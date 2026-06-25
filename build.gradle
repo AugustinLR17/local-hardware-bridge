@@ -63,6 +63,12 @@ tasks.named('build') {
     dependsOn shadowJar
 }
 
+tasks.configureEach {
+    if (name in ['distTar', 'distZip', 'startScripts', 'startShadowScripts', 'shadowDistTar', 'shadowDistZip']) {
+        enabled = false
+    }
+}
+
 tasks.register('createLinuxApp') {
     group = 'distribution'
     description = 'Creates Linux DEB package using jpackage'
