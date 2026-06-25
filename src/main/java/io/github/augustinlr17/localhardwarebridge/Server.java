@@ -3,6 +3,7 @@ package io.github.augustinlr17.localhardwarebridge;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.fazecast.jSerialComm.SerialPort;
 import io.javalin.Javalin;
 import io.javalin.community.ssl.SslPlugin;
@@ -29,6 +30,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 @Log4j2
 public class Server implements WebSocketServerInterface {
@@ -199,82 +201,11 @@ public class Server implements WebSocketServerInterface {
             }
         });
 
-        // Add HTTP Service
-        javalinServer.get("/config.json", ctx -> {
-            ctx.contentType(ContentType.APPLICATION_JSON).result(configService.getConfig().toJson());
-        });
-
-        javalinServer.put("/config.json", ctx -> {
-            configService.loadFromJson(ctx.body());
-            configService.save();
-
-            messageToService("/notification", objectMapper.writeValueAsString(new NotificationDTO("INFO", "Setting", "Setting saved successfully")));
-
-            ctx.contentType(ContentType.APPLICATION_JSON).result(configService.getConfig().toJson());
-        });
-
-        javalinServer.get("/system/printers.json", ctx -> {
-            ArrayList<PrintServiceDTO> dtos = new ArrayList<>();
-            for (PrintService service : PrinterJob.lookupPrintServices()) {
-                dtos.add(new PrintServiceDTO(service.getName(), ""));
-            }
-
-            ctx.contentType(ContentType.APPLICATION_JSON).result(objectMapper.writeValueAsString(dtos));
-        });
-
-        javalinServer.get("/system/serials.json", ctx -> {
-            ArrayList<SerialPortDTO> dtos = new ArrayList<>();
-            for (SerialPort port : SerialPort.getCommPorts()) {
-                dtos.add(new SerialPortDTO(port.getSystemPortName(), port.getPortDescription(), port.getManufacturer()));
-            }
-
-            ctx.contentType(ContentType.APPLICATION_JSON).result(objectMapper.writeValueAsString(dtos));
-        });
-
-        javalinServer.get("/system/version.json", ctx -> {
-            VersionDTO dto = new VersionDTO(Constants.APP_NAME, Constants.APP_ID, Constants.VERSION);
-
-            ctx.contentType(ContentType.APPLICATION_JSON).result(objectMapper.writeValueAsString(dto));
-        });
-
-        javalinServer.post("/system/restart.json", ctx -> {
-            stop();
-            ThreadUtil.silentSleep(500);
-            start();
-
-            messageToService("/notification", objectMapper.writeValueAsString(new NotificationDTO("INFO", "Restart", "Server restarted successfully")));
-        });
-
-        // Add HTTP Print Service
-        javalinServer.post("/printer", ctx -> {
-            if (printerWebSocketService == null) {
-                ctx.status(503).json("{\"error\": \"Printer service is disabled\"}");
-                return;
-            }
-
-            String body = ctx.body();
-            log.info("HTTP print request received: {}", body);
-
-            try {
-                PrintDocument printDocument = objectMapper.readValue(body, PrintDocument.class);
-                PrintResult result = printerWebSocketService.printDocument(printDocument);
-                ctx.contentType(ContentType.APPLICATION_JSON).result(objectMapper.writeValueAsString(result));
-            } catch (Exception e) {
-                log.error("HTTP print error: {}", e.getMessage());
-                ctx.status(500).json("{\"error\": \"" + e.getMessage().replace("\"", "'") + "\"}");
-            }
-        });
-
-        // Add HTTP Serial Write Service
-        javalinServer.post("/serial/{type}", ctx -> {
-            String type = ctx.pathParam("type");
-            String body = ctx.body();
-            log.info("HTTP serial write request received for type {}: {}", type, body);
-
-            messageToService("/serial/" + type, body);
-
-            ctx.contentType(ContentType.APPLICATION_JSON).result("{\"status\": \"submitted\"}");
-        });
+        // Add HTTP API endpoints
+        registerConfigEndpoints();
+        registerPrinterEndpoints();
+        registerSerialEndpoints();
+        registerSystemEndpoints();
 
         try {
             javalinServer.start(serverConfig.getBind(), serverConfig.getPort());
@@ -416,5 +347,376 @@ public class Server implements WebSocketServerInterface {
         serviceChannelSubscriptions.put(channel, serviceList);
 
         services.remove(service);
+    }
+
+    /*
+     * HTTP API - Config endpoints
+     */
+    private void registerConfigEndpoints() {
+        javalinServer.get("/config.json", ctx -> {
+            ctx.contentType(ContentType.APPLICATION_JSON).result(configService.getConfig().toJson());
+        });
+
+        javalinServer.put("/config.json", ctx -> {
+            configService.loadFromJson(ctx.body());
+            configService.save();
+
+            messageToService("/notification", objectMapper.writeValueAsString(new NotificationDTO("INFO", "Setting", "Setting saved successfully")));
+
+            ctx.contentType(ContentType.APPLICATION_JSON).result(configService.getConfig().toJson());
+        });
+    }
+
+    /*
+     * HTTP API - Printer endpoints
+     */
+    private void registerPrinterEndpoints() {
+        // List OS printers
+        javalinServer.get("/system/printers.json", ctx -> {
+            ArrayList<PrintServiceDTO> dtos = new ArrayList<>();
+            for (PrintService service : PrinterJob.lookupPrintServices()) {
+                dtos.add(new PrintServiceDTO(service.getName(), ""));
+            }
+            ctx.contentType(ContentType.APPLICATION_JSON).result(objectMapper.writeValueAsString(dtos));
+        });
+
+        // Submit print job
+        javalinServer.post("/printer", ctx -> {
+            if (printerWebSocketService == null) {
+                ctx.status(503).json("{\"error\": \"Printer service is disabled\"}");
+                return;
+            }
+
+            String body = ctx.body();
+            log.info("HTTP print request received: {}", body);
+
+            try {
+                PrintDocument printDocument = objectMapper.readValue(body, PrintDocument.class);
+                PrintResult result = printerWebSocketService.printDocument(printDocument);
+                ctx.contentType(ContentType.APPLICATION_JSON).result(objectMapper.writeValueAsString(result));
+            } catch (Exception e) {
+                log.error("HTTP print error: {}", e.getMessage());
+                ctx.status(500).json("{\"error\": \"" + e.getMessage().replace("\"", "'") + "\"}");
+            }
+        });
+
+        // List printer mappings
+        javalinServer.get("/printer/mappings", ctx -> {
+            Config config = configService.getConfig();
+            ctx.contentType(ContentType.APPLICATION_JSON).result(objectMapper.writeValueAsString(config.getPrinter()));
+        });
+
+        // Add printer mapping
+        javalinServer.post("/printer/mappings", ctx -> {
+            Config.PrinterMapping mapping = objectMapper.readValue(ctx.body(), Config.PrinterMapping.class);
+            configService.getConfig().getPrinter().getMappings().add(mapping);
+            configService.save();
+
+            messageToService("/notification", objectMapper.writeValueAsString(new NotificationDTO("INFO", "Printer", "Printer mapping added: " + mapping.getType())));
+
+            ctx.contentType(ContentType.APPLICATION_JSON).result(objectMapper.writeValueAsString(configService.getConfig().getPrinter()));
+        });
+
+        // Update printer mapping by type
+        javalinServer.put("/printer/mappings/{type}", ctx -> {
+            String type = ctx.pathParam("type");
+            Config.PrinterMapping updated = objectMapper.readValue(ctx.body(), Config.PrinterMapping.class);
+
+            ArrayList<Config.PrinterMapping> mappings = configService.getConfig().getPrinter().getMappings();
+            boolean found = false;
+            for (int i = 0; i < mappings.size(); i++) {
+                if (type.equals(mappings.get(i).getType())) {
+                    mappings.set(i, updated);
+                    found = true;
+                    break;
+                }
+            }
+
+            if (!found) {
+                ctx.status(404).json("{\"error\": \"Printer mapping not found: " + type + "\"}");
+                return;
+            }
+
+            configService.save();
+
+            messageToService("/notification", objectMapper.writeValueAsString(new NotificationDTO("INFO", "Printer", "Printer mapping updated: " + type)));
+
+            ctx.contentType(ContentType.APPLICATION_JSON).result(objectMapper.writeValueAsString(configService.getConfig().getPrinter()));
+        });
+
+        // Delete printer mapping by type
+        javalinServer.delete("/printer/mappings/{type}", ctx -> {
+            String type = ctx.pathParam("type");
+            ArrayList<Config.PrinterMapping> mappings = configService.getConfig().getPrinter().getMappings();
+            boolean removed = mappings.removeIf(m -> type.equals(m.getType()));
+
+            if (!removed) {
+                ctx.status(404).json("{\"error\": \"Printer mapping not found: " + type + "\"}");
+                return;
+            }
+
+            configService.save();
+
+            messageToService("/notification", objectMapper.writeValueAsString(new NotificationDTO("INFO", "Printer", "Printer mapping deleted: " + type)));
+
+            ctx.contentType(ContentType.APPLICATION_JSON).result(objectMapper.writeValueAsString(configService.getConfig().getPrinter()));
+        });
+
+        // Enable/disable printer service
+        javalinServer.put("/printer/enabled", ctx -> {
+            JsonNode node = objectMapper.readTree(ctx.body());
+            configService.getConfig().getPrinter().setEnabled(node.get("enabled").asBoolean());
+            configService.save();
+
+            messageToService("/notification", objectMapper.writeValueAsString(new NotificationDTO("INFO", "Printer", "Printer service " + (node.get("enabled").asBoolean() ? "enabled" : "disabled"))));
+
+            ctx.contentType(ContentType.APPLICATION_JSON).result(objectMapper.writeValueAsString(configService.getConfig().getPrinter()));
+        });
+    }
+
+    /*
+     * HTTP API - Serial endpoints
+     */
+    private void registerSerialEndpoints() {
+        // List OS serial ports
+        javalinServer.get("/system/serials.json", ctx -> {
+            ArrayList<SerialPortDTO> dtos = new ArrayList<>();
+            for (SerialPort port : SerialPort.getCommPorts()) {
+                dtos.add(new SerialPortDTO(port.getSystemPortName(), port.getPortDescription(), port.getManufacturer()));
+            }
+            ctx.contentType(ContentType.APPLICATION_JSON).result(objectMapper.writeValueAsString(dtos));
+        });
+
+        // List serial mappings (registered BEFORE wildcard /serial/{type})
+        javalinServer.get("/serial/mappings", ctx -> {
+            Config config = configService.getConfig();
+            ctx.contentType(ContentType.APPLICATION_JSON).result(objectMapper.writeValueAsString(config.getSerial()));
+        });
+
+        // Add serial mapping
+        javalinServer.post("/serial/mappings", ctx -> {
+            Config.SerialMapping mapping = objectMapper.readValue(ctx.body(), Config.SerialMapping.class);
+            configService.getConfig().getSerial().getMappings().add(mapping);
+            configService.save();
+
+            messageToService("/notification", objectMapper.writeValueAsString(new NotificationDTO("INFO", "Serial", "Serial mapping added: " + mapping.getType())));
+
+            ctx.contentType(ContentType.APPLICATION_JSON).result(objectMapper.writeValueAsString(configService.getConfig().getSerial()));
+        });
+
+        // Update serial mapping by type
+        javalinServer.put("/serial/mappings/{type}", ctx -> {
+            String type = ctx.pathParam("type");
+            Config.SerialMapping updated = objectMapper.readValue(ctx.body(), Config.SerialMapping.class);
+
+            ArrayList<Config.SerialMapping> mappings = configService.getConfig().getSerial().getMappings();
+            boolean found = false;
+            for (int i = 0; i < mappings.size(); i++) {
+                if (type.equals(mappings.get(i).getType())) {
+                    mappings.set(i, updated);
+                    found = true;
+                    break;
+                }
+            }
+
+            if (!found) {
+                ctx.status(404).json("{\"error\": \"Serial mapping not found: " + type + "\"}");
+                return;
+            }
+
+            configService.save();
+
+            messageToService("/notification", objectMapper.writeValueAsString(new NotificationDTO("INFO", "Serial", "Serial mapping updated: " + type)));
+
+            ctx.contentType(ContentType.APPLICATION_JSON).result(objectMapper.writeValueAsString(configService.getConfig().getSerial()));
+        });
+
+        // Delete serial mapping by type
+        javalinServer.delete("/serial/mappings/{type}", ctx -> {
+            String type = ctx.pathParam("type");
+            ArrayList<Config.SerialMapping> mappings = configService.getConfig().getSerial().getMappings();
+            boolean removed = mappings.removeIf(m -> type.equals(m.getType()));
+
+            if (!removed) {
+                ctx.status(404).json("{\"error\": \"Serial mapping not found: " + type + "\"}");
+                return;
+            }
+
+            configService.save();
+
+            messageToService("/notification", objectMapper.writeValueAsString(new NotificationDTO("INFO", "Serial", "Serial mapping deleted: " + type)));
+
+            ctx.contentType(ContentType.APPLICATION_JSON).result(objectMapper.writeValueAsString(configService.getConfig().getSerial()));
+        });
+
+        // Enable/disable serial service
+        javalinServer.put("/serial/enabled", ctx -> {
+            JsonNode node = objectMapper.readTree(ctx.body());
+            configService.getConfig().getSerial().setEnabled(node.get("enabled").asBoolean());
+            configService.save();
+
+            messageToService("/notification", objectMapper.writeValueAsString(new NotificationDTO("INFO", "Serial", "Serial service " + (node.get("enabled").asBoolean() ? "enabled" : "disabled"))));
+
+            ctx.contentType(ContentType.APPLICATION_JSON).result(objectMapper.writeValueAsString(configService.getConfig().getSerial()));
+        });
+
+        // Get serial port status (registered BEFORE wildcard /serial/{type})
+        javalinServer.get("/serial/status", ctx -> {
+            ArrayList<SerialPortDTO> dtos = new ArrayList<>();
+            for (SerialPort port : SerialPort.getCommPorts()) {
+                SerialPortDTO dto = new SerialPortDTO(port.getSystemPortName(), port.getPortDescription(), port.getManufacturer());
+                dtos.add(dto);
+            }
+
+            ArrayList<JsonNode> statuses = new ArrayList<>();
+            for (SerialPortDTO dto : dtos) {
+                ObjectNode statusNode = objectMapper.createObjectNode();
+                statusNode.put("port", dto.name);
+                statusNode.put("description", dto.description);
+                statusNode.put("manufacturer", dto.manufacturer);
+
+                SerialPort port = SerialPort.getCommPort(dto.name);
+                statusNode.put("open", port.isOpen());
+
+                Config.SerialMapping mapping = configService.getConfig().getSerial().getMappings().stream()
+                    .filter(m -> dto.name.equals(m.getName()))
+                    .findFirst().orElse(null);
+                statusNode.put("mapped", mapping != null);
+                if (mapping != null) {
+                    statusNode.put("type", mapping.getType());
+                }
+
+                statuses.add(statusNode);
+            }
+
+            ctx.contentType(ContentType.APPLICATION_JSON).result(objectMapper.writeValueAsString(statuses));
+        });
+
+        // Get connected WebSocket clients per channel (registered BEFORE wildcard)
+        javalinServer.get("/serial/connections", ctx -> {
+            ObjectNode connections = objectMapper.createObjectNode();
+            for (Map.Entry<String, ConcurrentLinkedQueue<WsContext>> entry : socketChannelSubscriptions.entrySet()) {
+                if (entry.getKey().startsWith("/serial/")) {
+                    connections.put(entry.getKey(), entry.getValue().size());
+                }
+            }
+            ctx.contentType(ContentType.APPLICATION_JSON).result(objectMapper.writeValueAsString(connections));
+        });
+
+        // Write to serial port by type (wildcard - registered AFTER static routes)
+        javalinServer.post("/serial/{type}", ctx -> {
+            String type = ctx.pathParam("type");
+            String body = ctx.body();
+            log.info("HTTP serial write request received for type {}: {}", type, body);
+
+            messageToService("/serial/" + type, body);
+
+            ctx.contentType(ContentType.APPLICATION_JSON).result("{\"status\": \"submitted\"}");
+        });
+    }
+
+    /*
+     * HTTP API - System endpoints
+     */
+    private void registerSystemEndpoints() {
+        // Version
+        javalinServer.get("/system/version.json", ctx -> {
+            VersionDTO dto = new VersionDTO(Constants.APP_NAME, Constants.APP_ID, Constants.VERSION);
+            ctx.contentType(ContentType.APPLICATION_JSON).result(objectMapper.writeValueAsString(dto));
+        });
+
+        // Restart
+        javalinServer.post("/system/restart.json", ctx -> {
+            stop();
+            ThreadUtil.silentSleep(500);
+            start();
+
+            messageToService("/notification", objectMapper.writeValueAsString(new NotificationDTO("INFO", "Restart", "Server restarted successfully")));
+
+            ctx.contentType(ContentType.APPLICATION_JSON).result("{\"status\": \"restarted\"}");
+        });
+
+        // Health check
+        javalinServer.get("/system/health", ctx -> {
+            ObjectNode health = objectMapper.createObjectNode();
+            health.put("status", "UP");
+            health.put("appName", Constants.APP_NAME);
+            health.put("version", Constants.VERSION);
+
+            ObjectNode servicesNode = objectMapper.createObjectNode();
+            for (WebSocketServiceInterface svc : services) {
+                servicesNode.put(svc.getClass().getSimpleName(), true);
+            }
+            health.set("services", servicesNode);
+
+            ObjectNode connectionsNode = objectMapper.createObjectNode();
+            for (Map.Entry<String, ConcurrentLinkedQueue<WsContext>> entry : socketChannelSubscriptions.entrySet()) {
+                connectionsNode.put(entry.getKey(), entry.getValue().size());
+            }
+            health.set("connections", connectionsNode);
+
+            ctx.contentType(ContentType.APPLICATION_JSON).result(objectMapper.writeValueAsString(health));
+        });
+
+        // Send notification
+        javalinServer.post("/system/notification", ctx -> {
+            NotificationDTO notification = objectMapper.readValue(ctx.body(), NotificationDTO.class);
+            messageToService("/notification", objectMapper.writeValueAsString(notification));
+
+            ctx.contentType(ContentType.APPLICATION_JSON).result("{\"status\": \"sent\"}");
+        });
+
+        // List all WebSocket connections
+        javalinServer.get("/system/connections", ctx -> {
+            ObjectNode connections = objectMapper.createObjectNode();
+            for (Map.Entry<String, ConcurrentLinkedQueue<WsContext>> entry : socketChannelSubscriptions.entrySet()) {
+                connections.put(entry.getKey(), entry.getValue().size());
+            }
+            ctx.contentType(ContentType.APPLICATION_JSON).result(objectMapper.writeValueAsString(connections));
+        });
+
+        // Server config (bind, port, auth, tls)
+        javalinServer.get("/system/server.json", ctx -> {
+            ctx.contentType(ContentType.APPLICATION_JSON).result(objectMapper.writeValueAsString(configService.getConfig().getServer()));
+        });
+
+        // Update server config
+        javalinServer.put("/system/server.json", ctx -> {
+            Config.Server updated = objectMapper.readValue(ctx.body(), Config.Server.class);
+            configService.getConfig().setServer(updated);
+            configService.save();
+
+            messageToService("/notification", objectMapper.writeValueAsString(new NotificationDTO("INFO", "Server", "Server configuration updated. Restart required.")));
+
+            ctx.contentType(ContentType.APPLICATION_JSON).result(objectMapper.writeValueAsString(configService.getConfig().getServer()));
+        });
+
+        // Downloader config
+        javalinServer.get("/system/downloader.json", ctx -> {
+            ctx.contentType(ContentType.APPLICATION_JSON).result(objectMapper.writeValueAsString(configService.getConfig().getDownloader()));
+        });
+
+        // Update downloader config
+        javalinServer.put("/system/downloader.json", ctx -> {
+            Config.Downloader updated = objectMapper.readValue(ctx.body(), Config.Downloader.class);
+            configService.getConfig().setDownloader(updated);
+            configService.save();
+
+            ctx.contentType(ContentType.APPLICATION_JSON).result(objectMapper.writeValueAsString(configService.getConfig().getDownloader()));
+        });
+
+        // GUI config
+        javalinServer.get("/system/gui.json", ctx -> {
+            ctx.contentType(ContentType.APPLICATION_JSON).result(objectMapper.writeValueAsString(configService.getConfig().getGui()));
+        });
+
+        // Update GUI config
+        javalinServer.put("/system/gui.json", ctx -> {
+            Config.GUI updated = objectMapper.readValue(ctx.body(), Config.GUI.class);
+            configService.getConfig().setGui(updated);
+            configService.save();
+
+            ctx.contentType(ContentType.APPLICATION_JSON).result(objectMapper.writeValueAsString(configService.getConfig().getGui()));
+        });
     }
 }
