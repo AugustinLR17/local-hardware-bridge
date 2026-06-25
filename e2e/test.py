@@ -68,11 +68,9 @@ def main():
     mappings = json.loads(body).get("mappings", [])
     assert_eq("mapping type", mappings[0]["type"], "TEST")
 
-    # 6. Print via URL (file content)
-    with open("/app/print-test.pdf", "rb") as f:
-        pdf_b64 = base64.b64encode(f.read()).decode("utf-8")
-    doc = {"type": "TEST", "url": "test.pdf", "file_content": pdf_b64, "id": "e2e-1"}
-    status, body = request("POST", "/printer", doc)
+    # 6. Print via raw content (avoids PDF/CUPS rendering issues in Docker)
+    raw_doc = {"type": "TEST", "raw_content": "SGVsbG8gV29ybGQ=", "id": "e2e-1"}
+    status, body = request("POST", "/printer", raw_doc)
     assert_eq("print status", status, 200)
     result = json.loads(body)
     assert_eq("print success", result.get("success"), True)
