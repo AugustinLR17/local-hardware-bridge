@@ -86,7 +86,7 @@ def main():
     # Wait a moment for config to take effect
     time.sleep(1)
 
-    status, body = request("POST", "/printer", doc)
+    status, body = request("POST", "/printer", raw_doc)
     assert_eq("blocked printer status", status, 403)
 
     # Re-enable for clean state
@@ -100,10 +100,10 @@ def main():
     assert_eq("set password status", status, 200)
     time.sleep(1)
 
-    status, body = request("POST", "/printer", doc)
+    status, body = request("POST", "/printer", raw_doc)
     assert_eq("printer without password status", status, 401)
 
-    status, body = request("POST", "/printer", doc, {"Authorization": "Bearer secret123"})
+    status, body = request("POST", "/printer", raw_doc, {"Authorization": "Bearer secret123"})
     assert_eq("printer with password status", status, 200)
     result = json.loads(body)
     assert_eq("printer with password success", result.get("success"), True)
