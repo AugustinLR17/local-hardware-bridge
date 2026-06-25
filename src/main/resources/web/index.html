@@ -1,316 +1,483 @@
 <!doctype html>
-<!--suppress JSUnusedGlobalSymbols, HtmlFormInputWithoutLabel, JSUnresolvedReference -->
-<html lang="en" xmlns: xmlns:@vue>
+<html lang="en">
 <head>
     <meta charset="utf-8">
     <meta content="width=device-width,initial-scale=1" name="viewport">
-    <title>Local Hardware Bridge Web UI</title>
+    <title>Local Hardware Bridge</title>
     <link href="css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --lhb-bg: #0f1117;
+            --lhb-surface: #1a1d27;
+            --lhb-surface2: #242836;
+            --lhb-border: #2e3348;
+            --lhb-text: #e2e4f0;
+            --lhb-text-dim: #8b8fa8;
+            --lhb-accent: #6c72ff;
+            --lhb-accent-hover: #8186ff;
+            --lhb-success: #4ade80;
+            --lhb-danger: #f87171;
+            --lhb-warning: #fbbf24;
+            --lhb-info: #38bdf8;
+        }
+        body {
+            background: var(--lhb-bg);
+            color: var(--lhb-text);
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        }
+        .lhb-card {
+            background: var(--lhb-surface);
+            border: 1px solid var(--lhb-border);
+            border-radius: 12px;
+            padding: 1.25rem;
+            margin-bottom: 1rem;
+        }
+        .lhb-card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid var(--lhb-border);
+        }
+        .lhb-card-title {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--lhb-text);
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .lhb-badge {
+            font-size: 0.7rem;
+            padding: 2px 8px;
+            border-radius: 99px;
+            background: var(--lhb-accent);
+            color: #fff;
+            font-weight: 500;
+        }
+        .lhb-form-label {
+            color: var(--lhb-text-dim);
+            font-size: 0.8rem;
+            font-weight: 500;
+            margin-bottom: 0.3rem;
+        }
+        .lhb-form-control {
+            background: var(--lhb-surface2);
+            border: 1px solid var(--lhb-border);
+            border-radius: 8px;
+            color: var(--lhb-text);
+            padding: 0.4rem 0.6rem;
+            font-size: 0.85rem;
+            width: 100%;
+            transition: border-color 0.2s;
+        }
+        .lhb-form-control:focus {
+            border-color: var(--lhb-accent);
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(108, 114, 255, 0.2);
+        }
+        select.lhb-form-control {
+            appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238b8fa8' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 0.5rem center;
+            padding-right: 1.5rem;
+        }
+        .lhb-toggle {
+            position: relative;
+            width: 40px;
+            height: 22px;
+        }
+        .lhb-toggle input { opacity: 0; width: 0; height: 0; }
+        .lhb-toggle-slider {
+            position: absolute;
+            inset: 0;
+            background: var(--lhb-surface2);
+            border: 1px solid var(--lhb-border);
+            border-radius: 99px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .lhb-toggle-slider::before {
+            content: '';
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            left: 2px;
+            bottom: 2px;
+            background: var(--lhb-text-dim);
+            border-radius: 50%;
+            transition: 0.2s;
+        }
+        .lhb-toggle input:checked + .lhb-toggle-slider {
+            background: var(--lhb-accent);
+            border-color: var(--lhb-accent);
+        }
+        .lhb-toggle input:checked + .lhb-toggle-slider::before {
+            transform: translateX(18px);
+            background: #fff;
+        }
+        .lhb-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 0.75rem;
+        }
+        .lhb-row-label { flex: 1; }
+        .lhb-row-value { width: 200px; }
+        .lhb-btn {
+            border: none;
+            border-radius: 8px;
+            padding: 0.45rem 1rem;
+            font-size: 0.85rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+        .lhb-btn-accent { background: var(--lhb-accent); color: #fff; }
+        .lhb-btn-accent:hover { background: var(--lhb-accent-hover); }
+        .lhb-btn-success { background: rgba(74, 222, 128, 0.15); color: var(--lhb-success); }
+        .lhb-btn-success:hover { background: rgba(74, 222, 128, 0.25); }
+        .lhb-btn-danger { background: rgba(248, 113, 113, 0.15); color: var(--lhb-danger); }
+        .lhb-btn-danger:hover { background: rgba(248, 113, 113, 0.25); }
+        .lhb-btn-warning { background: rgba(251, 191, 36, 0.15); color: var(--lhb-warning); }
+        .lhb-btn-warning:hover { background: rgba(251, 191, 36, 0.25); }
+        .lhb-btn-sm { padding: 0.3rem 0.7rem; font-size: 0.78rem; }
+        .lhb-nav {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem 0;
+            margin-bottom: 1.5rem;
+            border-bottom: 1px solid var(--lhb-border);
+        }
+        .lhb-nav-brand {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--lhb-text);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .lhb-nav-brand svg { color: var(--lhb-accent); }
+        .lhb-nav-actions { display: flex; gap: 0.5rem; }
+        .lhb-mapping-card {
+            background: var(--lhb-surface2);
+            border: 1px solid var(--lhb-border);
+            border-radius: 10px;
+            padding: 1rem;
+            margin-bottom: 0.75rem;
+        }
+        .lhb-mapping-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 0.75rem;
+        }
+        .lhb-mapping-title {
+            font-weight: 600;
+            font-size: 0.85rem;
+            color: var(--lhb-accent);
+        }
+        .lhb-status-dot {
+            width: 8px; height: 8px; border-radius: 50%; display: inline-block;
+        }
+        .lhb-status-dot.on { background: var(--lhb-success); }
+        .lhb-status-dot.off { background: var(--lhb-danger); }
+        .lhb-section-icon { font-size: 1rem; }
+        .lhb-health {
+            display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem;
+        }
+        .lhb-health-chip {
+            background: var(--lhb-surface2);
+            border: 1px solid var(--lhb-border);
+            border-radius: 99px;
+            padding: 0.3rem 0.8rem;
+            font-size: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+        .form-check-input { display: none; }
+    </style>
 </head>
 <body>
 <div @vue:mounted="mounted" v-scope>
     <div class="container">
-        <header class="d-flex flex-wrap justify-content-center py-3 mb-4 border-bottom">
-            <a class="d-flex align-items-center mb-3 mb-md-0 me-md-auto link-body-emphasis text-decoration-none" href="#">
-                <span class="fs-4">Local Hardware Bridge Web UI</span>
-            </a>
-            <button @click="saveConfig" class="btn btn-success ms-2">Save</button>
-            <button @click="restartServer" class="btn btn-warning ms-2">Restart Server</button>
-        </header>
+        <nav class="lhb-nav">
+            <div class="lhb-nav-brand">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 18L18 6M6 6l12 12"/></svg>
+                Local Hardware Bridge
+            </div>
+            <div class="lhb-nav-actions">
+                <button @click="saveConfig" class="lhb-btn lhb-btn-success">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v9a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                    Save
+                </button>
+                <button @click="restartServer" class="lhb-btn lhb-btn-warning">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+                    Restart
+                </button>
+            </div>
+        </nav>
+
+        <div v-if="health" class="lhb-health">
+            <div class="lhb-health-chip">
+                <span class="lhb-status-dot" :class="health.status === 'UP' ? 'on' : 'off'"></span>
+                {{ health.status }}
+            </div>
+            <div class="lhb-health-chip" v-for="(active, name) in health.services">
+                <span class="lhb-status-dot" :class="active ? 'on' : 'off'"></span>
+                {{ name }}
+            </div>
+            <div class="lhb-health-chip">
+                v{{ health.version }}
+            </div>
+        </div>
     </div>
+
     <div class="container" v-if="config != null">
         <div class="row">
             <div class="mb-2 col-xl-4">
-                <div class="card mb-2">
-                    <div class="card-body">
-                        <h5 class="card-title mb-3">GUI</h5>
+                <div class="lhb-card">
+                    <div class="lhb-card-header">
+                        <h5 class="lhb-card-title">
+                            <span class="lhb-section-icon">🔔</span> Notifications
+                        </h5>
+                    </div>
+                    <div class="lhb-row">
+                        <span class="lhb-row-label lhb-form-label">Enable notifications</span>
+                        <label class="lhb-toggle">
+                            <input type="checkbox" v-model="config.gui.notification.enabled"/>
+                            <span class="lhb-toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
 
-                        <div class="form-group row mb-2">
-                            <label class="col-sm-10" for="gui-notification-enabled">Enable notification</label>
-                            <div class="col-sm-2 text-end">
-                                <input class="form-check-input" id="gui-notification-enabled" type="checkbox" v-model="config.gui.notification.enabled"/>
-                            </div>
+                <div class="lhb-card">
+                    <div class="lhb-card-header">
+                        <h5 class="lhb-card-title">
+                            <span class="lhb-section-icon">🌐</span> Server
+                            <span class="lhb-badge">{{ config.server.tls.enabled ? 'HTTPS' : 'HTTP' }}</span>
+                        </h5>
+                    </div>
+                    <div class="lhb-row">
+                        <span class="lhb-row-label lhb-form-label">Bind Address</span>
+                        <div class="lhb-row-value"><input class="lhb-form-control" type="text" v-model="config.server.bind"/></div>
+                    </div>
+                    <div class="lhb-row">
+                        <span class="lhb-row-label lhb-form-label">Public Address</span>
+                        <div class="lhb-row-value"><input class="lhb-form-control" type="text" v-model="config.server.address"/></div>
+                    </div>
+                    <div class="lhb-row">
+                        <span class="lhb-row-label lhb-form-label">Port</span>
+                        <div class="lhb-row-value"><input class="lhb-form-control" type="number" min="1024" max="65535" v-model="config.server.port"/></div>
+                    </div>
+                    <div class="lhb-row">
+                        <span class="lhb-row-label lhb-form-label">Authentication</span>
+                        <label class="lhb-toggle">
+                            <input type="checkbox" v-model="config.server.authentication.enabled"/>
+                            <span class="lhb-toggle-slider"></span>
+                        </label>
+                    </div>
+                    <div v-if="config.server.authentication.enabled" style="margin-bottom:0.75rem">
+                        <div class="lhb-row">
+                            <span class="lhb-row-label lhb-form-label">Token</span>
+                            <div class="lhb-row-value"><input class="lhb-form-control" type="password" v-model="config.server.authentication.token"/></div>
+                        </div>
+                    </div>
+                    <div class="lhb-row">
+                        <span class="lhb-row-label lhb-form-label">TLS / WSS</span>
+                        <label class="lhb-toggle">
+                            <input type="checkbox" v-model="config.server.tls.enabled"/>
+                            <span class="lhb-toggle-slider"></span>
+                        </label>
+                    </div>
+                    <div v-if="config.server.tls.enabled">
+                        <div class="lhb-row">
+                            <span class="lhb-row-label lhb-form-label">Self-Signed</span>
+                            <label class="lhb-toggle">
+                                <input type="checkbox" v-model="config.server.tls.selfSigned"/>
+                                <span class="lhb-toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="lhb-row">
+                            <span class="lhb-row-label lhb-form-label">Certificate</span>
+                            <div class="lhb-row-value"><input class="lhb-form-control" type="text" v-model="config.server.tls.cert"/></div>
+                        </div>
+                        <div class="lhb-row">
+                            <span class="lhb-row-label lhb-form-label">Private Key</span>
+                            <div class="lhb-row-value"><input class="lhb-form-control" type="text" v-model="config.server.tls.key"/></div>
+                        </div>
+                        <div class="lhb-row">
+                            <span class="lhb-row-label lhb-form-label">CA Bundle</span>
+                            <div class="lhb-row-value"><input class="lhb-form-control" type="text" v-model="config.server.tls.caBundle"/></div>
                         </div>
                     </div>
                 </div>
 
-                <div class="card mb-2">
-                    <div class="card-body">
-                        <h5 class="card-title mb-3">Web/WebSocket Server</h5>
-
-                        <div class="form-group row mb-2">
-                            <label class="col-sm-4" for="server-bind">Bind</label>
-                            <div class="col-sm-8">
-                                <input class="form-control form-control-sm" id="server-bind" type="text" v-model="config.server.bind"/>
-                            </div>
-                        </div>
-
-                        <div class="form-group row mb-2">
-                            <label class="col-sm-4" for="server-address">Address</label>
-                            <div class="col-sm-8">
-                                <input class="form-control form-control-sm" id="server-address" type="text" v-model="config.server.address"/>
-                            </div>
-                        </div>
-
-                        <div class="form-group row mb-2">
-                            <label class="col-sm-4" for="server-port">Port</label>
-                            <div class="col-sm-8">
-                                <input class="form-control form-control-sm" id="server-port" max="65535" min="1024" type="number" v-model="config.server.port"/>
-                            </div>
-                        </div>
-
-                        <div class="form-group row mb-2">
-                            <label class="col-sm-10" for="server-authentication-enabled">Enable authentication</label>
-                            <div class="col-sm-2 text-end">
-                                <input class="form-check-input" id="server-authentication-enabled" type="checkbox" v-model="config.server.authentication.enabled"/>
-                            </div>
-                        </div>
-
-                        <div class="card mb-2" v-if="config.server.authentication.enabled">
-                            <div class="card-body"><h6 class="card-title mb-3">Authentication</h6>
-                                <div class="form-group row mb-2">
-                                    <label class="col-sm-4" for="server-authentication-token">Token</label>
-                                    <div class="col-sm-8">
-                                        <input class="form-control form-control-sm" id="server-authentication-token" type="text" v-model="config.server.authentication.token"/>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="form-group row mb-2">
-                            <label class="col-sm-10" for="server-tls-enabled">Enable TLS</label>
-                            <div class="col-sm-2 text-end">
-                                <input class="form-check-input" id="server-tls-enabled" type="checkbox" v-model="config.server.tls.enabled"/>
-                            </div>
-                        </div>
-
-                        <div class="card mb-2" v-if="config.server.tls.enabled">
-                            <div class="card-body"><h6 class="card-title mb-3">TLS</h6>
-                                <div class="form-group row mb-2">
-                                    <label class="col-sm-4" for="server-tls-self-signed">Self Signed</label>
-                                    <div class="col-sm-8">
-                                        <input class="form-check-input" id="server-tls-self-signed" type="checkbox" v-model="config.server.tls.selfSigned"/>
-                                    </div>
-                                </div>
-
-                                <div class="form-group row mb-2">
-                                    <label class="col-sm-4" for="server-tls-cert">Cert</label>
-                                    <div class="col-sm-8">
-                                        <input class="form-control form-control-sm" id="server-tls-cert" type="text" v-model="config.server.tls.cert"/>
-                                    </div>
-                                </div>
-
-                                <div class="form-group row mb-2">
-                                    <label class="col-sm-4" for="server-tls-key">Key</label>
-                                    <div class="col-sm-8">
-                                        <input class="form-control form-control-sm" id="server-tls-key" type="text" v-model="config.server.tls.key"/>
-                                    </div>
-                                </div>
-
-                                <div class="form-group row mb-2">
-                                    <label class="col-sm-4" for="server-tls-ca-bundle">CA Bundle</label>
-                                    <div class="col-sm-8">
-                                        <input class="form-control form-control-sm" id="server-tls-ca-bundle" type="text" v-model="config.server.tls.caBundle"/>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                <div class="lhb-card">
+                    <div class="lhb-card-header">
+                        <h5 class="lhb-card-title">
+                            <span class="lhb-section-icon">⬇️</span> Downloader
+                        </h5>
                     </div>
-                </div>
-
-                <div class="card">
-                    <div class="card-body">
-                        <h5 class="card-title mb-3">Downloader</h5>
-
-                        <div class="form-group row mb-2">
-                            <label class="col-sm-4" for="downloader-path">Path</label>
-                            <div class="col-sm-8">
-                                <input class="form-control form-control-sm" id="downloader-path" type="text" v-model="config.downloader.path"/>
-                            </div>
-                        </div>
-
-                        <div class="form-group row mb-2">
-                            <label class="col-sm-4" for="downloader-timeout">Timeout</label>
-                            <div class="col-sm-8">
-                                <input class="form-control form-control-sm" id="downloader-timeout" type="number" v-model="config.downloader.timeout"/>
-                            </div>
-                        </div>
-
-                        <div class="form-group row mb-2">
-                            <label class="col-sm-10" for="downloader-ignore-tls-certificate-error">Ignore TLS certificate error</label>
-                            <div class="col-sm-2 text-end">
-                                <input class="form-check-input" id="downloader-ignore-tls-certificate-error" type="checkbox" v-model="config.downloader.ignoreTLSCertificateError"/>
-                            </div>
-                        </div>
+                    <div class="lhb-row">
+                        <span class="lhb-row-label lhb-form-label">Download Path</span>
+                        <div class="lhb-row-value"><input class="lhb-form-control" type="text" v-model="config.downloader.path"/></div>
+                    </div>
+                    <div class="lhb-row">
+                        <span class="lhb-row-label lhb-form-label">Timeout (s)</span>
+                        <div class="lhb-row-value"><input class="lhb-form-control" type="number" v-model="config.downloader.timeout"/></div>
+                    </div>
+                    <div class="lhb-row">
+                        <span class="lhb-row-label lhb-form-label">Ignore TLS Errors</span>
+                        <label class="lhb-toggle">
+                            <input type="checkbox" v-model="config.downloader.ignoreTLSCertificateError"/>
+                            <span class="lhb-toggle-slider"></span>
+                        </label>
                     </div>
                 </div>
             </div>
 
-
             <div class="mb-2 col-xl-4">
-                <div class="card">
-                    <div class="card-body">
-                        <h5 class="card-title mb-3">
-                            Printers
-                            <button @click="addPrinter" class="btn btn-sm btn-success float-end">+</button>
+                <div class="lhb-card">
+                    <div class="lhb-card-header">
+                        <h5 class="lhb-card-title">
+                            <span class="lhb-section-icon">🖨️</span> Printers
+                            <span class="lhb-badge">{{ config.printer.mappings.length }}</span>
                         </h5>
+                        <button @click="addPrinter" class="lhb-btn lhb-btn-accent lhb-btn-sm">+ Add</button>
+                    </div>
+                    <div class="lhb-row">
+                        <span class="lhb-row-label lhb-form-label">Enabled</span>
+                        <label class="lhb-toggle">
+                            <input type="checkbox" v-model="config.printer.enabled"/>
+                            <span class="lhb-toggle-slider"></span>
+                        </label>
+                    </div>
+                    <div class="lhb-row">
+                        <span class="lhb-row-label lhb-form-label">Auto-add unknown types</span>
+                        <label class="lhb-toggle">
+                            <input type="checkbox" v-model="config.printer.autoAddUnknownType"/>
+                            <span class="lhb-toggle-slider"></span>
+                        </label>
+                    </div>
+                    <div class="lhb-row">
+                        <span class="lhb-row-label lhb-form-label">Fallback to default</span>
+                        <label class="lhb-toggle">
+                            <input type="checkbox" v-model="config.printer.fallbackToDefault"/>
+                            <span class="lhb-toggle-slider"></span>
+                        </label>
+                    </div>
 
-                        <div class="clearfix pb-3"></div>
-
-                        <div class="form-group row mb-2">
-                            <label class="col-sm-10" for="printer-enabled">Enabled</label>
-                            <div class="col-sm-2 text-end">
-                                <input class="form-check-input" id="printer-enabled" type="checkbox" v-model="config.printer.enabled"/>
+                    <div class="lhb-mapping-card" v-for="(printer, index) in config.printer.mappings">
+                        <div class="lhb-mapping-header">
+                            <span class="lhb-mapping-title">{{ printer.type || 'New Mapping' }}</span>
+                            <button @click="removePrinter(index)" class="lhb-btn lhb-btn-danger lhb-btn-sm">Remove</button>
+                        </div>
+                        <div class="lhb-row">
+                            <span class="lhb-row-label lhb-form-label">Type</span>
+                            <div class="lhb-row-value"><input class="lhb-form-control" type="text" v-model="printer.type"/></div>
+                        </div>
+                        <div class="lhb-row">
+                            <span class="lhb-row-label lhb-form-label">Printer</span>
+                            <div class="lhb-row-value">
+                                <select class="lhb-form-control" v-model="printer.name">
+                                    <option :value="p.name" v-for="p in printers">{{ p.name }}</option>
+                                </select>
                             </div>
                         </div>
-
-                        <div class="form-group row mb-2">
-                            <label class="col-sm-10" for="printer-auto-add-unknown-type">Auto add unknown type</label>
-                            <div class="col-sm-2 text-end">
-                                <input class="form-check-input" id="printer-auto-add-unknown-type" type="checkbox" v-model="config.printer.autoAddUnknownType"/>
-                            </div>
+                        <div class="lhb-row">
+                            <span class="lhb-row-label lhb-form-label">Auto rotate</span>
+                            <label class="lhb-toggle">
+                                <input type="checkbox" v-model="printer.autoRotate"/>
+                                <span class="lhb-toggle-slider"></span>
+                            </label>
                         </div>
-
-                        <div class="form-group row mb-2">
-                            <label class="col-sm-10" for="printer-fallback-to-default">Fallback to default printer if none matched</label>
-                            <div class="col-sm-2 text-end">
-                                <input class="form-check-input" id="printer-fallback-to-default" type="checkbox" v-model="config.printer.fallbackToDefault"/>
-                            </div>
+                        <div class="lhb-row">
+                            <span class="lhb-row-label lhb-form-label">Reset imageable area</span>
+                            <label class="lhb-toggle">
+                                <input type="checkbox" v-model="printer.resetImageableArea"/>
+                                <span class="lhb-toggle-slider"></span>
+                            </label>
                         </div>
-
-                        <div class="card mb-2" v-for="(printer, index) in config.printer.mappings">
-                            <div class="card-body">
-                                <h5 class="card-title mb-3">
-                                    Printer {{ index + 1 }} <span v-if="printer.type">({{ printer.type }})</span>
-                                    <button @click="removePrinter(index)" class="btn btn-sm btn-danger float-end">-</button>
-                                </h5>
-
-                                <div class="form-group row mb-2">
-                                    <label class="col-sm-4">Type</label>
-                                    <div class="col-sm-8">
-                                        <input class="form-control form-control-sm" type="text" v-model="printer.type"/>
-                                    </div>
-                                </div>
-
-                                <div class="form-group row mb-2">
-                                    <label class="col-sm-4">Printer Name</label>
-                                    <div class="col-sm-8">
-                                        <select class="form-control form-control-sm" type="text" v-model="printer.name">
-                                            <option :value="printerSelection.name" v-for="printerSelection in printers">{{ printerSelection.name }}</option>
-                                        </select>
-                                    </div>
-                                </div>
-
-                                <div class="form-group row mb-2">
-                                    <label class="col-sm-10">Auto rotate</label>
-                                    <div class="col-sm-2 text-end">
-                                        <input class="form-check-input" type="checkbox" v-model="printer.autoRotate"/>
-                                    </div>
-                                </div>
-
-                                <div class="form-group row mb-2">
-                                    <label class="col-sm-10">Reset imageable area</label>
-                                    <div class="col-sm-2 text-end">
-                                        <input class="form-check-input" type="checkbox" v-model="printer.resetImageableArea"/>
-                                    </div>
-                                </div>
-
-                                <div class="form-group row mb-2">
-                                    <label class="col-sm-4">Force DPI</label>
-                                    <div class="col-sm-8">
-                                        <input class="form-control form-control-sm" type="number" v-model="printer.forceDPI"/>
-                                    </div>
-                                </div>
-                            </div>
+                        <div class="lhb-row">
+                            <span class="lhb-row-label lhb-form-label">Force DPI</span>
+                            <div class="lhb-row-value"><input class="lhb-form-control" type="number" v-model="printer.forceDPI"/></div>
                         </div>
                     </div>
                 </div>
             </div>
 
             <div class="mb-2 col-xl-4">
-                <div class="card">
-                    <div class="card-body">
-                        <h5 class="card-title mb-3">
-                            Serials
-                            <button @click="addSerial" class="btn btn-sm btn-success float-end">+</button>
+                <div class="lhb-card">
+                    <div class="lhb-card-header">
+                        <h5 class="lhb-card-title">
+                            <span class="lhb-section-icon">🔌</span> Serial Ports
+                            <span class="lhb-badge">{{ config.serial.mappings.length }}</span>
                         </h5>
+                        <button @click="addSerial" class="lhb-btn lhb-btn-accent lhb-btn-sm">+ Add</button>
+                    </div>
+                    <div class="lhb-row">
+                        <span class="lhb-row-label lhb-form-label">Enabled</span>
+                        <label class="lhb-toggle">
+                            <input type="checkbox" v-model="config.serial.enabled"/>
+                            <span class="lhb-toggle-slider"></span>
+                        </label>
+                    </div>
 
-                        <div class="clearfix pb-3"></div>
-
-                        <div class="form-group row mb-2">
-                            <label class="col-sm-10" for="printer-enabled">Enabled</label>
-                            <div class="col-sm-2 text-end">
-                                <input class="form-check-input" id="serial-enabled" type="checkbox" v-model="config.serial.enabled"/>
+                    <div class="lhb-mapping-card" v-for="(serial, index) in config.serial.mappings">
+                        <div class="lhb-mapping-header">
+                            <span class="lhb-mapping-title">{{ serial.type || 'New Mapping' }}</span>
+                            <button @click="removeSerial(index)" class="lhb-btn lhb-btn-danger lhb-btn-sm">Remove</button>
+                        </div>
+                        <div class="lhb-row">
+                            <span class="lhb-row-label lhb-form-label">Type</span>
+                            <div class="lhb-row-value"><input class="lhb-form-control" type="text" v-model="serial.type"/></div>
+                        </div>
+                        <div class="lhb-row">
+                            <span class="lhb-row-label lhb-form-label">Port</span>
+                            <div class="lhb-row-value">
+                                <select class="lhb-form-control" v-model="serial.name">
+                                    <option :value="s.name" v-for="s in serials">{{ s.name }} — {{ s.description }}</option>
+                                </select>
                             </div>
                         </div>
-
-                        <div class="card mb-2" v-for="(serial, index) in config.serial.mappings">
-                            <div class="card-body">
-                                <h5 class="card-title mb-3">
-                                    Serial {{ index + 1 }} <span v-if="serial.type">({{ serial.type }})</span>
-                                    <button @click="removeSerial(index)" class="btn btn-sm btn-danger float-end">-</button>
-                                </h5>
-
-                                <div class="form-group row mb-2">
-                                    <label class="col-sm-4">Type</label>
-                                    <div class="col-sm-8">
-                                        <input class="form-control form-control-sm" type="text" v-model="serial.type"/>
-                                    </div>
-                                </div>
-
-                                <div class="form-group row mb-2">
-                                    <label class="col-sm-4">Serial Port</label>
-                                    <div class="col-sm-8">
-                                        <select class="form-control form-control-sm" type="text" v-model="serial.name">
-                                            <option :value="serial.name" v-for="serial in serials">{{ serial.name }}</option>
-                                        </select>
-                                    </div>
-                                </div>
-
-                                <div class="form-group row mb-2">
-                                    <label class="col-sm-4">Baud Rate</label>
-                                    <div class="col-sm-8">
-                                        <input class="form-control form-control-sm" type="number" v-model="serial.baudRate"/>
-                                    </div>
-                                </div>
-
-                                <div class="form-group row mb-2">
-                                    <label class="col-sm-4">Data Bits</label>
-                                    <div class="col-sm-8">
-                                        <input class="form-control form-control-sm" type="number" v-model="serial.numDataBits"/>
-                                    </div>
-                                </div>
-
-                                <div class="form-group row mb-2">
-                                    <label class="col-sm-4">Stop Bits</label>
-                                    <div class="col-sm-8">
-                                        <input class="form-control form-control-sm" type="number" v-model="serial.numStopBits"/>
-                                    </div>
-                                </div>
-
-                                <div class="form-group row mb-2">
-                                    <label class="col-sm-4">Parity</label>
-                                    <div class="col-sm-8">
-                                        <input class="form-control form-control-sm" type="number" v-model="serial.parity"/>
-                                    </div>
-                                </div>
-
-                                <div class="form-group row mb-2">
-                                    <label class="col-sm-4">Read Charset</label>
-                                    <div class="col-sm-8">
-                                        <select class="form-control form-control-sm" type="text" v-model="serial.readCharset">
-                                            <option :value="charset" v-for="charset in ['ISO-8859-1', 'UTF-8', 'US-ASCII', 'BINARY']">{{ charset }}</option>
-                                        </select>
-                                    </div>
-                                </div>
-
-                                <div class="form-group row mb-2">
-                                    <label class="col-sm-10">Read Multi-bytes</label>
-                                    <div class="col-sm-2 text-end">
-                                        <input class="form-check-input" type="checkbox" v-model="serial.readMultipleBytes"/>
-                                    </div>
-                                </div>
+                        <div class="lhb-row">
+                            <span class="lhb-row-label lhb-form-label">Baud Rate</span>
+                            <div class="lhb-row-value"><input class="lhb-form-control" type="number" v-model="serial.baudRate"/></div>
+                        </div>
+                        <div class="lhb-row">
+                            <span class="lhb-row-label lhb-form-label">Data Bits</span>
+                            <div class="lhb-row-value"><input class="lhb-form-control" type="number" v-model="serial.numDataBits"/></div>
+                        </div>
+                        <div class="lhb-row">
+                            <span class="lhb-row-label lhb-form-label">Stop Bits</span>
+                            <div class="lhb-row-value"><input class="lhb-form-control" type="number" v-model="serial.numStopBits"/></div>
+                        </div>
+                        <div class="lhb-row">
+                            <span class="lhb-row-label lhb-form-label">Parity</span>
+                            <div class="lhb-row-value"><input class="lhb-form-control" type="number" v-model="serial.parity"/></div>
+                        </div>
+                        <div class="lhb-row">
+                            <span class="lhb-row-label lhb-form-label">Read Charset</span>
+                            <div class="lhb-row-value">
+                                <select class="lhb-form-control" v-model="serial.readCharset">
+                                    <option :value="c" v-for="c in ['ISO-8859-1', 'UTF-8', 'US-ASCII', 'BINARY']">{{ c }}</option>
+                                </select>
                             </div>
+                        </div>
+                        <div class="lhb-row">
+                            <span class="lhb-row-label lhb-form-label">Read Multi-bytes</span>
+                            <label class="lhb-toggle">
+                                <input type="checkbox" v-model="serial.readMultipleBytes"/>
+                                <span class="lhb-toggle-slider"></span>
+                            </label>
                         </div>
                     </div>
                 </div>
@@ -326,6 +493,7 @@ createApp({
     config: null,
     printers: [],
     serials: [],
+    health: null,
 
     loadConfig() {
         return axios.get('/config.json')
@@ -336,13 +504,13 @@ createApp({
             .then(response => this.config = response.data)
     },
     addPrinter() {
-        this.config.printer.mappings.push({type: '', name: ''})
+        this.config.printer.mappings.push({type: '', name: '', autoRotate: false, resetImageableArea: true, forceDPI: 0})
     },
     removePrinter(index) {
         this.config.printer.mappings.splice(index, 1)
     },
     addSerial() {
-        this.config.serial.mappings.push({type: '', name: ''})
+        this.config.serial.mappings.push({type: '', name: '', baudRate: 9600, numDataBits: 8, numStopBits: 1, parity: 0, readMultipleBytes: false, readCharset: 'ISO-8859-1'})
     },
     removeSerial(index) {
         this.config.serial.mappings.splice(index, 1)
@@ -355,6 +523,10 @@ createApp({
         return axios.get('/system/serials.json')
             .then(response => this.serials = response.data)
     },
+    loadHealth() {
+        return axios.get('/system/health')
+            .then(response => this.health = response.data)
+    },
     restartServer() {
         return axios.post('/system/restart.json', this.config)
     },
@@ -362,6 +534,7 @@ createApp({
         Promise.all([this.loadPrinters(), this.loadSerials()]).then(() => {
             this.loadConfig()
         })
+        this.loadHealth()
     }
 }).mount()</script>
 </body>

@@ -2,115 +2,112 @@
 
 > **Fork of** [WebApp Hardware Bridge](https://github.com/imTigger/webapp-hardware-bridge) by imTigger — originally licensed under MIT.
 
-## Introduction
-
-Local Hardware Bridge made it possible for WebApps to perform silent print and access to serial ports.
-
-Common use cases:
-- Web-based POS - PDF and ESC/POS receipt silent print
-- Web-based WMS - Serial weight scale real-time reading, delivery note/packing List silent print
-- Any WebApps need to read/write to serial ports
+**Local Hardware Bridge** exposes local printers and serial ports to web applications via WebSocket and REST APIs. Built for POS systems, WMS, IoT dashboards, and any web app needing hardware access.
 
 ## Features
 
-- [x] Direct print from WebApps
-- [x] Serial port read/write from WebApps
-- [x] Support all modern browsers that implemented WebSocket (Chrome, Firefox, Edge... etc)
-- [x] [HTTP API](HTTP_API.md) to configure directly from your WebApp
-- [x] [JS SDK/Example included](demo)
+- **Silent Printing** — PDF, images, ESC/POS, ZPL from any browser or remote server
+- **Serial Port I/O** — Bidirectional communication with scales, scanners, IoT devices
+- **REST API** — Full CRUD for config, mappings, printer/serial management
+- **WebSocket API** — Real-time streaming for serial data and print status
+- **Web UI** — Browser-based configuration dashboard
+- **TUI Client** — Terminal interface for headless/server environments
+- **Cross-Platform** — Windows, Linux, macOS with native installers
+- **Auth & TLS** — Bearer token authentication, HTTPS/WSS support
 
-### Direct Print
-- 0-click silent printing in web browsers
-- Download via URL / Base64 encoded file / Base64 encoded binary raw command
-- Support multiple printers, mapped by key
-- Support PDF/PNG/JPG Printing
-- Support RAW/ESC-POS/ZPL Printing (via `raw_content` field with Base64-encoded binary data)
-- Support adding annotation text to PDF/Image before printing
-- Per printer settings
+## Quick Start
 
-### Serial Access
-- Bidirectional communication
-- Support multiple ports, mapped by key
-- Support multiple connection share same serial port
-- Serial weigh scale (AWH-SA30 supported out-of-box in JS SDK)
-- Per port settings (Baud rate, data bits, stop bit, parity bit)
+### Download
 
-## How to use?
+Grab the latest release from [Releases](https://github.com/AugustinLR17/local-hardware-bridge/releases):
 
-### Client Side
+| Platform | File |
+|----------|------|
+| Cross-platform | `local-hardware-bridge-*.jar` (requires JDK 21+) |
+| Windows | `.exe` or `.msi` installer |
+| Linux (Debian/Ubuntu) | `.deb` package |
+| Linux (Fedora/RHEL) | `.rpm` package |
+| macOS | `.dmg` installer |
 
-1. Install and setup mapping via Web UI / API
+### Run
 
-2. Start "Local Hardware Bridge" and start using your WebApp
+```bash
+# GUI mode (system tray icon)
+java -jar local-hardware-bridge-*.jar
 
-### WebApp Side
+# Server mode (headless)
+java -cp local-hardware-bridge-*.jar io.github.augustinlr17.localhardwarebridge.Server
 
-1. Check [JS SDK/Example](demo)
-
-## How it works?
-
-Local Hardware Bridge is a Java based application, which have more access to underlying hardwares.
-
-It exposes a WebSocket and HTTP server on localhost to accept print jobs and serial connections from browsers and remote servers.
-
-### Print Jobs
-
-- PDF/Images job are downloaded/decoded and then sent to mapped printer.
-- Raw job are sent to mapped printer directly via `raw_content` (Base64-encoded binary).
-
-#### Raw/ZPL/ESC-POS Printing
-
-To send raw commands (ESC-POS, ZPL, etc.) directly to a printer:
-
-1. Install a **Generic / Text Only** driver for your printer (or use the printer's native driver if it supports raw mode)
-2. Map a type to that printer in the Web UI (e.g., type `RECEIPT` → `Generic / Text Only`)
-3. Send the raw data as Base64 in the `raw_content` field:
-
-```javascript
-printService.submit({
-    'type': 'RECEIPT',
-    'raw_content': btoa(rawCommandString)  // or base64-encode binary data
-});
+# TUI mode (terminal interface)
+./lhb-tui --server http://127.0.0.1:12212
 ```
 
-For ZPL label printers, encode your ZPL string as Base64 and send it the same way.
+The Web UI is available at `http://127.0.0.1:12212` (default).
 
-### Serial Connections
+## Architecture
 
-- Serial port are opened by Java and "proxied" as WebSocket stream
-- Serial port can be shared by multiple connections
-- Bidirectional communications possible
+```
+┌─────────────────┐     ┌──────────────────────────────────┐
+│  Web App / POS  │────▶│                                  │
+│  (Browser)      │ WS  │      Local Hardware Bridge       │
+└─────────────────┘     │                                  │
+                        │  ┌──────────┐  ┌──────────────┐  │   ┌──────────┐
+┌─────────────────┐     │  │ Printer  │  │   Serial     │  │──▶│ Printers │
+│  Remote Server  │────▶│  │ Service  │  │   Services   │  │   │ (OS)     │
+│  (HTTP API)     │ REST│  └──────────┘  └──────────────┘  │   └──────────┘
+└─────────────────┘     │                                  │   ┌──────────┐
+                        │  ┌──────────┐  ┌──────────────┐  │──▶│ Serial   │
+┌─────────────────┐     │  │  Config  │  │   Web UI     │  │   │ Ports    │
+│  TUI Client     │────▶│  │ Service  │  │   (Static)   │  │   │ (OS)     │
+│  (Terminal)     │ REST│  └──────────┘  └──────────────┘  │   └──────────┘
+└─────────────────┘     └──────────────────────────────────┘
+```
 
-### Mappings
+**How it works:** The Java application runs a Javalin HTTP/WebSocket server on localhost. Printer and serial services subscribe to channels. Messages are routed between WebSocket clients, HTTP requests, and hardware services via a pub/sub channel model.
 
-Web UI / API are provided to set up mappings between keys and printers/serials.
+## REST API
 
-Therefore, WebApps do not need to care about the actual printer names.
+Full API documentation: [HTTP_API.md](HTTP_API.md)
 
-## More documents
+### Quick Reference
 
-- [Configurations](CONFIGURATION.md)
-- [HTTP APIs](HTTP_API.md)
-- [Advanced Configurations - Authentication](ADVANCED.md#authentication)
-- [Advanced Configurations - HTTPS/WSS Support](ADVANCED.md#httpswss-support)
-- [Build from source](BUILD.md)
-- [Troubleshooting](TROUBLESHOOT.md)
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| **Config** | | |
+| GET | `/config.json` | Get full configuration |
+| PUT | `/config.json` | Update full configuration |
+| GET | `/system/server.json` | Get server config |
+| PUT | `/system/server.json` | Update server config |
+| GET | `/system/downloader.json` | Get downloader config |
+| PUT | `/system/downloader.json` | Update downloader config |
+| GET | `/system/gui.json` | Get GUI config |
+| PUT | `/system/gui.json` | Update GUI config |
+| **Printer** | | |
+| GET | `/system/printers.json` | List OS printers |
+| GET | `/printer/mappings` | List printer mappings |
+| POST | `/printer/mappings` | Add printer mapping |
+| PUT | `/printer/mappings/{type}` | Update printer mapping |
+| DELETE | `/printer/mappings/{type}` | Delete printer mapping |
+| PUT | `/printer/enabled` | Enable/disable printer service |
+| POST | `/printer` | Submit print job |
+| **Serial** | | |
+| GET | `/system/serials.json` | List OS serial ports |
+| GET | `/serial/mappings` | List serial mappings |
+| POST | `/serial/mappings` | Add serial mapping |
+| PUT | `/serial/mappings/{type}` | Update serial mapping |
+| DELETE | `/serial/mappings/{type}` | Delete serial mapping |
+| PUT | `/serial/enabled` | Enable/disable serial service |
+| GET | `/serial/status` | Serial port status (open/mapped) |
+| GET | `/serial/connections` | WebSocket clients per channel |
+| POST | `/serial/{type}` | Write to serial port |
+| **System** | | |
+| GET | `/system/version.json` | App name, ID, version |
+| GET | `/system/health` | Health check + services + connections |
+| GET | `/system/connections` | All WebSocket connections |
+| POST | `/system/notification` | Send desktop notification |
+| POST | `/system/restart.json` | Restart server |
 
-## Cross-Platform Support
-
-Local Hardware Bridge runs on **Windows**, **Linux**, and **macOS**.
-
-| Platform | GUI Mode | Server Mode | Service |
-|----------|----------|-------------|---------|
-| Windows | System tray icon, NSIS installer | `java -cp ... Server` | Startup shortcut |
-| Linux | Headless fallback if no system tray | `java -cp ... Server` | systemd service |
-| macOS | Headless fallback if no system tray | `java -cp ... Server` | launchd plist |
-
-See [Build Instructions](BUILD.md) for platform-specific installation details.
-
-## HTTP Print API (Server-to-Server)
-
-A remote server can submit print jobs via HTTP without needing a WebSocket connection:
+### Example: Print from command line
 
 ```bash
 # List available printers
@@ -121,36 +118,99 @@ curl -X POST http://127.0.0.1:12212/printer \
   -H "Content-Type: application/json" \
   -d '{"type":"INVOICE","url":"https://example.com/invoice.pdf"}'
 
-# Print raw ESC-POS data
+# Print raw ESC/POS data
 curl -X POST http://127.0.0.1:12212/printer \
   -H "Content-Type: application/json" \
   -d '{"type":"RECEIPT","raw_content":"<base64-encoded-data>"}'
+
+# Add a printer mapping
+curl -X POST http://127.0.0.1:12212/printer/mappings \
+  -H "Content-Type: application/json" \
+  -d '{"type":"RECEIPT","name":"POS-80"}'
+
+# Check health
+curl http://127.0.0.1:12212/system/health
 ```
 
-See [HTTP APIs](HTTP_API.md) for full documentation.
-
-## Running on Linux
-
-The server can run on Linux in headless mode:
+### Example: Serial port management
 
 ```bash
-java -cp local-hardware-bridge.jar io.github.augustinlr17.localhardwarebridge.Server
+# List serial ports
+curl http://127.0.0.1:12212/system/serials.json
+
+# Add a serial mapping
+curl -X POST http://127.0.0.1:12212/serial/mappings \
+  -H "Content-Type: application/json" \
+  -d '{"type":"SCALE","name":"/dev/ttyUSB0","baudRate":9600,"numDataBits":8,"numStopBits":1,"parity":0}'
+
+# Write to serial port
+curl -X POST http://127.0.0.1:12212/serial/SCALE \
+  -H "Content-Type: text/plain" \
+  -d 'W'
+
+# Check serial port status
+curl http://127.0.0.1:12212/serial/status
 ```
 
-The Web UI is then accessible at `http://127.0.0.1:12212`. The GUI mode (system tray icon) requires a desktop environment and is not supported on most Linux distributions.
+## WebSocket Protocol
 
-## Version
+### Printer Channel (`/printer`)
 
-The application version is displayed at startup in the log and is available via the HTTP API:
-
-```bash
-curl http://127.0.0.1:12212/system/version.json
+Send:
+```json
+{
+  "type": "receipt",
+  "url": "https://example.com/receipt.pdf",
+  "id": "optional-id",
+  "qty": 1,
+  "file_content": "base64-encoded-file",
+  "raw_content": "base64-encoded-raw-escpos",
+  "extras": [{"text": "annotation", "x": 10.0, "y": 20.0, "size": 12, "bold": true}]
+}
 ```
 
-## Upgrade
+Receive `PrintResult`:
+```json
+{"success": true, "message": "Success", "id": "...", "printerName": "..."}
+```
 
-- Settings will lost after upgrade from 0.x to 1.0, please reconfigure via "Web UI" or "Web API"
+### Serial Channel (`/serial/{type}`)
 
-## Changelogs
+- Text messages → written to serial port
+- Binary messages → written as raw bytes
+- Data from serial port → sent back as text (or binary if `readCharset` is `"BINARY"`)
 
-- [Changelogs](CHANGELOG.md)
+## Cross-Platform
+
+| Platform | GUI Mode | Server Mode | Install | Service |
+|----------|----------|-------------|---------|---------|
+| Windows | System tray, `.exe`/`.msi` | `java -cp ... Server` | Installer | Startup shortcut |
+| Linux | Headless fallback | `java -cp ... Server` | `.deb` / `.rpm` | systemd |
+| macOS | Headless fallback | `java -cp ... Server` | `.dmg` | launchd |
+
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [HTTP API Reference](HTTP_API.md) | Complete REST & WebSocket API docs |
+| [Configuration](CONFIGURATION.md) | All config options explained |
+| [Advanced](ADVANCED.md) | Auth, TLS/WSS, advanced settings |
+| [Build Instructions](BUILD.md) | Build from source, create installers |
+| [Troubleshooting](TROUBLESHOOT.md) | Common issues and fixes |
+| [Architecture](ARCHITECTURE.md) | Internal architecture and design |
+| [Changelog](CHANGELOG.md) | Version history |
+
+## JS SDK
+
+Integration examples for web apps are in the [`demo/`](demo) directory:
+
+- [`websocket-printer.js`](demo/websocket-printer.js) — Printer WebSocket client
+- [`websocket-serial.js`](demo/websocket-serial.js) — Serial WebSocket client
+- [`websocket-weigh.js`](demo/websocket-weigh.js) — Weight scale client (AWH-SA30)
+
+## License
+
+MIT License — see [LICENSE](LICENSE)
+
+Original work Copyright (c) 2017 imTigger
+Modified work Copyright (c) 2026 AugustinLR17
