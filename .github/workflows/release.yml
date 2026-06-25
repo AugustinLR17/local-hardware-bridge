@@ -164,17 +164,10 @@ jobs:
           name: windows-exe
           path: build/dist/windows-exe/*.exe
 
-  linux-packages:
-    name: Linux (${{ matrix.package-type }})
+  linux-appimage:
+    name: Linux AppImage
     runs-on: ubuntu-latest
     needs: build-jar
-    strategy:
-      matrix:
-        include:
-          - package-type: deb
-            artifact-name: linux-deb
-          - package-type: rpm
-            artifact-name: linux-rpm
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -184,10 +177,6 @@ jobs:
         with:
           java-version: 21
           distribution: temurin
-
-      - name: Install RPM tools
-        if: matrix.package-type == 'rpm'
-        run: sudo apt-get update && sudo apt-get install -y rpm
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -202,28 +191,59 @@ jobs:
         id: version
         run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
 
-      - name: Create ${{ matrix.package-type }} package with jpackage
+      - name: Create AppDir structure
         run: |
-          jpackage \
-            --type ${{ matrix.package-type }} \
-            --name local-hardware-bridge \
-            --app-version "${{ steps.version.outputs.VERSION }}" \
-            --input build/libs/ \
-            --main-jar "local-hardware-bridge-${{ steps.version.outputs.VERSION }}.jar" \
-            --main-class io.github.augustinlr17.localhardwarebridge.GUI \
-            --dest build/dist/linux-${{ matrix.package-type }} \
-            --vendor AugustinLR17 \
-            --description "Local Hardware Bridge - exposes local printer and serial port to web browsers" \
-            --icon src/main/resources/icon.png \
-            --linux-shortcut \
-            --linux-menu-group Utility \
-            --linux-app-category Utility
+          mkdir -p AppDir/usr/bin
+          mkdir -p AppDir/usr/share/applications
+          mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
+          mkdir -p AppDir/usr/share/local-hardware-bridge
 
-      - name: Upload ${{ matrix.package-type }} package
+          cp build/libs/local-hardware-bridge-${{ steps.version.outputs.VERSION }}.jar AppDir/usr/share/local-hardware-bridge/local-hardware-bridge.jar
+          cp src/main/resources/icon.png AppDir/usr/share/icons/hicolor/256x256/apps/local-hardware-bridge.png
+
+          cat > AppDir/usr/bin/local-hardware-bridge << 'SCRIPT'
+          #!/bin/bash
+          SELF=$(readlink -f "$0")
+          APPDIR=$(dirname "$SELF")/..
+          exec "${JAVA_HOME:-/usr/bin/java}" -cp "${APPDIR}/usr/share/local-hardware-bridge/local-hardware-bridge.jar" io.github.augustinlr17.localhardwarebridge.GUI "$@"
+          SCRIPT
+          chmod +x AppDir/usr/bin/local-hardware-bridge
+
+          cat > AppDir/usr/share/applications/local-hardware-bridge.desktop << 'DESKTOP'
+          [Desktop Entry]
+          Name=Local Hardware Bridge
+          Comment=Exposes local printer and serial port to web browsers
+          Exec=local-hardware-bridge
+          Icon=local-hardware-bridge
+          Terminal=false
+          Type=Application
+          Categories=Utility;Network;
+          DESKTOP
+
+          cat > AppDir/AppRun << 'APPRUN'
+          #!/bin/bash
+          SELF=$(readlink -f "$0")
+          APPDIR=$(dirname "$SELF")
+          exec "${JAVA_HOME:-/usr/bin/java}" -cp "${APPDIR}/usr/share/local-hardware-bridge/local-hardware-bridge.jar" io.github.augustinlr17.localhardwarebridge.GUI "$@"
+          APPRUN
+          chmod +x AppDir/AppRun
+
+      - name: Download linuxdeploy
+        run: |
+          wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage -O linuxdeploy.AppImage
+          chmod +x linuxdeploy.AppImage
+
+      - name: Build AppImage
+        run: |
+          export VERSION=${{ steps.version.outputs.VERSION }}
+          ./linuxdeploy.AppImage --appdir AppDir --output appimage
+          mv Local_Hardware_Bridge-*.AppImage local-hardware-bridge-${{ steps.version.outputs.VERSION }}-x86_64.AppImage
+
+      - name: Upload AppImage
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact-name }}
-          path: build/dist/linux-${{ matrix.package-type }}/*
+          name: linux-appimage
+          path: local-hardware-bridge-*.AppImage
 
   macos-app:
     name: macOS Application
@@ -292,7 +312,7 @@ jobs:
   release:
     name: Create GitHub Release
     runs-on: ubuntu-latest
-    needs: [build-jar, build-tui, windows-installer, linux-packages, macos-app]
+    needs: [build-jar, build-tui, windows-installer, linux-appimage, macos-app]
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
       - name: Checkout
@@ -319,8 +339,7 @@ jobs:
             |----------|------|
             | Cross-platform (JAR) | `local-hardware-bridge-*.jar` (requires JDK 21+) |
             | Windows | `.exe` installer or `.msi` installer |
-            | Linux (Debian/Ubuntu) | `.deb` package |
-            | Linux (Fedora/RHEL) | `.rpm` package |
+            | Linux | `.AppImage` (requires JDK 21+) |
             | macOS | `.dmg` installer |
             | TUI (Terminal) | `lhb-tui-*` binaries for Linux/Windows/macOS |
 
@@ -343,7 +362,6 @@ jobs:
             artifacts/fat-jar/*.jar
             artifacts/windows-exe/*.exe
             artifacts/windows-msi/*.msi
-            artifacts/linux-deb/*.deb
-            artifacts/linux-rpm/*.rpm
+            artifacts/linux-appimage/*.AppImage
             artifacts/macos-dmg/*.dmg
             artifacts/lhb-tui-*/*
