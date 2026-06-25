@@ -217,6 +217,12 @@ public class Server implements WebSocketServerInterface {
                 return;
             }
 
+            // Block disabled endpoints with 403
+            if (rule != null && !rule.isEnabled()) {
+                ctx.res().sendError(403, "Endpoint disabled");
+                return;
+            }
+
             // Check endpoint-specific password if set
             if (rule != null && rule.getPassword() != null && !rule.getPassword().isEmpty()) {
                 try {
