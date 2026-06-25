@@ -8,7 +8,7 @@ RUN apt-get update && apt-get install -y \
     python3-urllib3 \
     python3-venv \
     cups \
-    cups-pdf \
+    printer-driver-cups-pdf \
     && rm -rf /var/lib/apt/lists/*
 
 # Configure CUPS-PDF output directory

@@ -340,6 +340,9 @@
             <button class="lhb-tab" :class="{ active: tab === 'advanced' }" @click="tab = 'advanced'">
                 ⚙️ Advanced
             </button>
+            <button class="lhb-tab" :class="{ active: tab === 'security' }" @click="tab = 'security'">
+                🔒 Security
+            </button>
         </div>
     </div>
 
@@ -468,33 +471,6 @@
                             <input type="checkbox" v-model="config.gui.notification.enabled"/>
                             <span class="lhb-toggle-slider"></span>
                         </label>
-                    </div>
-                </div>
-
-                <div class="lhb-card">
-                    <div class="lhb-card-header">
-                        <h5 class="lhb-card-title">🔒 Endpoint Security</h5>
-                    </div>
-                    <div class="lhb-row">
-                        <div class="lhb-row-label" style="width:100%">
-                            <div class="text-muted mb-2" style="font-size:0.78rem">Disable endpoints or set per-endpoint passwords. Empty password = no extra protection.</div>
-                            <div v-for="path in endpointList" :key="path" class="lhb-mapping-card" style="padding:0.75rem">
-                                <div class="lhb-mapping-header">
-                                    <span class="lhb-mapping-title" style="font-size:0.78rem">{{ path }}</span>
-                                    <label class="lhb-toggle" :title="config.security.endpoints[path].enabled ? 'Enabled' : 'Disabled'" v-if="!lockedEndpoints.includes(path)">
-                                        <input type="checkbox" v-model="config.security.endpoints[path].enabled"/>
-                                        <span class="lhb-toggle-slider"></span>
-                                    </label>
-                                    <span v-else class="lhb-badge" style="background:#e5e7eb;color:#6b6f85">required</span>
-                                </div>
-                                <div class="lhb-row" style="margin-bottom:0">
-                                    <span class="lhb-row-label lhb-form-label" style="font-size:0.75rem">Password</span>
-                                    <div class="lhb-row-value" style="width:140px">
-                                        <input class="lhb-form-control" type="password" placeholder="none" v-model="config.security.endpoints[path].password" style="font-size:0.75rem"/>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
                     </div>
                 </div>
 
@@ -805,5 +781,41 @@ createApp({
         this.loadHealth()
     }
 }).mount()</script>
+
+    <!-- SECURITY TAB -->
+    <div class="container" v-if="tab === 'security' && config != null">
+        <div class="row">
+            <div class="col-12">
+<div class="lhb-card">
+                    <div class="lhb-card-header">
+                        <h5 class="lhb-card-title">🔒 Endpoint Security</h5>
+                    </div>
+                    <div class="lhb-row">
+                        <div class="lhb-row-label" style="width:100%">
+                            <div class="text-muted mb-2" style="font-size:0.78rem">Disable endpoints or set per-endpoint passwords. Empty password = no extra protection.</div>
+                            <div v-for="path in endpointList" :key="path" class="lhb-mapping-card" style="padding:0.75rem">
+                                <div class="lhb-mapping-header">
+                                    <span class="lhb-mapping-title" style="font-size:0.78rem">{{ path }}</span>
+                                    <label class="lhb-toggle" :title="config.security.endpoints[path].enabled ? 'Enabled' : 'Disabled'" v-if="!lockedEndpoints.includes(path)">
+                                        <input type="checkbox" v-model="config.security.endpoints[path].enabled"/>
+                                        <span class="lhb-toggle-slider"></span>
+                                    </label>
+                                    <span v-else class="lhb-badge" style="background:#e5e7eb;color:#6b6f85">required</span>
+                                </div>
+                                <div class="lhb-row" style="margin-bottom:0">
+                                    <span class="lhb-row-label lhb-form-label" style="font-size:0.75rem">Password</span>
+                                    <div class="lhb-row-value" style="width:140px">
+                                        <input class="lhb-form-control" type="password" placeholder="none" v-model="config.security.endpoints[path].password" style="font-size:0.75rem"/>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                
+            </div>
+        </div>
+    </div>
 </body>
 </html>
