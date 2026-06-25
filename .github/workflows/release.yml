@@ -331,35 +331,68 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          generate_release_notes: true
+          generate_release_notes: false
           draft: false
           prerelease: ${{ contains(github.ref_name, '-rc') || contains(github.ref_name, '-beta') || contains(github.ref_name, '-alpha') }}
           body: |
+            ## What's New in ${{ github.ref_name }}
+
+            Local Hardware Bridge exposes local printers and serial ports to web applications via WebSocket and REST APIs.
+
+            ### Features
+            - Silent printing: PDF, images, ESC/POS raw, with annotations
+            - Serial port I/O: bidirectional communication with scales, scanners, IoT devices
+            - REST API: full CRUD for config, mappings, printer/serial management
+            - WebSocket API: real-time streaming for serial data and print status
+            - Web UI: browser-based configuration dashboard (light theme)
+            - TUI Client: terminal interface for headless/server environments
+            - Auth & TLS: Bearer token authentication, HTTPS/WSS support
+            - Systemd service: one-command install for Linux servers
+
             ## Downloads
 
-            | Platform | File |
-            |----------|------|
-            | Cross-platform (JAR) | `local-hardware-bridge-*.jar` (requires JDK 21+) |
-            | Windows | `.exe` installer or `.msi` installer |
-            | Linux | `.AppImage` (requires JDK 21+) |
-            | macOS | `.dmg` installer |
-            | TUI (Terminal) | `lhb-tui-*` binaries for Linux/Windows/macOS |
+            | Platform | File | Notes |
+            |----------|------|-------|
+            | Cross-platform | `local-hardware-bridge-*.jar` | Requires JDK 21+ |
+            | Windows | `.exe` installer | Full installer with shortcuts |
+            | Windows | `.msi` installer | MSI for enterprise deployment |
+            | Linux | `.AppImage` | Requires JDK 21+, portable |
+            | macOS | `.dmg` installer | Intel & Apple Silicon |
+            | Terminal | `lhb-tui-*` | Standalone binary, no JVM needed |
 
-            ### Quick Start (JAR)
+            ## Quick Start
+
+            ### JAR (all platforms)
             ```bash
             java -jar local-hardware-bridge-*.jar
             ```
+            Web UI at `http://127.0.0.1:12212`
 
-            ### Quick Start (TUI)
+            ### TUI (terminal)
             ```bash
             chmod +x lhb-tui-linux-amd64
             ./lhb-tui-linux-amd64 http://127.0.0.1:12212
             ```
 
+            ### Linux systemd service (headless, auto-start on boot)
+            ```bash
+            # Install and start the service
+            curl -X POST http://127.0.0.1:12212/system/install-service
+
+            # Check status
+            systemctl status local-hardware-bridge
+
+            # View logs
+            journalctl -u local-hardware-bridge -f
+
+            # Uninstall
+            curl -X POST http://127.0.0.1:12212/system/uninstall-service
+            ```
+
             ### Run modes
-            - **GUI mode**: `java -cp local-hardware-bridge.jar io.github.augustinlr17.localhardwarebridge.GUI`
-            - **Server mode (headless)**: `java -cp local-hardware-bridge.jar io.github.augustinlr17.localhardwarebridge.Server`
-            - **TUI mode (terminal)**: `./lhb-tui http://127.0.0.1:12212`
+            - **GUI mode**: `java -jar local-hardware-bridge.jar` (system tray icon)
+            - **Server mode**: `java -cp local-hardware-bridge.jar io.github.augustinlr17.localhardwarebridge.Server` (headless)
+            - **TUI mode**: `./lhb-tui http://127.0.0.1:12212` (terminal dashboard)
           files: |
             artifacts/fat-jar/*.jar
             artifacts/windows-exe/*.exe

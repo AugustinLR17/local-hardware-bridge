@@ -26,11 +26,16 @@ import io.github.augustinlr17.localhardwarebridge.websocketservices.SerialWebSoc
 import javax.print.PrintService;
 import java.awt.print.PrinterJob;
 import java.nio.ByteBuffer;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
+import java.util.Locale;
 
 @Log4j2
 public class Server implements WebSocketServerInterface {
@@ -637,6 +642,8 @@ public class Server implements WebSocketServerInterface {
 
         // Restart
         javalinServer.post("/system/restart.json", ctx -> {
+            messageToService("/notification", objectMapper.writeValueAsString(new NotificationDTO("WARNING", "Restart", "Server is restarting...")));
+
             stop();
             ThreadUtil.silentSleep(500);
             start();
@@ -727,6 +734,80 @@ public class Server implements WebSocketServerInterface {
             configService.save();
 
             ctx.contentType(ContentType.APPLICATION_JSON).result(objectMapper.writeValueAsString(configService.getConfig().getGui()));
+        });
+
+        // Install systemd service (Linux only)
+        javalinServer.post("/system/install-service", ctx -> {
+            String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
+            if (!os.contains("linux")) {
+                ctx.status(400).result("{\"error\": \"Service installation is only available on Linux\"}");
+                return;
+            }
+
+            String jarPath = Paths.get(Server.class.getProtectionDomain().getCodeSource().getLocation().toURI()).toAbsolutePath().toString();
+            String workingDir = System.getProperty("user.dir");
+            String javaHome = System.getProperty("java.home");
+            String javaExec = javaHome + "/bin/java";
+
+            String serviceContent = "[Unit]\n"
+                + "Description=Local Hardware Bridge\n"
+                + "After=network.target\n\n"
+                + "[Service]\n"
+                + "Type=simple\n"
+                + "ExecStart=" + javaExec + " -cp " + jarPath + " io.github.augustinlr17.localhardwarebridge.Server\n"
+                + "WorkingDirectory=" + workingDir + "\n"
+                + "Restart=on-failure\n"
+                + "RestartSec=5\n\n"
+                + "[Install]\n"
+                + "WantedBy=multi-user.target\n";
+
+            String serviceName = "local-hardware-bridge.service";
+            Path serviceFile = Path.of("/etc/systemd/system/" + serviceName);
+
+            try {
+                Files.writeString(serviceFile, serviceContent, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+
+                ProcessBuilder daemonReload = new ProcessBuilder("systemctl", "daemon-reload");
+                daemonReload.redirectErrorStream(true).start().waitFor();
+
+                ProcessBuilder enable = new ProcessBuilder("systemctl", "enable", "--now", serviceName);
+                enable.redirectErrorStream(true).start().waitFor();
+
+                messageToService("/notification", objectMapper.writeValueAsString(new NotificationDTO("INFO", "Service", "Systemd service installed and started")));
+
+                ctx.contentType(ContentType.APPLICATION_JSON).result("{\"status\": \"installed\", \"service\": \"" + serviceName + "\"}");
+            } catch (Exception e) {
+                log.error("Failed to install systemd service", e);
+                ctx.status(500).result("{\"error\": \"" + e.getMessage().replace("\"", "'") + "\"}");
+            }
+        });
+
+        // Uninstall systemd service (Linux only)
+        javalinServer.post("/system/uninstall-service", ctx -> {
+            String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
+            if (!os.contains("linux")) {
+                ctx.status(400).result("{\"error\": \"Service uninstallation is only available on Linux\"}");
+                return;
+            }
+
+            String serviceName = "local-hardware-bridge.service";
+
+            try {
+                ProcessBuilder disable = new ProcessBuilder("systemctl", "disable", "--now", serviceName);
+                disable.redirectErrorStream(true).start().waitFor();
+
+                Files.deleteIfExists(Path.of("/etc/systemd/system/" + serviceName));
+
+                ProcessBuilder daemonReload = new ProcessBuilder("systemctl", "daemon-reload");
+                daemonReload.redirectErrorStream(true).start().waitFor();
+
+                messageToService("/notification", objectMapper.writeValueAsString(new NotificationDTO("INFO", "Service", "Systemd service uninstalled")));
+
+                ctx.contentType(ContentType.APPLICATION_JSON).result("{\"status\": \"uninstalled\"}");
+            } catch (Exception e) {
+                log.error("Failed to uninstall systemd service", e);
+                ctx.status(500).result("{\"error\": \"" + e.getMessage().replace("\"", "'") + "\"}");
+            }
         });
     }
 }

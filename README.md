@@ -120,6 +120,8 @@ Full API documentation: [HTTP_API.md](HTTP_API.md)
 | GET | `/system/connections` | All WebSocket connections |
 | POST | `/system/notification` | Send desktop notification |
 | POST | `/system/restart.json` | Restart server |
+| POST | `/system/install-service` | Install systemd service (Linux) |
+| POST | `/system/uninstall-service` | Uninstall systemd service (Linux) |
 
 ### Example: Print from command line
 

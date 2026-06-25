@@ -13,6 +13,7 @@ import java.awt.*;
 import java.io.File;
 import java.net.URI;
 import java.util.Objects;
+import java.util.Locale;
 
 @Log4j2
 public class GUI implements WebSocketServiceInterface {
@@ -125,13 +126,22 @@ public class GUI implements WebSocketServiceInterface {
 
     public void notify(String title, String message, TrayIcon.MessageType messageType) {
         try {
-            if (trayIcon != null) {
+            String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
+            if (os.contains("linux")) {
+                String urgency = switch (messageType) {
+                    case ERROR -> "critical";
+                    case WARNING -> "normal";
+                    default -> "low";
+                };
+                ProcessBuilder pb = new ProcessBuilder("notify-send", "-u", urgency, title, message);
+                pb.redirectErrorStream(true).start().waitFor();
+            } else if (trayIcon != null) {
                 trayIcon.displayMessage(title, message, messageType);
             } else {
                 log.info("Notification: {} - {}", title, message);
             }
         } catch (Exception e) {
-            log.error("Failed to display notification", e);
+            log.warn("Notification fallback (display failed): {} - {}", title, message);
         }
     }
 
