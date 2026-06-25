@@ -4,7 +4,7 @@ plugins {
     id 'com.gradleup.shadow' version '8.3.6'
 }
 
-group 'webapp-hardware-bridge'
+group 'io.github.augustinlr17'
 version '1.0.1'
 
 sourceCompatibility = '21'
@@ -39,12 +39,12 @@ dependencies {
 }
 
 application {
-    mainClass = 'tigerworkshop.webapphardwarebridge.GUI'
+    mainClass = 'io.github.augustinlr17.localhardwarebridge.GUI'
 }
 
 jar {
     manifest {
-        attributes 'Main-Class': 'tigerworkshop.webapphardwarebridge.GUI'
+        attributes 'Main-Class': 'io.github.augustinlr17.localhardwarebridge.GUI'
     }
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
@@ -52,10 +52,10 @@ jar {
 shadowJar {
     mergeServiceFiles()
     manifest {
-        attributes 'Main-Class': 'tigerworkshop.webapphardwarebridge.GUI'
+        attributes 'Main-Class': 'io.github.augustinlr17.localhardwarebridge.GUI'
     }
     archiveClassifier = ''
-    archiveFileName = "webapp-hardware-bridge-${project.version}.jar"
+    archiveFileName = "local-hardware-bridge-${project.version}.jar"
     exclude 'module-info.class'
 }
 
@@ -77,15 +77,15 @@ tasks.register('createLinuxApp') {
         exec {
             commandLine 'jpackage',
                 '--type', 'deb',
-                '--name', 'webapp-hardware-bridge',
+                '--name', 'local-hardware-bridge',
                 '--app-version', project.version,
                 '--input', 'build/libs/',
-                '--main-jar', "webapp-hardware-bridge-${project.version}.jar",
-                '--main-class', 'tigerworkshop.webapphardwarebridge.GUI',
+                '--main-jar', "local-hardware-bridge-${project.version}.jar",
+                '--main-class', 'io.github.augustinlr17.localhardwarebridge.GUI',
                 '--dest', 'build/dist/linux',
                 '--icon', 'src/main/resources/icon.png',
-                '--vendor', 'TigerWorkshop',
-                '--description', 'WebApp Hardware Bridge - exposes local printer and serial port to web browsers',
+                '--vendor', 'AugustinLR17',
+                '--description', 'Local Hardware Bridge - exposes local printer and serial port to web browsers',
                 '--linux-shortcut',
                 '--linux-menu-group', 'Utility'
         }
@@ -100,14 +100,14 @@ tasks.register('createRpmApp') {
         exec {
             commandLine 'jpackage',
                 '--type', 'rpm',
-                '--name', 'webapp-hardware-bridge',
+                '--name', 'local-hardware-bridge',
                 '--app-version', project.version,
                 '--input', 'build/libs/',
-                '--main-jar', "webapp-hardware-bridge-${project.version}.jar",
-                '--main-class', 'tigerworkshop.webapphardwarebridge.GUI',
+                '--main-jar', "local-hardware-bridge-${project.version}.jar",
+                '--main-class', 'io.github.augustinlr17.localhardwarebridge.GUI',
                 '--dest', 'build/dist/linux-rpm',
-                '--vendor', 'TigerWorkshop',
-                '--description', 'WebApp Hardware Bridge - exposes local printer and serial port to web browsers',
+                '--vendor', 'AugustinLR17',
+                '--description', 'Local Hardware Bridge - exposes local printer and serial port to web browsers',
                 '--linux-shortcut',
                 '--linux-menu-group', 'Utility'
         }

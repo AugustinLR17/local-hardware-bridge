@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-WebApp Hardware Bridge — a Java desktop application that exposes local printer and serial port access to web browsers via WebSocket and HTTP APIs. Commonly used for web-based POS systems (silent receipt printing, ESC/POS), WMS systems (weight scale reading, delivery note printing), and any web app needing serial port I/O.
+Local Hardware Bridge — a Java desktop application that exposes local printer and serial port access to web browsers via WebSocket and HTTP APIs. Commonly used for web-based POS systems (silent receipt printing, ESC/POS), WMS systems (weight scale reading, delivery note printing), and any web app needing serial port I/O.
 
 ## Build & Run Commands
 
@@ -17,13 +17,13 @@ WebApp Hardware Bridge — a Java desktop application that exposes local printer
 Output JAR goes to `build/libs/`.
 
 ### Run
-- **GUI mode** (system tray icon): `java -cp build/libs/webapp-hardware-bridge-1.0.1.jar tigerworkshop.webapphardwarebridge.GUI`
-- **Server-only mode** (no GUI, headless): `java -cp build/libs/webapp-hardware-bridge-1.0.1.jar tigerworkshop.webapphardwarebridge.Server`
+- **GUI mode** (system tray icon): `java -cp build/libs/local-hardware-bridge-1.0.1.jar io.github.augustinlr17.localhardwarebridge.GUI`
+- **Server-only mode** (no GUI, headless): `java -cp build/libs/local-hardware-bridge-1.0.1.jar io.github.augustinlr17.localhardwarebridge.Server`
 - Via Gradle: `./gradlew run` (runs `GUI` main class as configured in `build.gradle`)
 
 ### Windows Installer
 - Requires NSIS and a JRE 21 in `./jre` directory
-- Run `install.nsi` to produce `whb.exe`
+- Run `install.nsi` to produce `lhb.exe`
 - The IntelliJ IDEA artifact build (`out/artifacts/webapp_hardware_bridge_jar/`) is used by the NSIS installer, not the Gradle output
 
 ### Tests
@@ -88,7 +88,7 @@ The app uses a **pub/sub channel model** with two interfaces:
 ## Code Organization
 
 ```
-src/main/java/tigerworkshop/webapphardwarebridge/
+src/main/java/io/github/augustinlr17/localhardwarebridge/
 ├── Constants.java              — App name, ID, version string
 ├── GUI.java                    — System tray icon + Server launcher
 ├── Server.java                 — Javalin HTTP/WS server, channel router, service registry

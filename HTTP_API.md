@@ -123,7 +123,7 @@ Return application version info.
 **Response:**
 
 ```json
-{"appName": "WebApp Hardware Bridge", "appId": "tigerworkshop.webapphardwarebridge", "version": "1.0.1"}
+{"appName": "Local Hardware Bridge", "appId": "io.github.augustinlr17.localhardwarebridge", "version": "1.0.1"}
 ```
 
 ### POST /system/restart.json

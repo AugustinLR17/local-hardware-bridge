@@ -1,0 +1,14 @@
+[Unit]
+Description=Local Hardware Bridge
+After=network.target
+
+[Service]
+Type=simple
+User=%i
+ExecStart=/usr/bin/java -cp /opt/local-hardware-bridge/local-hardware-bridge.jar io.github.augustinlr17.localhardwarebridge.Server
+WorkingDirectory=/opt/local-hardware-bridge
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

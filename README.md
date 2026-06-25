@@ -1,8 +1,10 @@
-# WebApp Hardware Bridge
+# Local Hardware Bridge
+
+> **Fork of** [WebApp Hardware Bridge](https://github.com/imTigger/webapp-hardware-bridge) by imTigger — originally licensed under MIT.
 
 ## Introduction
 
-WebApp Hardware Bridge made it possible for WebApps to perform silent print and access to serial ports.
+Local Hardware Bridge made it possible for WebApps to perform silent print and access to serial ports.
 
 Common use cases:
 - Web-based POS - PDF and ESC/POS receipt silent print
@@ -39,7 +41,7 @@ Common use cases:
 
 1. Install and setup mapping via Web UI / API
 
-2. Start "WebApp Hardware Bridge" and start using your WebApp
+2. Start "Local Hardware Bridge" and start using your WebApp
 
 ### WebApp Side
 
@@ -47,7 +49,7 @@ Common use cases:
 
 ## How it works?
 
-WebApp Hardware Bridge is a Java based application, which have more access to underlying hardwares.
+Local Hardware Bridge is a Java based application, which have more access to underlying hardwares.
 
 It exposes a WebSocket and HTTP server on localhost to accept print jobs and serial connections from browsers and remote servers.
 
@@ -96,7 +98,7 @@ Therefore, WebApps do not need to care about the actual printer names.
 
 ## Cross-Platform Support
 
-WebApp Hardware Bridge runs on **Windows**, **Linux**, and **macOS**.
+Local Hardware Bridge runs on **Windows**, **Linux**, and **macOS**.
 
 | Platform | GUI Mode | Server Mode | Service |
 |----------|----------|-------------|---------|
@@ -132,7 +134,7 @@ See [HTTP APIs](HTTP_API.md) for full documentation.
 The server can run on Linux in headless mode:
 
 ```bash
-java -cp webapp-hardware-bridge.jar tigerworkshop.webapphardwarebridge.Server
+java -cp local-hardware-bridge.jar io.github.augustinlr17.localhardwarebridge.Server
 ```
 
 The Web UI is then accessible at `http://127.0.0.1:12212`. The GUI mode (system tray icon) requires a desktop environment and is not supported on most Linux distributions.

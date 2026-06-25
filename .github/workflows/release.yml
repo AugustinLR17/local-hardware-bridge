@@ -35,7 +35,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: fat-jar
-          path: build/libs/webapp-hardware-bridge-*.jar
+          path: build/libs/local-hardware-bridge-*.jar
 
   windows-installer:
     name: Windows Installer
@@ -69,14 +69,14 @@ jobs:
         run: |
           jpackage `
             --type msi `
-            --name "WebApp Hardware Bridge" `
+            --name "Local Hardware Bridge" `
             --app-version ${{ steps.version.outputs.VERSION }} `
             --input build/libs/ `
-            --main-jar "webapp-hardware-bridge-${{ steps.version.outputs.VERSION }}.jar" `
-            --main-class tigerworkshop.webapphardwarebridge.GUI `
+            --main-jar "local-hardware-bridge-${{ steps.version.outputs.VERSION }}.jar" `
+            --main-class io.github.augustinlr17.localhardwarebridge.GUI `
             --dest build/dist/windows `
-            --vendor TigerWorkshop `
-            --description "WebApp Hardware Bridge - exposes local printer and serial port to web browsers" `
+            --vendor AugustinLR17 `
+            --description "Local Hardware Bridge - exposes local printer and serial port to web browsers" `
             --icon icon.ico `
             --win-console `
             --win-dir-chooser `
@@ -101,14 +101,14 @@ jobs:
           $env:PATH = "C:\Program Files (x86)\Inno Setup 6;$env:PATH"
           jpackage `
             --type exe `
-            --name "WebApp Hardware Bridge" `
+            --name "Local Hardware Bridge" `
             --app-version ${{ steps.version.outputs.VERSION }} `
             --input build/libs/ `
-            --main-jar "webapp-hardware-bridge-${{ steps.version.outputs.VERSION }}.jar" `
-            --main-class tigerworkshop.webapphardwarebridge.GUI `
+            --main-jar "local-hardware-bridge-${{ steps.version.outputs.VERSION }}.jar" `
+            --main-class io.github.augustinlr17.localhardwarebridge.GUI `
             --dest build/dist/windows-exe `
-            --vendor TigerWorkshop `
-            --description "WebApp Hardware Bridge - exposes local printer and serial port to web browsers" `
+            --vendor AugustinLR17 `
+            --description "Local Hardware Bridge - exposes local printer and serial port to web browsers" `
             --icon icon.ico `
             --win-console `
             --win-dir-chooser `
@@ -166,14 +166,14 @@ jobs:
         run: |
           jpackage \
             --type ${{ matrix.package-type }} \
-            --name webapp-hardware-bridge \
+            --name local-hardware-bridge \
             --app-version "${{ steps.version.outputs.VERSION }}" \
             --input build/libs/ \
-            --main-jar "webapp-hardware-bridge-${{ steps.version.outputs.VERSION }}.jar" \
-            --main-class tigerworkshop.webapphardwarebridge.GUI \
+            --main-jar "local-hardware-bridge-${{ steps.version.outputs.VERSION }}.jar" \
+            --main-class io.github.augustinlr17.localhardwarebridge.GUI \
             --dest build/dist/linux-${{ matrix.package-type }} \
-            --vendor TigerWorkshop \
-            --description "WebApp Hardware Bridge - exposes local printer and serial port to web browsers" \
+            --vendor AugustinLR17 \
+            --description "Local Hardware Bridge - exposes local printer and serial port to web browsers" \
             --icon src/main/resources/icon.png \
             --linux-shortcut \
             --linux-menu-group Utility \
@@ -231,17 +231,17 @@ jobs:
         run: |
           jpackage \
             --type dmg \
-            --name "WebApp Hardware Bridge" \
+            --name "Local Hardware Bridge" \
             --app-version "${{ steps.version.outputs.VERSION }}" \
             --input build/libs/ \
-            --main-jar "webapp-hardware-bridge-${{ steps.version.outputs.VERSION }}.jar" \
-            --main-class tigerworkshop.webapphardwarebridge.GUI \
+            --main-jar "local-hardware-bridge-${{ steps.version.outputs.VERSION }}.jar" \
+            --main-class io.github.augustinlr17.localhardwarebridge.GUI \
             --dest build/dist/macos \
-            --vendor TigerWorkshop \
-            --description "WebApp Hardware Bridge - exposes local printer and serial port to web browsers" \
+            --vendor AugustinLR17 \
+            --description "Local Hardware Bridge - exposes local printer and serial port to web browsers" \
             --icon icon.icns \
-            --mac-package-name "WebAppHardwareBridge" \
-            --mac-package-identifier "tigerworkshop.webapphardwarebridge"
+            --mac-package-name "LocalHardwareBridge" \
+            --mac-package-identifier "io.github.augustinlr17.localhardwarebridge"
 
       - name: Upload macOS DMG
         uses: actions/upload-artifact@v4
@@ -277,7 +277,7 @@ jobs:
 
             | Platform | File |
             |----------|------|
-            | Cross-platform (JAR) | `webapp-hardware-bridge-*.jar` (requires JDK 21+) |
+            | Cross-platform (JAR) | `local-hardware-bridge-*.jar` (requires JDK 21+) |
             | Windows | `.exe` installer or `.msi` installer |
             | Linux (Debian/Ubuntu) | `.deb` package |
             | Linux (Fedora/RHEL) | `.rpm` package |
@@ -285,12 +285,12 @@ jobs:
 
             ### Quick Start (JAR)
             ```bash
-            java -jar webapp-hardware-bridge-*.jar
+            java -jar local-hardware-bridge-*.jar
             ```
 
             ### Run modes
-            - **GUI mode**: `java -cp webapp-hardware-bridge.jar tigerworkshop.webapphardwarebridge.GUI`
-            - **Server mode (headless)**: `java -cp webapp-hardware-bridge.jar tigerworkshop.webapphardwarebridge.Server`
+            - **GUI mode**: `java -cp local-hardware-bridge.jar io.github.augustinlr17.localhardwarebridge.GUI`
+            - **Server mode (headless)**: `java -cp local-hardware-bridge.jar io.github.augustinlr17.localhardwarebridge.Server`
           files: |
             artifacts/fat-jar/*.jar
             artifacts/windows-exe/*.exe

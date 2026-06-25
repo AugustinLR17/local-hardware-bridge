@@ -40,6 +40,6 @@ jobs:
         uses: actions/upload-artifact@v4
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         with:
-          name: webapp-hardware-bridge-jar
-          path: build/libs/webapp-hardware-bridge-*.jar
+          name: local-hardware-bridge-jar
+          path: build/libs/local-hardware-bridge-*.jar
           retention-days: 7

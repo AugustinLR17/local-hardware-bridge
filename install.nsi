@@ -1,11 +1,11 @@
 ; The name of the installer
-Name "WebApp Hardware Bridge"
+Name "Local Hardware Bridge"
 
 ; The file to write
-OutFile "whb.exe"
+OutFile "lhb.exe"
 
 ; The default installation directory
-InstallDir "$LOCALAPPDATA\WebApp Hardware Bridge"
+InstallDir "$LOCALAPPDATA\Local Hardware Bridge"
 
 ; Request application privileges for Windows Vista
 RequestExecutionLevel user
@@ -31,10 +31,16 @@ Section "!Main Application" ;No components page, name is not important
   RMDir /r "$INSTDIR\jre"
   Delete "$INSTDIR\*.jar"
   Delete "$INSTDIR\setting.default.json"
-  Delete "$DESKTOP\WebApp Hardware Bridge (GUI).lnk"
-  Delete "$DESKTOP\WebApp Hardware Bridge (Configurator).lnk"
-  Delete "$SMPROGRAMS\WebApp Hardware Bridge (GUI).lnk"
-  Delete "$SMPROGRAMS\WebApp Hardware Bridge (Configurator).lnk"
+  Delete "$DESKTOP\Local Hardware Bridge (GUI).lnk"
+  Delete "$DESKTOP\Local Hardware Bridge (Configurator).lnk"
+  Delete "$SMPROGRAMS\Local Hardware Bridge (GUI).lnk"
+  Delete "$SMPROGRAMS\Local Hardware Bridge (Configurator).lnk"
+  
+  ; Remove old TigerWorkshop shortcuts
+  Delete "$DESKTOP\WebApp Hardware Bridge.lnk"
+  Delete "$DESKTOP\WebApp Hardware Bridge (CLI).lnk"
+  Delete "$SMPROGRAMS\WebApp Hardware Bridge.lnk"
+  Delete "$SMPROGRAMS\WebApp Hardware Bridge (CLI).lnk"
   
   ; Put file there
   File /r out\artifacts\webapp_hardware_bridge_jar\*
@@ -43,26 +49,26 @@ Section "!Main Application" ;No components page, name is not important
   File "install.nsi"
   File "icon.ico"
   
-  ; Delete shortcuts  
-  Delete "$DESKTOP\WebApp Hardware Bridge.lnk"
-  Delete "$DESKTOP\WebApp Hardware Bridge (CLI).lnk"
-  Delete "$SMPROGRAMS\WebApp Hardware Bridge.lnk"
-  Delete "$SMPROGRAMS\WebApp Hardware Bridge (CLI).lnk"
+  ; Delete old shortcuts  
+  Delete "$DESKTOP\Local Hardware Bridge.lnk"
+  Delete "$DESKTOP\Local Hardware Bridge (CLI).lnk"
+  Delete "$SMPROGRAMS\Local Hardware Bridge.lnk"
+  Delete "$SMPROGRAMS\Local Hardware Bridge (CLI).lnk"
   
   ; Create shortcuts
-  CreateShortcut "$DESKTOP\WebApp Hardware Bridge.lnk" "$INSTDIR\jre\bin\javaw.exe" "-cp webapp-hardware-bridge.jar tigerworkshop.webapphardwarebridge.GUI" "$INSTDIR\icon.ico" 0
-  CreateShortcut "$DESKTOP\WebApp Hardware Bridge (CLI).lnk" "$INSTDIR\jre\bin\java.exe" "-cp webapp-hardware-bridge.jar tigerworkshop.webapphardwarebridge.Server" "$INSTDIR\icon.ico" 0
-  CreateShortcut "$SMPROGRAMS\WebApp Hardware Bridge.lnk" "$INSTDIR\jre\bin\javaw.exe" "-cp webapp-hardware-bridge.jar tigerworkshop.webapphardwarebridge.GUI" "$INSTDIR\icon.ico" 0
-  CreateShortcut "$SMPROGRAMS\WebApp Hardware Bridge (CLI).lnk" "$INSTDIR\jre\bin\java.exe" "-cp webapp-hardware-bridge.jar tigerworkshop.webapphardwarebridge.Server" "$INSTDIR\icon.ico" 0
+  CreateShortcut "$DESKTOP\Local Hardware Bridge.lnk" "$INSTDIR\jre\bin\javaw.exe" "-cp local-hardware-bridge.jar io.github.augustinlr17.localhardwarebridge.GUI" "$INSTDIR\icon.ico" 0
+  CreateShortcut "$DESKTOP\Local Hardware Bridge (CLI).lnk" "$INSTDIR\jre\bin\java.exe" "-cp local-hardware-bridge.jar io.github.augustinlr17.localhardwarebridge.Server" "$INSTDIR\icon.ico" 0
+  CreateShortcut "$SMPROGRAMS\Local Hardware Bridge.lnk" "$INSTDIR\jre\bin\javaw.exe" "-cp local-hardware-bridge.jar io.github.augustinlr17.localhardwarebridge.GUI" "$INSTDIR\icon.ico" 0
+  CreateShortcut "$SMPROGRAMS\Local Hardware Bridge (CLI).lnk" "$INSTDIR\jre\bin\java.exe" "-cp local-hardware-bridge.jar io.github.augustinlr17.localhardwarebridge.Server" "$INSTDIR\icon.ico" 0
 
   ; Write the installation path into the registry
-  WriteRegStr HKCU "SOFTWARE\WebApp Hardware Bridge" "Install_Dir" "$INSTDIR"
+  WriteRegStr HKCU "SOFTWARE\Local Hardware Bridge" "Install_Dir" "$INSTDIR"
   
   ; Write the uninstall keys for Windows
-  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\WebApp Hardware Bridge" "DisplayName" "WebApp Hardware Bridge"
-  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\WebApp Hardware Bridge" "UninstallString" '"$INSTDIR\uninstall.exe"'
-  WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\WebApp Hardware Bridge" "NoModify" 1
-  WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\WebApp Hardware Bridge" "NoRepair" 1
+  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Local Hardware Bridge" "DisplayName" "Local Hardware Bridge"
+  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Local Hardware Bridge" "UninstallString" '"$INSTDIR\uninstall.exe"'
+  WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Local Hardware Bridge" "NoModify" 1
+  WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Local Hardware Bridge" "NoRepair" 1
   WriteUninstaller "uninstall.exe"
 
   ; Auto close when finished
@@ -70,24 +76,24 @@ Section "!Main Application" ;No components page, name is not important
 SectionEnd ; end the section
 
 Section "Auto-start" autostart
-  CreateShortcut "$SMSTARTUP\WebApp Hardware Bridge.lnk" "$INSTDIR\jre\bin\javaw.exe" "-cp webapp-hardware-bridge.jar tigerworkshop.webapphardwarebridge.GUI"
+  CreateShortcut "$SMSTARTUP\Local Hardware Bridge.lnk" "$INSTDIR\jre\bin\javaw.exe" "-cp local-hardware-bridge.jar io.github.augustinlr17.localhardwarebridge.GUI"
 SectionEnd
 
 Section "Uninstall"
   ; Remove registry keys
-  DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\WebApp Hardware Bridge"
-  DeleteRegKey HKCU "SOFTWARE\WebApp Hardware Bridge"
+  DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Local Hardware Bridge"
+  DeleteRegKey HKCU "SOFTWARE\Local Hardware Bridge"
   
   ; Delete shortcuts
-  Delete "$DESKTOP\WebApp Hardware Bridge.lnk"
-  Delete "$DESKTOP\WebApp Hardware Bridge (CLI).lnk"
-  Delete "$SMPROGRAMS\WebApp Hardware Bridge.lnk"
-  Delete "$SMPROGRAMS\WebApp Hardware Bridge (CLI).lnk"
+  Delete "$DESKTOP\Local Hardware Bridge.lnk"
+  Delete "$DESKTOP\Local Hardware Bridge (CLI).lnk"
+  Delete "$SMPROGRAMS\Local Hardware Bridge.lnk"
+  Delete "$SMPROGRAMS\Local Hardware Bridge (CLI).lnk"
   
   ; Remove files and uninstaller
   RMDir /r $INSTDIR
 SectionEnd
 
 Function .onInstSuccess
-  ExecShell "" "$DESKTOP\WebApp Hardware Bridge.lnk"
+  ExecShell "" "$DESKTOP\Local Hardware Bridge.lnk"
 FunctionEnd

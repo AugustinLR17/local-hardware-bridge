@@ -40,7 +40,7 @@
 
         <div>
             <button class="btn btn-primary" onclick="printPDFWithFallback()">Print (With Fallback)</button>
-            <p class="text-muted">Fallback to window.open() if WebApp Hardware Bridge is not running.</p>
+            <p class="text-muted">Fallback to window.open() if Local Hardware Bridge is not running.</p>
         </div>
 
         <hr/>
@@ -106,7 +106,7 @@
         if (printService.isConnected()) {
             printPDF();
         } else {
-            alert('WebApp Hardware Bridge not running');
+            alert('Local Hardware Bridge not running');
             window.open(document.getElementById('url').value);
         }
     }

@@ -1,4 +1,4 @@
-module tigerworkshop.webapphardwarebridge {
+module io.github.augustinlr17.localhardwarebridge {
     requires java.desktop;
     requires com.fazecast.jSerialComm;
     requires jdk.management;
@@ -15,10 +15,10 @@ module tigerworkshop.webapphardwarebridge {
     requires io.javalin.community.ssl;
     requires static lombok;
 
-    opens tigerworkshop.webapphardwarebridge.dtos to com.fasterxml.jackson.databind;
-    opens tigerworkshop.webapphardwarebridge.responses to com.fasterxml.jackson.databind;
-    opens tigerworkshop.webapphardwarebridge.utils to com.fasterxml.jackson.databind;
+    opens io.github.augustinlr17.localhardwarebridge.dtos to com.fasterxml.jackson.databind;
+    opens io.github.augustinlr17.localhardwarebridge.responses to com.fasterxml.jackson.databind;
+    opens io.github.augustinlr17.localhardwarebridge.utils to com.fasterxml.jackson.databind;
 
-    exports tigerworkshop.webapphardwarebridge;
-    exports tigerworkshop.webapphardwarebridge.interfaces;
+    exports io.github.augustinlr17.localhardwarebridge;
+    exports io.github.augustinlr17.localhardwarebridge.interfaces;
 }
