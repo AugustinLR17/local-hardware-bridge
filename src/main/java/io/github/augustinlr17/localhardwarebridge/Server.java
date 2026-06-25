@@ -191,11 +191,9 @@ public class Server implements WebSocketServerInterface {
             String path = ctx.path();
             Config.EndpointRule rule = security.getEndpoints().get(path);
 
-            // If a rule exists and the endpoint is disabled, reject immediately
-            if (rule != null && !rule.isEnabled()) {
-                ctx.status(403).result("{\"error\": \"Endpoint disabled\"}");
-                ctx.skipRemainingHandlers();
-                return;
+            // Critical endpoints required for the Web UI must always stay enabled
+            if ("/config.json".equals(path) || "/system/health".equals(path)) {
+                rule = null; // ignore any disable/password rule
             }
 
             // Check global token if enabled
