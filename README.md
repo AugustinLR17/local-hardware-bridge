@@ -25,8 +25,7 @@ Grab the latest release from [Releases](https://github.com/AugustinLR17/local-ha
 |----------|------|
 | Cross-platform | `local-hardware-bridge-*.jar` (requires JDK 21+) |
 | Windows | `.exe` or `.msi` installer |
-| Linux (Debian/Ubuntu) | `.deb` package |
-| Linux (Fedora/RHEL) | `.rpm` package |
+| Linux | `.AppImage` (requires JDK 21+) |
 | macOS | `.dmg` installer |
 
 ### Run
@@ -46,21 +45,36 @@ The Web UI is available at `http://127.0.0.1:12212` (default).
 
 ## Architecture
 
-```
-┌─────────────────┐     ┌──────────────────────────────────┐
-│  Web App / POS  │────▶│                                  │
-│  (Browser)      │ WS  │      Local Hardware Bridge       │
-└─────────────────┘     │                                  │
-                        │  ┌──────────┐  ┌──────────────┐  │   ┌──────────┐
-┌─────────────────┐     │  │ Printer  │  │   Serial     │  │──▶│ Printers │
-│  Remote Server  │────▶│  │ Service  │  │   Services   │  │   │ (OS)     │
-│  (HTTP API)     │ REST│  └──────────┘  └──────────────┘  │   └──────────┘
-└─────────────────┘     │                                  │   ┌──────────┐
-                        │  ┌──────────┐  ┌──────────────┐  │──▶│ Serial   │
-┌─────────────────┐     │  │  Config  │  │   Web UI     │  │   │ Ports    │
-│  TUI Client     │────▶│  │ Service  │  │   (Static)   │  │   │ (OS)     │
-│  (Terminal)     │ REST│  └──────────┘  └──────────────┘  │   └──────────┘
-└─────────────────┘     └──────────────────────────────────┘
+```mermaid
+graph LR
+    subgraph Clients
+        Browser[Web App / POS]
+        Remote[Remote Server]
+        TUI[TUI Client]
+    end
+
+    subgraph LHB[Local Hardware Bridge]
+        PrinterSvc[Printer Service]
+        SerialSvc[Serial Services]
+        ConfigSvc[Config Service]
+        WebUI[Web UI]
+    end
+
+    subgraph Hardware
+        Printers[OS Printers]
+        SerialPorts[OS Serial Ports]
+    end
+
+    Browser -- WebSocket --> PrinterSvc
+    Browser -- WebSocket --> SerialSvc
+    Remote -- REST API --> PrinterSvc
+    Remote -- REST API --> SerialSvc
+    TUI -- REST API --> ConfigSvc
+    TUI -- REST API --> PrinterSvc
+    TUI -- REST API --> SerialSvc
+
+    PrinterSvc --> Printers
+    SerialSvc --> SerialPorts
 ```
 
 **How it works:** The Java application runs a Javalin HTTP/WebSocket server on localhost. Printer and serial services subscribe to channels. Messages are routed between WebSocket clients, HTTP requests, and hardware services via a pub/sub channel model.
@@ -185,7 +199,7 @@ Receive `PrintResult`:
 | Platform | GUI Mode | Server Mode | Install | Service |
 |----------|----------|-------------|---------|---------|
 | Windows | System tray, `.exe`/`.msi` | `java -cp ... Server` | Installer | Startup shortcut |
-| Linux | Headless fallback | `java -cp ... Server` | `.deb` / `.rpm` | systemd |
+| Linux | Headless fallback | `java -cp ... Server` | `.AppImage` | systemd |
 | macOS | Headless fallback | `java -cp ... Server` | `.dmg` | launchd |
 
 ## Documentation

@@ -237,6 +237,7 @@ jobs:
       - name: Build AppImage
         run: |
           export VERSION=${{ steps.version.outputs.VERSION }}
+          export ARCH=x86_64
           ./linuxdeploy.AppImage --appdir AppDir --output appimage
           mv Local_Hardware_Bridge-*.AppImage local-hardware-bridge-${{ steps.version.outputs.VERSION }}-x86_64.AppImage
 
