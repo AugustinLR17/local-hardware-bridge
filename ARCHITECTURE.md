@@ -11,6 +11,17 @@ Local Hardware Bridge is a Java 21 application built on [Javalin](https://javali
 | `io.github.augustinlr17.localhardwarebridge.GUI` | GUI | System tray icon + server, desktop notifications |
 | `io.github.augustinlr17.localhardwarebridge.Server` | Headless | Server only, no desktop dependencies |
 
+## Admin Clients
+
+The bridge does not require end users to install any client. Admin tools connect to the bridge REST API for management:
+
+| Tool | Language | Purpose |
+|------|----------|---------|
+| Web UI | JavaScript (static files served by the bridge) | Browser configuration of the same bridge instance |
+| TUI (`tui/`) | Go | Terminal dashboard for remote bridge servers |
+
+The TUI is an optional admin tool; it is not shipped to end users and is not used by the browser client.
+
 ## Core Components
 
 ### Server (`Server.java`)

@@ -347,6 +347,24 @@
     <div class="container" v-if="tab === 'simple' && config != null">
         <div class="row">
             <div class="col-lg-6">
+                <div class="lhb-quick-card" style="background: linear-gradient(135deg, var(--lhb-accent-light), transparent); border-color: var(--lhb-accent);">
+                    <div class="lhb-quick-icon" style="background: var(--lhb-accent); color: #fff; font-size: 1.3rem">🌐</div>
+                    <div class="lhb-quick-body">
+                        <div class="lhb-quick-title">Server Mode</div>
+                        <div class="lhb-quick-desc">
+                            Public bridge URL: <code>{{ config.server.address }}:{{ config.server.port }}</code>
+                        </div>
+                    </div>
+                    <div class="lhb-quick-action">
+                        <span class="lhb-badge" v-if="config.server.address !== '127.0.0.1' || config.server.bind !== '127.0.0.1'">ON</span>
+                        <span class="lhb-badge" style="background:#e5e7eb;color:#6b6f85" v-else>LOCAL</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-lg-6">
                 <div class="lhb-quick-card">
                     <div class="lhb-quick-icon printer">🖨️</div>
                     <div class="lhb-quick-body">
@@ -477,6 +495,12 @@
                             🌐 Server
                             <span class="lhb-badge">{{ config.server.tls.enabled ? 'HTTPS' : 'HTTP' }}</span>
                         </h5>
+                    </div>
+                    <div class="lhb-row">
+                        <span class="lhb-row-label lhb-form-label">Server Mode</span>
+                        <div class="lhb-row-value" style="text-align: right; font-size: 0.85rem; color: var(--lhb-text-dim)">
+                            Set Public/Bind Address to <code>0.0.0.0</code> or a LAN IP to allow remote browsers.
+                        </div>
                     </div>
                     <div class="lhb-row">
                         <span class="lhb-row-label lhb-form-label">Bind Address</span>

@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <title>LHB Server Mode Demo</title>
+    <style>
+        body { background: #f5f6fa; padding: 2rem; }
+        .card { border: 0; border-radius: 1rem; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+        .status { font-size: 0.85rem; }
+        .status.ok { color: #22c55e; }
+        .status.err { color: #ef4444; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h2 class="mb-4">Local Hardware Bridge — Server Mode Demo</h2>
+    <p class="text-muted">
+        This page is a public/remote website. It prints through the Local Hardware Bridge running
+        on the user's network. The user does not install anything on their computer.
+    </p>
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title">Bridge Connection</h5>
+            <div class="input-group mb-3">
+                <span class="input-group-text">Server URL</span>
+                <input id="serverUrl" class="form-control" value="http://127.0.0.1:12212">
+                <button class="btn btn-outline-primary" onclick="checkBridge()">Check</button>
+            </div>
+            <div id="connStatus" class="status">Enter the bridge URL and click Check.</div>
+        </div>
+    </div>
+
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title">Print</h5>
+            <div class="row g-3">
+                <div class="col-md-4">
+                    <label class="form-label">Document Type</label>
+                    <input id="docType" class="form-control" value="INVOICE">
+                </div>
+                <div class="col-md-8">
+                    <label class="form-label">PDF URL</label>
+                    <input id="pdfUrl" class="form-control" value="https://pdfobject.com/pdf/sample.pdf">
+                </div>
+            </div>
+            <button class="btn btn-success mt-3" onclick="printDocument()" id="printBtn" disabled>Print</button>
+            <div id="printStatus" class="status mt-2"></div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-body">
+            <h5 class="card-title">Live Status</h5>
+            <pre id="statusLog" class="bg-light p-3 rounded" style="min-height: 120px; font-size: 0.8rem;"></pre>
+        </div>
+    </div>
+</div>
+
+<!-- Printer chooser modal -->
+<div class="modal" tabindex="-1" id="printerModal" style="display: none; background: rgba(0,0,0,0.5);">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Choose a printer</h5>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted">Select the printer that will be used for <strong id="modalType">INVOICE</strong>. This choice is saved for future print jobs.</p>
+                <select id="printerSelect" class="form-select"></select>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-primary" onclick="confirmPrinter()">Save & Print</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="printer-sdk.js"></script>
+<script>
+    let pendingPrint = null;
+    let ws = null;
+
+    function log(msg) {
+        document.getElementById('statusLog').textContent += (new Date().toLocaleTimeString()) + '  ' + msg + '\n';
+    }
+
+    function serverUrl() {
+        return document.getElementById('serverUrl').value.replace(/\/$/, '');
+    }
+
+    function setStatus(id, text, ok) {
+        const el = document.getElementById(id);
+        el.textContent = text;
+        el.className = 'status ' + (ok ? 'ok' : 'err');
+    }
+
+    async function checkBridge() {
+        try {
+            const printers = await LHB.listPrinters(serverUrl());
+            setStatus('connStatus', 'Connected to bridge. Printers available: ' + printers.length, true);
+            log('Connected to ' + serverUrl() + ' — found ' + printers.length + ' printers');
+            document.getElementById('printBtn').disabled = false;
+            connectWs();
+        } catch (e) {
+            setStatus('connStatus', e.message, false);
+            log('Connection failed: ' + e.message);
+        }
+    }
+
+    async function printDocument() {
+        const type = document.getElementById('docType').value;
+        const url = document.getElementById('pdfUrl').value;
+        try {
+            await LHB.ensurePrinter(serverUrl(), type, null, {
+                prompt: async (printers) => {
+                    return new Promise((resolve) => {
+                        const select = document.getElementById('printerSelect');
+                        select.innerHTML = '';
+                        printers.forEach(p => {
+                            const opt = document.createElement('option');
+                            opt.value = p.name;
+                            opt.textContent = p.name + (p.description ? ' — ' + p.description : '');
+                            select.appendChild(opt);
+                        });
+                        document.getElementById('modalType').textContent = type;
+                        document.getElementById('printerModal').style.display = 'block';
+                        pendingPrint = resolve;
+                    });
+                }
+            });
+            await LHB.print(serverUrl(), { type: type, url: url });
+            log('Print job submitted: ' + type + ' / ' + url);
+            setStatus('printStatus', 'Print job submitted. Waiting for result...', true);
+        } catch (e) {
+            log('Print failed: ' + e.message);
+            setStatus('printStatus', e.message, false);
+        }
+    }
+
+    async function confirmPrinter() {
+        const chosen = document.getElementById('printerSelect').value;
+        document.getElementById('printerModal').style.display = 'none';
+        if (pendingPrint) pendingPrint(chosen);
+        pendingPrint = null;
+    }
+
+    function connectWs() {
+        if (ws) ws.close();
+        ws = LHB.connect(serverUrl(), {
+            onConnect: () => log('WebSocket connected'),
+            onDisconnect: () => log('WebSocket disconnected'),
+            onError: (e) => log('WebSocket error'),
+            onUpdate: (data) => log('Print result: ' + JSON.stringify(data))
+        });
+    }
+</script>
+</body>
+</html>

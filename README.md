@@ -11,7 +11,7 @@
 - **REST API** — Full CRUD for config, mappings, printer/serial management
 - **WebSocket API** — Real-time streaming for serial data and print status
 - **Web UI** — Browser-based configuration dashboard
-- **TUI Client** — Terminal interface for headless/server environments
+- **TUI Admin** — Terminal dashboard for managing the bridge server (not for end users)
 - **Cross-Platform** — Windows, Linux, macOS with native installers
 - **Auth & TLS** — Bearer token authentication, HTTPS/WSS support
 
@@ -43,21 +43,66 @@ java -cp local-hardware-bridge-*.jar io.github.augustinlr17.localhardwarebridge.
 
 The Web UI is available at `http://127.0.0.1:12212` (default).
 
+![Dashboard](docs/screenshot-dashboard.png)
+![Advanced Settings](docs/screenshot-advanced.png)
+
+## Operating Modes
+
+### 1. Local Mode (single user, one computer)
+
+The bridge runs on the same machine as the browser. The web app (local POS, intranet page) talks directly to the bridge.
+
+```mermaid
+graph LR
+    Browser[Web App / Browser]
+    LHB[Local Hardware Bridge]
+    Printers[OS Printers]
+    Browser -- HTTP/WebSocket<br/>127.0.0.1:12212 --> LHB
+    LHB --> Printers
+```
+
+Use case: a cashier PC running both the browser and the bridge.
+
+### 2. Server Mode (networked, users install nothing)
+
+The bridge runs on a shared office PC, a small server, or a VM. The website is hosted elsewhere (or on the same network) and the user's browser talks to the bridge. The user does **not** install any software on their own computer.
+
+```mermaid
+graph LR
+    User[User Browser]
+    Website[Remote Website]
+    LHB[Local Hardware Bridge Server]
+    Printers[OS Printers]
+    Website -- serves page --> User
+    User -- HTTP/WebSocket<br/>from browser to bridge --> LHB
+    LHB --> Printers
+```
+
+Use case: a SaaS POS, a WMS in the cloud, or a central web application where each shop/floor has one bridge machine connected to the printers.
+
+### 3. TUI Mode
+
+The TUI is an **admin dashboard for the bridge server** that runs in a terminal. It is used to monitor and configure the bridge in headless/server environments. It is **not** a client for end users.
+
+```bash
+./lhb-tui --server http://127.0.0.1:12212
+```
+
 ## Architecture
 
 ```mermaid
 graph LR
     subgraph Clients
         Browser[Web App / POS]
-        Remote[Remote Server]
-        TUI[TUI Client]
+        Remote[Remote Website]
+        TUI[TUI Admin Client]
     end
 
     subgraph LHB[Local Hardware Bridge]
         PrinterSvc[Printer Service]
         SerialSvc[Serial Services]
         ConfigSvc[Config Service]
-        WebUI[Web UI]
+        WebUI[Web Admin UI]
     end
 
     subgraph Hardware
@@ -65,10 +110,10 @@ graph LR
         SerialPorts[OS Serial Ports]
     end
 
-    Browser -- WebSocket --> PrinterSvc
-    Browser -- WebSocket --> SerialSvc
-    Remote -- REST API --> PrinterSvc
-    Remote -- REST API --> SerialSvc
+    Browser -- HTTP/WS --> PrinterSvc
+    Browser -- HTTP/WS --> SerialSvc
+    Remote -- HTTP/WS --> PrinterSvc
+    Remote -- HTTP/WS --> SerialSvc
     TUI -- REST API --> ConfigSvc
     TUI -- REST API --> PrinterSvc
     TUI -- REST API --> SerialSvc
@@ -216,11 +261,75 @@ Receive `PrintResult`:
 | [Architecture](ARCHITECTURE.md) | Internal architecture and design |
 | [Changelog](CHANGELOG.md) | Version history |
 
+## Server Mode Integration
+
+For **Server Mode**, include the SDK on your public website and use it from the user's browser. The bridge does not need to be installed on the user's machine; it runs on a machine on the network with printer access.
+
+### SDK API
+
+| Method | Description |
+|----------|-------------|
+| `LHB.listPrinters(serverUrl)` | List printers available on the bridge machine |
+| `LHB.listMappings(serverUrl)` | List configured type → printer mappings |
+| `LHB.choosePrinter(serverUrl, type, printerName)` | Persist a type → printer mapping on the bridge |
+| `LHB.print(serverUrl, document)` | Submit a print job |
+| `LHB.connect(serverUrl, callbacks)` | WebSocket for live print status |
+| `LHB.ensurePrinter(serverUrl, type, token, {prompt})` | Auto-map or prompt the user to choose a printer |
+
+### Example
+
+```html
+<script src="https://your-cdn.com/local-hardware-bridge/printer-sdk.js"></script>
+<script>
+const serverUrl = 'http://192.168.1.100:12212';
+const documentType = 'INVOICE';
+
+async function printInvoice(pdfUrl) {
+  // Make sure the user has chosen a printer for this type
+  await LHB.ensurePrinter(serverUrl, documentType, null, {
+    prompt: async (printers) => {
+      const names = printers.map(p => p.name);
+      const chosen = await showPrinterDialog(names); // your UI
+      return chosen;
+    }
+  });
+
+  // Submit the print job
+  await LHB.print(serverUrl, { type: documentType, url: pdfUrl });
+}
+</script>
+```
+
+The chosen printer is persisted both in the bridge config (`/printer/mappings`) and in the browser's `localStorage`, so the next print job can skip the dialog.
+
+### Workflow
+
+```mermaid
+sequenceDiagram
+    participant U as User Browser
+    participant W as Website
+    participant B as LHB Server
+    participant P as OS Printer
+
+    U->>W: Open page, click Print
+    W->>U: Load LHB SDK
+    U->>B: GET /system/printers.json
+    B-->>U: Available printers
+    U->>U: Show printer chooser
+    U->>B: POST /printer/mappings {type, name}
+    B-->>U: Mapping saved
+    U->>B: POST /printer {type, url}
+    B->>P: Print document
+    B-->>U: WebSocket PrintResult
+```
+
 ## JS SDK
 
 Integration examples for web apps are in the [`demo/`](demo) directory:
 
-- [`websocket-printer.js`](demo/websocket-printer.js) — Printer WebSocket client
+- [`websocket-printer.js`](demo/websocket-printer.js) — Printer WebSocket client (Local Mode)
+- [`printer-sdk.js`](demo/printer-sdk.js) — Printer REST/WS SDK (Server Mode)
+- [`printer-server-mode.htm`](demo/printer-server-mode.htm) — Server Mode demo page
 - [`websocket-serial.js`](demo/websocket-serial.js) — Serial WebSocket client
 - [`websocket-weigh.js`](demo/websocket-weigh.js) — Weight scale client (AWH-SA30)
 

@@ -345,7 +345,7 @@ jobs:
             - REST API: full CRUD for config, mappings, printer/serial management
             - WebSocket API: real-time streaming for serial data and print status
             - Web UI: browser-based configuration dashboard (light theme)
-            - TUI Client: terminal interface for headless/server environments
+            - TUI Admin: terminal dashboard for bridge server administrators
             - Auth & TLS: Bearer token authentication, HTTPS/WSS support
             - Systemd service: one-command install for Linux servers
 
@@ -358,7 +358,7 @@ jobs:
             | Windows | `.msi` installer | MSI for enterprise deployment |
             | Linux | `.AppImage` | Requires JDK 21+, portable |
             | macOS | `.dmg` installer | Intel & Apple Silicon |
-            | Terminal | `lhb-tui-*` | Standalone binary, no JVM needed |
+            | Terminal | `lhb-tui-*` | Admin dashboard, no JVM needed |
 
             ## Quick Start
 
