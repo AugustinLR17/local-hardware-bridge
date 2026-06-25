@@ -43,7 +43,7 @@ jobs:
 
       - name: Build TUI
         working-directory: tui
-        run: go build -o ../build/lhb-tui .
+        run: go mod tidy && go build -o ../build/lhb-tui .
 
       - name: Upload fat JAR
         uses: actions/upload-artifact@v4
