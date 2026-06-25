@@ -2,16 +2,32 @@
 set -e
 
 # Start CUPS in background
-/usr/sbin/cupsd
+mkdir -p /var/run/cups /var/cache/cups /var/spool/cups /tmp/cups-pdf /tmp/cups-pdf-anon
+chmod 777 /tmp/cups-pdf /tmp/cups-pdf-anon
+
+/usr/sbin/cupsd -f &
 
 # Wait for CUPS to be ready
-sleep 3
+for i in {1..60}; do
+    if lpstat -p 2>/dev/null | grep -q CUPS-PDF; then
+        break
+    fi
+    if cupsctl --no-debugging 2>/dev/null; then
+        break
+    fi
+    sleep 1
+done
 
-# Add CUPS-PDF printer if not already present
+# Create CUPS-PDF printer if not present
 if ! lpstat -p 2>/dev/null | grep -q CUPS-PDF; then
-    lpadmin -p CUPS-PDF -E -v cups-pdf:/ -P /usr/share/ppd/cups-pdf/CUPS-PDF_opt.ppd || \
-    lpadmin -p CUPS-PDF -E -v cups-pdf:/ -m everywhere || true
+    lpadmin -p CUPS-PDF -E -v cups-pdf:/ -P /usr/share/ppd/cups-pdf/CUPS-PDF_opt.ppd 2>/dev/null || \
+    lpadmin -p CUPS-PDF -E -v cups-pdf:/ -m everywhere 2>/dev/null || \
+    lpadmin -p CUPS-PDF -E -v cups-pdf:/ -m lsb/usr/cups-pdf/CUPS-PDF.ppd 2>/dev/null || true
 fi
+
+# Ensure CUPS-PDF is accepting jobs
+accept CUPS-PDF 2>/dev/null || true
+cupsenable CUPS-PDF 2>/dev/null || true
 
 # Start the bridge in server mode
 java -cp /app/local-hardware-bridge.jar io.github.augustinlr17.localhardwarebridge.Server &
