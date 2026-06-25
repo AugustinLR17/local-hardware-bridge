@@ -2,25 +2,35 @@
 
 ## Overview
 
-Local Hardware Bridge is a Java 21 application built on [Javalin](https://javalin.io/) that exposes local hardware (printers, serial ports) to web applications via WebSocket and REST APIs.
+Local Hardware Bridge is a Java 21 application built on [Javalin](https://javalin.io/) that exposes local hardware (printers, serial ports) to a web browser running on the **same machine**.
 
-## Entry Points
+## Operating Model
 
-| Main Class | Mode | Description |
-|------------|------|-------------|
-| `io.github.augustinlr17.localhardwarebridge.GUI` | GUI | System tray icon + server, desktop notifications |
-| `io.github.augustinlr17.localhardwarebridge.Server` | Headless | Server only, no desktop dependencies |
+The bridge is designed for **local mode only**:
+- The bridge process runs on the same machine as the browser.
+- The browser connects to `127.0.0.1:12212` (or a configured LAN address on the same machine).
+- The bridge talks to OS printers and serial ports.
 
-## Admin Clients
+```mermaid
+graph LR
+    subgraph Local Machine
+        Browser[Web App / Browser]
+        WebUI[Web Admin UI]
+        TUI[TUI Admin Client]
+        LHB[Local Hardware Bridge]
+    end
 
-The bridge does not require end users to install any client. Admin tools connect to the bridge REST API for management:
+    subgraph Hardware
+        Printers[OS Printers]
+        SerialPorts[OS Serial Ports]
+    end
 
-| Tool | Language | Purpose |
-|------|----------|---------|
-| Web UI | JavaScript (static files served by the bridge) | Browser configuration of the same bridge instance |
-| TUI (`tui/`) | Go | Terminal dashboard for remote bridge servers |
-
-The TUI is an optional admin tool; it is not shipped to end users and is not used by the browser client.
+    Browser -- HTTP/WS --> LHB
+    WebUI -- HTTP/WS --> LHB
+    TUI -- REST API --> LHB
+    LHB --> Printers
+    LHB --> SerialPorts
+```
 
 ## Core Components
 

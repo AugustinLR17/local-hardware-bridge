@@ -9,12 +9,15 @@ import lombok.NoArgsConstructor;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 
 @Data
 @NoArgsConstructor
 public class Config {
     private GUI gui = new GUI();
     private Server server = new Server();
+    private Security security = new Security();
     private Downloader downloader = new Downloader();
     private Printer printer = new Printer();
     private Serial serial = new Serial();
@@ -65,6 +68,19 @@ public class Config {
         private String cert = "tls/default-cert.pem";
         private String key = "tls/default-key.pem";
         private String caBundle = null;
+    }
+
+    @Data
+    @NoArgsConstructor
+    public static class Security {
+        private Map<String, EndpointRule> endpoints = new HashMap<>();
+    }
+
+    @Data
+    @NoArgsConstructor
+    public static class EndpointRule {
+        private boolean enabled = true;
+        private String password = null;
     }
 
     @Data

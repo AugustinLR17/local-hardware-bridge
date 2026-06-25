@@ -186,6 +186,19 @@ public class Server implements WebSocketServerInterface {
 
         // Add HTTP Auth
         javalinServer.before(ctx -> {
+            Config.Security security = configService.getConfig().getSecurity();
+
+            String path = ctx.path();
+            Config.EndpointRule rule = security.getEndpoints().get(path);
+
+            // If a rule exists and the endpoint is disabled, reject immediately
+            if (rule != null && !rule.isEnabled()) {
+                ctx.status(403).result("{\"error\": \"Endpoint disabled\"}");
+                ctx.skipRemainingHandlers();
+                return;
+            }
+
+            // Check global token if enabled
             if (serverConfig.getAuthentication().isEnabled()) {
                 try {
                     // Bearer Token
@@ -203,6 +216,24 @@ public class Server implements WebSocketServerInterface {
 
                 ctx.header("WWW-Authenticate", "Basic realm=\"Token required\"");
                 ctx.res().sendError(401, "Token mismatch");
+                return;
+            }
+
+            // Check endpoint-specific password if set
+            if (rule != null && rule.getPassword() != null && !rule.getPassword().isEmpty()) {
+                try {
+                    String provided = Optional.ofNullable(ctx.header("Authorization")).orElse("");
+                    if (provided.endsWith(rule.getPassword())) {
+                        return;
+                    }
+                    if (ctx.basicAuthCredentials() != null && Objects.equals(ctx.basicAuthCredentials().getPassword(), rule.getPassword())) {
+                        return;
+                    }
+                } catch (Exception e) {
+                    // NOOP
+                }
+                ctx.header("WWW-Authenticate", "Basic realm=\"Password required\"");
+                ctx.res().sendError(401, "Password mismatch");
             }
         });
 

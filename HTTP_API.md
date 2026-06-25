@@ -1,21 +1,10 @@
 # HTTP APIs
 
-All endpoints have CORS configured to allow requests from any origin.
+All endpoints have CORS configured to allow requests from any origin. In local mode the browser and the bridge run on the same machine.
 
 When authentication is enabled, use header `Authorization: Bearer <token>` or Basic Auth (password = token).
 
-## Server Mode
-
-In **Server Mode**, these endpoints are called **directly from the user's browser**. The user does not install any software on their machine; the Local Hardware Bridge runs on a machine with hardware access (office PC, server, VM) and the remote website talks to it from the browser.
-
-Typical printer flow from a website:
-
-1. `GET /system/printers.json` — list printers available to the bridge
-2. `POST /printer/mappings` — persist the user's printer choice for a document type
-3. `POST /printer` — submit the print job
-4. WebSocket `/printer` — receive `PrintResult` status
-
-See [`demo/printer-sdk.js`](demo/printer-sdk.js) for a ready-to-use browser SDK.
+Each endpoint can also be individually disabled or protected with its own password. See [README](README.md) for details.
 
 ## Configuration
 

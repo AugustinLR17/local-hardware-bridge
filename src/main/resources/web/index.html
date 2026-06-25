@@ -347,24 +347,6 @@
     <div class="container" v-if="tab === 'simple' && config != null">
         <div class="row">
             <div class="col-lg-6">
-                <div class="lhb-quick-card" style="background: linear-gradient(135deg, var(--lhb-accent-light), transparent); border-color: var(--lhb-accent);">
-                    <div class="lhb-quick-icon" style="background: var(--lhb-accent); color: #fff; font-size: 1.3rem">🌐</div>
-                    <div class="lhb-quick-body">
-                        <div class="lhb-quick-title">Server Mode</div>
-                        <div class="lhb-quick-desc">
-                            Public bridge URL: <code>{{ config.server.address }}:{{ config.server.port }}</code>
-                        </div>
-                    </div>
-                    <div class="lhb-quick-action">
-                        <span class="lhb-badge" v-if="config.server.address !== '127.0.0.1' || config.server.bind !== '127.0.0.1'">ON</span>
-                        <span class="lhb-badge" style="background:#e5e7eb;color:#6b6f85" v-else>LOCAL</span>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <div class="row">
-            <div class="col-lg-6">
                 <div class="lhb-quick-card">
                     <div class="lhb-quick-icon printer">🖨️</div>
                     <div class="lhb-quick-body">
@@ -491,16 +473,36 @@
 
                 <div class="lhb-card">
                     <div class="lhb-card-header">
+                        <h5 class="lhb-card-title">🔒 Endpoint Security</h5>
+                    </div>
+                    <div class="lhb-row">
+                        <div class="lhb-row-label" style="width:100%">
+                            <div class="text-muted mb-2" style="font-size:0.78rem">Disable endpoints or set per-endpoint passwords. Empty password = no extra protection.</div>
+                            <div v-for="path in endpointList" :key="path" class="lhb-mapping-card" style="padding:0.75rem">
+                                <div class="lhb-mapping-header">
+                                    <span class="lhb-mapping-title" style="font-size:0.78rem">{{ path }}</span>
+                                    <label class="lhb-toggle" :title="config.security.endpoints[path].enabled ? 'Enabled' : 'Disabled'">
+                                        <input type="checkbox" v-model="config.security.endpoints[path].enabled"/>
+                                        <span class="lhb-toggle-slider"></span>
+                                    </label>
+                                </div>
+                                <div class="lhb-row" style="margin-bottom:0">
+                                    <span class="lhb-row-label lhb-form-label" style="font-size:0.75rem">Password</span>
+                                    <div class="lhb-row-value" style="width:140px">
+                                        <input class="lhb-form-control" type="password" placeholder="none" v-model="config.security.endpoints[path].password" style="font-size:0.75rem"/>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="lhb-card">
+                    <div class="lhb-card-header">
                         <h5 class="lhb-card-title">
                             🌐 Server
                             <span class="lhb-badge">{{ config.server.tls.enabled ? 'HTTPS' : 'HTTP' }}</span>
                         </h5>
-                    </div>
-                    <div class="lhb-row">
-                        <span class="lhb-row-label lhb-form-label">Server Mode</span>
-                        <div class="lhb-row-value" style="text-align: right; font-size: 0.85rem; color: var(--lhb-text-dim)">
-                            Set Public/Bind Address to <code>0.0.0.0</code> or a LAN IP to allow remote browsers.
-                        </div>
                     </div>
                     <div class="lhb-row">
                         <span class="lhb-row-label lhb-form-label">Bind Address</span>
@@ -728,10 +730,40 @@ createApp({
     serials: [],
     health: null,
     tab: 'simple',
-
+    endpointList: [
+        '/config.json',
+        '/system/server.json',
+        '/system/downloader.json',
+        '/system/gui.json',
+        '/system/printers.json',
+        '/system/serials.json',
+        '/system/version.json',
+        '/system/health',
+        '/system/connections',
+        '/system/notification',
+        '/system/restart.json',
+        '/system/install-service',
+        '/system/uninstall-service',
+        '/printer',
+        '/printer/mappings',
+        '/printer/enabled',
+        '/serial/mappings',
+        '/serial/enabled',
+        '/serial/status',
+        '/serial/connections'
+    ],
     loadConfig() {
         return axios.get('/config.json')
-            .then(response => this.config = response.data)
+            .then(response => {
+                this.config = response.data;
+                if (!this.config.security) this.config.security = { endpoints: {} };
+                if (!this.config.security.endpoints) this.config.security.endpoints = {};
+                this.endpointList.forEach(path => {
+                    if (!this.config.security.endpoints[path]) {
+                        this.config.security.endpoints[path] = { enabled: true, password: '' };
+                    }
+                });
+            })
     },
     saveConfig() {
         return axios.put('/config.json', this.config)

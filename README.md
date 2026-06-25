@@ -2,7 +2,9 @@
 
 > **Fork of** [WebApp Hardware Bridge](https://github.com/imTigger/webapp-hardware-bridge) by imTigger — originally licensed under MIT.
 
-**Local Hardware Bridge** exposes local printers and serial ports to web applications via WebSocket and REST APIs. Built for POS systems, WMS, IoT dashboards, and any web app needing hardware access.
+**Local Hardware Bridge** exposes local printers and serial ports to a web browser running on the same machine. Built for POS systems, WMS, IoT dashboards, and any web app that needs silent access to local hardware without installing browser plugins or extensions.
+
+The bridge runs locally (127.0.0.1 by default). A website or local web app opens in the browser and talks to the bridge via HTTP/WebSocket. The bridge then talks to the OS printers and serial ports.
 
 ## Features
 
@@ -48,41 +50,24 @@ The Web UI is available at `http://127.0.0.1:12212` (default).
 
 ## Operating Modes
 
-### 1. Local Mode (single user, one computer)
-
-The bridge runs on the same machine as the browser. The web app (local POS, intranet page) talks directly to the bridge.
+Local Hardware Bridge runs on the **same machine as the browser**. The local web app (or a website that the user opens locally) talks to the bridge, and the bridge talks to the hardware.
 
 ```mermaid
 graph LR
     Browser[Web App / Browser]
     LHB[Local Hardware Bridge]
     Printers[OS Printers]
+    Serial[Serial Ports]
     Browser -- HTTP/WebSocket<br/>127.0.0.1:12212 --> LHB
     LHB --> Printers
+    LHB --> Serial
 ```
 
-Use case: a cashier PC running both the browser and the bridge.
+Use case: a cashier PC, a local POS, a warehouse workstation, or any desktop where the browser and the hardware are on the same machine.
 
-### 2. Server Mode (networked, users install nothing)
+### TUI Admin
 
-The bridge runs on a shared office PC, a small server, or a VM. The website is hosted elsewhere (or on the same network) and the user's browser talks to the bridge. The user does **not** install any software on their own computer.
-
-```mermaid
-graph LR
-    User[User Browser]
-    Website[Remote Website]
-    LHB[Local Hardware Bridge Server]
-    Printers[OS Printers]
-    Website -- serves page --> User
-    User -- HTTP/WebSocket<br/>from browser to bridge --> LHB
-    LHB --> Printers
-```
-
-Use case: a SaaS POS, a WMS in the cloud, or a central web application where each shop/floor has one bridge machine connected to the printers.
-
-### 3. TUI Mode
-
-The TUI is an **admin dashboard for the bridge server** that runs in a terminal. It is used to monitor and configure the bridge in headless/server environments. It is **not** a client for end users.
+The TUI is a terminal dashboard for the administrator of the bridge. It connects to a running bridge instance and is **not** used by end users. It is useful for headless setups or when you want to monitor the bridge without opening a browser.
 
 ```bash
 ./lhb-tui --server http://127.0.0.1:12212
@@ -92,17 +77,11 @@ The TUI is an **admin dashboard for the bridge server** that runs in a terminal.
 
 ```mermaid
 graph LR
-    subgraph Clients
-        Browser[Web App / POS]
-        Remote[Remote Website]
-        TUI[TUI Admin Client]
-    end
-
-    subgraph LHB[Local Hardware Bridge]
-        PrinterSvc[Printer Service]
-        SerialSvc[Serial Services]
-        ConfigSvc[Config Service]
+    subgraph Local Machine
+        Browser[Web App / Browser]
+        LHB[Local Hardware Bridge]
         WebUI[Web Admin UI]
+        TUI[TUI Admin Client]
     end
 
     subgraph Hardware
@@ -110,16 +89,12 @@ graph LR
         SerialPorts[OS Serial Ports]
     end
 
-    Browser -- HTTP/WS --> PrinterSvc
-    Browser -- HTTP/WS --> SerialSvc
-    Remote -- HTTP/WS --> PrinterSvc
-    Remote -- HTTP/WS --> SerialSvc
-    TUI -- REST API --> ConfigSvc
-    TUI -- REST API --> PrinterSvc
-    TUI -- REST API --> SerialSvc
+    Browser -- HTTP/WS --> LHB
+    WebUI -- HTTP/WS --> LHB
+    TUI -- REST API --> LHB
 
-    PrinterSvc --> Printers
-    SerialSvc --> SerialPorts
+    LHB --> Printers
+    LHB --> SerialPorts
 ```
 
 **How it works:** The Java application runs a Javalin HTTP/WebSocket server on localhost. Printer and serial services subscribe to channels. Messages are routed between WebSocket clients, HTTP requests, and hardware services via a pub/sub channel model.
@@ -249,6 +224,29 @@ Receive `PrintResult`:
 | Linux | Headless fallback | `java -cp ... Server` | `.AppImage` | systemd |
 | macOS | Headless fallback | `java -cp ... Server` | `.dmg` | launchd |
 
+## Security
+
+Each REST endpoint can be individually disabled or protected with its own password. This lets you lock down sensitive endpoints (`/printer`, `/system/restart.json`, etc.) while leaving public ones (`/system/health`) open.
+
+Configure endpoint security in the Web UI under **Advanced → Endpoint Security** or by editing `config.json`:
+
+```json
+{
+  "security": {
+    "endpoints": {
+      "/printer": { "enabled": true, "password": "print-password" },
+      "/system/restart.json": { "enabled": false, "password": null }
+    }
+  }
+}
+```
+
+- `enabled: false` → the endpoint returns `403 Forbidden`.
+- `password` set → endpoint requires `Authorization: Bearer <password>` or Basic Auth password.
+- Empty `password` with `enabled: true` → endpoint follows the global auth setting (if any).
+
+You can also enable global Bearer/Basic auth under **Advanced → Server → Authentication**.
+
 ## Documentation
 
 | Document | Description |
@@ -327,9 +325,7 @@ sequenceDiagram
 
 Integration examples for web apps are in the [`demo/`](demo) directory:
 
-- [`websocket-printer.js`](demo/websocket-printer.js) — Printer WebSocket client (Local Mode)
-- [`printer-sdk.js`](demo/printer-sdk.js) — Printer REST/WS SDK (Server Mode)
-- [`printer-server-mode.htm`](demo/printer-server-mode.htm) — Server Mode demo page
+- [`websocket-printer.js`](demo/websocket-printer.js) — Printer WebSocket client
 - [`websocket-serial.js`](demo/websocket-serial.js) — Serial WebSocket client
 - [`websocket-weigh.js`](demo/websocket-weigh.js) — Weight scale client (AWH-SA30)
 
