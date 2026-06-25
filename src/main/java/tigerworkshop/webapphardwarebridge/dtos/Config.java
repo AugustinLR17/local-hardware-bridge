@@ -116,6 +116,6 @@ public class Config {
         private Integer parity;
 
         private Boolean readMultipleBytes = false;
-        private String readCharset = StandardCharsets.UTF_8.toString();
+        private String readCharset = StandardCharsets.ISO_8859_1.toString();
     }
 }

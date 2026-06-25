@@ -14,6 +14,8 @@ import lombok.extern.log4j.Log4j2;
 import tigerworkshop.webapphardwarebridge.dtos.*;
 import tigerworkshop.webapphardwarebridge.interfaces.WebSocketServerInterface;
 import tigerworkshop.webapphardwarebridge.interfaces.WebSocketServiceInterface;
+import tigerworkshop.webapphardwarebridge.responses.PrintDocument;
+import tigerworkshop.webapphardwarebridge.responses.PrintResult;
 import tigerworkshop.webapphardwarebridge.services.ConfigService;
 import tigerworkshop.webapphardwarebridge.utils.CertificateGenerator;
 import tigerworkshop.webapphardwarebridge.utils.ThreadUtil;
@@ -38,6 +40,8 @@ public class Server implements WebSocketServerInterface {
     private final ConcurrentHashMap<String, ConcurrentLinkedQueue<WsContext>> socketChannelSubscriptions = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, ConcurrentLinkedQueue<WebSocketServiceInterface>> serviceChannelSubscriptions = new ConcurrentHashMap<>();
     private final ConcurrentLinkedQueue<WebSocketServiceInterface> services = new ConcurrentLinkedQueue<>();
+
+    private PrinterWebSocketService printerWebSocketService;
 
     public static void main(String[] args) {
         try {
@@ -98,7 +102,7 @@ public class Server implements WebSocketServerInterface {
         // Add WebSocket Printer Service
         Config.Printer printerConfig = config.getPrinter();
         if (printerConfig.isEnabled()) {
-            PrinterWebSocketService printerWebSocketService = new PrinterWebSocketService();
+            printerWebSocketService = new PrinterWebSocketService();
             printerWebSocketService.start();
 
             javalinServer.ws(printerWebSocketService.getChannel(), ws -> {
@@ -239,6 +243,37 @@ public class Server implements WebSocketServerInterface {
             start();
 
             messageToService("/notification", objectMapper.writeValueAsString(new NotificationDTO("INFO", "Restart", "Server restarted successfully")));
+        });
+
+        // Add HTTP Print Service
+        javalinServer.post("/printer", ctx -> {
+            if (printerWebSocketService == null) {
+                ctx.status(503).json("{\"error\": \"Printer service is disabled\"}");
+                return;
+            }
+
+            String body = ctx.body();
+            log.info("HTTP print request received: {}", body);
+
+            try {
+                PrintDocument printDocument = objectMapper.readValue(body, PrintDocument.class);
+                PrintResult result = printerWebSocketService.printDocument(printDocument);
+                ctx.contentType(ContentType.APPLICATION_JSON).result(objectMapper.writeValueAsString(result));
+            } catch (Exception e) {
+                log.error("HTTP print error: {}", e.getMessage());
+                ctx.status(500).json("{\"error\": \"" + e.getMessage().replace("\"", "'") + "\"}");
+            }
+        });
+
+        // Add HTTP Serial Write Service
+        javalinServer.post("/serial/{type}", ctx -> {
+            String type = ctx.pathParam("type");
+            String body = ctx.body();
+            log.info("HTTP serial write request received for type {}: {}", type, body);
+
+            messageToService("/serial/" + type, body);
+
+            ctx.contentType(ContentType.APPLICATION_JSON).result("{\"status\": \"submitted\"}");
         });
 
         try {

@@ -34,6 +34,8 @@ public class PrinterWebSocketService implements WebSocketServiceInterface {
     private static final ConfigService configService = ConfigService.getInstance();
     private static final DocumentService documentService = DocumentService.getInstance();
     private static final ObjectMapper objectMapper = new ObjectMapper();
+
+    private final Object printLock = new Object();
     
     public PrinterWebSocketService() {
         log.info("Starting PrinterWebSocketService");
@@ -82,10 +84,11 @@ public class PrinterWebSocketService implements WebSocketServiceInterface {
     /**
      * Prints a PrintDocument
      */
-    public void printDocument(PrintDocument printDocument) throws Exception {
-        log.info("Printing Document {}, {}", printDocument.getType(), printDocument.getUrl());
+    public PrintResult printDocument(PrintDocument printDocument) throws Exception {
+        synchronized (printLock) {
+            log.info("Printing Document {}, {}", printDocument.getType(), printDocument.getUrl());
 
-        PrinterSearchResult printerSearchResult = null;
+            PrinterSearchResult printerSearchResult = null;
         try {
             printerSearchResult = searchPrinterForType(printDocument.getType());
 
@@ -101,7 +104,9 @@ public class PrinterWebSocketService implements WebSocketServiceInterface {
                 throw new Exception("Unknown file type: " + printDocument.getUrl());
             }
 
-            server.messageToServer(getChannel(), objectMapper.writeValueAsString(new PrintResult(true, "Success", printDocument.getId(), printerSearchResult.getName())));
+            PrintResult result = new PrintResult(true, "Success", printDocument.getId(), printerSearchResult.getName());
+            server.messageToServer(getChannel(), objectMapper.writeValueAsString(result));
+            return result;
         } catch (Exception e) {
             String errorMessage = e.getMessage();
 
@@ -112,13 +117,19 @@ public class PrinterWebSocketService implements WebSocketServiceInterface {
             log.error("Print Error: {}, {}", e.getClass().getName(), errorMessage);
 
             if (!isRaw(printDocument)) {
-                log.error("Print Error: Deleting downloaded document");
-                documentService.deleteDocument(printDocument);
+                try {
+                    documentService.deleteDocument(printDocument);
+                } catch (Exception deleteEx) {
+                    log.warn("Failed to delete document after print error: {}", deleteEx.getMessage());
+                }
             }
 
             server.messageToService("/notification", objectMapper.writeValueAsString(new NotificationDTO("ERROR", "Print Error " + printDocument.getType(), errorMessage)));
 
-            server.messageToServer(getChannel(), objectMapper.writeValueAsString(new PrintResult(false, errorMessage, printDocument.getId(), printerSearchResult != null ? printerSearchResult.getName() : null)));
+            PrintResult result = new PrintResult(false, errorMessage, printDocument.getId(), printerSearchResult != null ? printerSearchResult.getName() : null);
+            server.messageToServer(getChannel(), objectMapper.writeValueAsString(result));
+            return result;
+        }
         }
     }
 
@@ -285,11 +296,12 @@ public class PrinterWebSocketService implements WebSocketServiceInterface {
      * Get PrinterSearchResult for specified type
      */
     private PrinterSearchResult searchPrinterForType(String type) throws PrinterException {
+        PrintService[] printServices = PrintServiceLookup.lookupPrintServices(null, null);
+
         Optional<Config.PrinterMapping> printerMappingOptional = configService.getConfig().getPrinter().getMappings().stream().filter(it -> it.getType().equals(type)).findFirst();
 
         if (printerMappingOptional.isPresent()) {
             Config.PrinterMapping printerMapping = printerMappingOptional.get();
-            PrintService[] printServices = PrinterJob.lookupPrintServices();
 
             for (PrintService printService : printServices) {
                 if (printService.getName().equalsIgnoreCase(printerMapping.getName())) {
@@ -298,6 +310,8 @@ public class PrinterWebSocketService implements WebSocketServiceInterface {
                     return new PrinterSearchResult(printService.getName(), printerMapping, printService.createPrintJob(), false);
                 }
             }
+
+            throw new PrinterException("Printer not found on system: " + printerMapping.getName() + " (mapped to type: " + type + ")");
         }
 
          if (configService.getConfig().getPrinter().isAutoAddUnknownType()) {
@@ -319,7 +333,7 @@ public class PrinterWebSocketService implements WebSocketServiceInterface {
              return new PrinterSearchResult(printService.getName(), new Config.PrinterMapping(), printService.createPrintJob(), true);
         }
 
-         throw new PrinterException("No matched printer: " + type);
+         throw new PrinterException("No printer mapping found for type: " + type);
     }
 
     @Getter

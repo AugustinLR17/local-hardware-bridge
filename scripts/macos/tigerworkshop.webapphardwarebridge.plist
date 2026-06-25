@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>tigerworkshop.webapphardwarebridge</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/java</string>
+        <string>-cp</string>
+        <string>/usr/local/opt/webapp-hardware-bridge/webapp-hardware-bridge.jar</string>
+        <string>tigerworkshop.webapphardwarebridge.Server</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>/usr/local/opt/webapp-hardware-bridge</string>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/usr/local/var/log/webapp-hardware-bridge.log</string>
+    <key>StandardErrorPath</key>
+    <string>/usr/local/var/log/webapp-hardware-bridge.error.log</string>
+</dict>
+</plist>

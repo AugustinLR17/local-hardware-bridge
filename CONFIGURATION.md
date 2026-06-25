@@ -165,8 +165,9 @@ Charset to decode data received from serial port
 
 Changing this may break compatibility with WebApp integrated with pre-1.0 version
 
-- (Default) `UTF-8`
-- `UTF-8` - Data will be sent to WebSocket as UTF-8 `string`
+- (Default) `ISO-8859-1`
+- `ISO-8859-1` - Data will be sent to WebSocket as ISO-8859-1 `string` (preserves all byte values 0x00-0xFF without loss)
+- `UTF-8` - Data will be sent to WebSocket as UTF-8 `string` (bytes 0x80-0xFF may be decoded as replacement character U+FFFD)
 - `US-ASCII` - Data will be sent to WebSocket as ASCII `string`
 - `BINARY` - Data will be sent to WebSocket as `blob`
 

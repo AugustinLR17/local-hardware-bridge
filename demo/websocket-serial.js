@@ -39,6 +39,10 @@ function WebSocketSerial(options) {
     };
 
     this.send = function (message) {
+        if (websocket.readyState !== WebSocket.OPEN) {
+            console.warn("WebSocketSerial: Cannot send, connection not open (readyState: " + websocket.readyState + ")");
+            return;
+        }
         websocket.send(message);
     };
 

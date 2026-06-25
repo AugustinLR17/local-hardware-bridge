@@ -35,7 +35,16 @@ public class GUI implements WebSocketServiceInterface {
 
         // Create tray icon
         if (!SystemTray.isSupported()) {
-            log.warn("SystemTray is not supported");
+            log.warn("SystemTray is not supported. Running in headless mode.");
+            log.info("Web UI available at: {}", config.getServer().getUri());
+
+            // Register service as notification listener even without tray
+            if (config.getGui().getNotification().isEnabled()) {
+                server.registerService(this);
+            }
+
+            // Keep process alive
+            Thread.currentThread().join();
             return;
         }
 
@@ -116,7 +125,11 @@ public class GUI implements WebSocketServiceInterface {
 
     public void notify(String title, String message, TrayIcon.MessageType messageType) {
         try {
-            trayIcon.displayMessage(title, message, messageType);
+            if (trayIcon != null) {
+                trayIcon.displayMessage(title, message, messageType);
+            } else {
+                log.info("Notification: {} - {}", title, message);
+            }
         } catch (Exception e) {
             log.error("Failed to display notification", e);
         }

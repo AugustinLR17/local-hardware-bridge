@@ -40,6 +40,10 @@ function WebSocketPrinter(options) {
     };
 
     this.submit = function (data) {
+        if (websocket.readyState !== WebSocket.OPEN) {
+            console.warn("WebSocketPrinter: Cannot submit, connection not open (readyState: " + websocket.readyState + ")");
+            return;
+        }
         if (Array.isArray(data)) {
             data.forEach(function (element) {
                 websocket.send(JSON.stringify(element));

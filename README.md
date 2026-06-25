@@ -22,7 +22,7 @@ Common use cases:
 - Download via URL / Base64 encoded file / Base64 encoded binary raw command
 - Support multiple printers, mapped by key
 - Support PDF/PNG/JPG Printing
-- Support RAW/ESC-POS Printing
+- Support RAW/ESC-POS/ZPL Printing (via `raw_content` field with Base64-encoded binary data)
 - Support adding annotation text to PDF/Image before printing
 - Per printer settings
 
@@ -49,12 +49,29 @@ Common use cases:
 
 WebApp Hardware Bridge is a Java based application, which have more access to underlying hardwares.
 
-It exposes a WebSocket server on localhost to accept print jobs and serial connections from browsers.
+It exposes a WebSocket and HTTP server on localhost to accept print jobs and serial connections from browsers and remote servers.
 
-### Print Jobs 
+### Print Jobs
 
 - PDF/Images job are downloaded/decoded and then sent to mapped printer.
-- Raw job are sent to mapped printer directly.
+- Raw job are sent to mapped printer directly via `raw_content` (Base64-encoded binary).
+
+#### Raw/ZPL/ESC-POS Printing
+
+To send raw commands (ESC-POS, ZPL, etc.) directly to a printer:
+
+1. Install a **Generic / Text Only** driver for your printer (or use the printer's native driver if it supports raw mode)
+2. Map a type to that printer in the Web UI (e.g., type `RECEIPT` → `Generic / Text Only`)
+3. Send the raw data as Base64 in the `raw_content` field:
+
+```javascript
+printService.submit({
+    'type': 'RECEIPT',
+    'raw_content': btoa(rawCommandString)  // or base64-encode binary data
+});
+```
+
+For ZPL label printers, encode your ZPL string as Base64 and send it the same way.
 
 ### Serial Connections
 
@@ -76,6 +93,57 @@ Therefore, WebApps do not need to care about the actual printer names.
 - [Advanced Configurations - HTTPS/WSS Support](ADVANCED.md#httpswss-support)
 - [Build from source](BUILD.md)
 - [Troubleshooting](TROUBLESHOOT.md)
+
+## Cross-Platform Support
+
+WebApp Hardware Bridge runs on **Windows**, **Linux**, and **macOS**.
+
+| Platform | GUI Mode | Server Mode | Service |
+|----------|----------|-------------|---------|
+| Windows | System tray icon, NSIS installer | `java -cp ... Server` | Startup shortcut |
+| Linux | Headless fallback if no system tray | `java -cp ... Server` | systemd service |
+| macOS | Headless fallback if no system tray | `java -cp ... Server` | launchd plist |
+
+See [Build Instructions](BUILD.md) for platform-specific installation details.
+
+## HTTP Print API (Server-to-Server)
+
+A remote server can submit print jobs via HTTP without needing a WebSocket connection:
+
+```bash
+# List available printers
+curl http://127.0.0.1:12212/system/printers.json
+
+# Print a PDF from URL
+curl -X POST http://127.0.0.1:12212/printer \
+  -H "Content-Type: application/json" \
+  -d '{"type":"INVOICE","url":"https://example.com/invoice.pdf"}'
+
+# Print raw ESC-POS data
+curl -X POST http://127.0.0.1:12212/printer \
+  -H "Content-Type: application/json" \
+  -d '{"type":"RECEIPT","raw_content":"<base64-encoded-data>"}'
+```
+
+See [HTTP APIs](HTTP_API.md) for full documentation.
+
+## Running on Linux
+
+The server can run on Linux in headless mode:
+
+```bash
+java -cp webapp-hardware-bridge.jar tigerworkshop.webapphardwarebridge.Server
+```
+
+The Web UI is then accessible at `http://127.0.0.1:12212`. The GUI mode (system tray icon) requires a desktop environment and is not supported on most Linux distributions.
+
+## Version
+
+The application version is displayed at startup in the log and is available via the HTTP API:
+
+```bash
+curl http://127.0.0.1:12212/system/version.json
+```
 
 ## Upgrade
 

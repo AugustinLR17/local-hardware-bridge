@@ -1,0 +1,14 @@
+[Unit]
+Description=WebApp Hardware Bridge
+After=network.target
+
+[Service]
+Type=simple
+User=%i
+ExecStart=/usr/bin/java -cp /opt/webapp-hardware-bridge/webapp-hardware-bridge.jar tigerworkshop.webapphardwarebridge.Server
+WorkingDirectory=/opt/webapp-hardware-bridge
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

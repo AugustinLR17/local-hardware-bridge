@@ -56,7 +56,11 @@ public class DocumentService {
             output = new File(downloaderConfig.getPath() + "/" + printDocument.getUuid() + "-" + printDocument.getUrl());
         } else {
             URL url = new URL(printDocument.getUrl());
-            output = new File(downloaderConfig.getPath() + "/" + printDocument.getUuid() + "-" + FilenameUtils.getName(url.getPath()));
+            String filename = FilenameUtils.getName(url.getPath());
+            if (filename == null || filename.isEmpty()) {
+                filename = printDocument.getUuid().toString();
+            }
+            output = new File(downloaderConfig.getPath() + "/" + printDocument.getUuid() + "-" + filename);
         }
         return output;
     }

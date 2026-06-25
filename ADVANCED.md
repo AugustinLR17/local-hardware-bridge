@@ -41,25 +41,25 @@ Chrome: Add `--allow-running-insecure-content` to launching argument
 
 WHB have built-in ability to generate self-signed certificate.
 
-Set `server.tls.enabled` to true, `server.tls.selfSigned` to true in `setting.json` and relaunch the application.
+Set `server.tls.enabled` to true, `server.tls.selfSigned` to true in `config.json` and relaunch the application.
 
-Upon start, application should automatically generate a self-signed certificate
+Upon start, application should automatically generate a self-signed certificate for the configured `server.address` and start listening with secured connection.
 
-and start listening on `wss://127.0.0.1:12212` with secured connection.
+If the `server.address` changes, the certificate will be automatically regenerated.
 
-On first setup, you must go to `https://127.0.0.1:12212` to accept that self-signed certificate.
+On first setup, you must open the server URL in your browser to accept the self-signed certificate.
 
-After change, point url to `wss://127.0.0.1:12212` instead of `ws://127.0.0.1:12212`
+After change, point url to `wss://<server.address>:<port>` instead of `ws://<server.address>:<port>`
 
 ### Enable WebSocket Secure (WSS) with real, user-provided certificate
 
 Copy your certificate and private key to `tls` directory.
 
-Set `server.tls.enabled` to true, `server.tls.selfSigned` to false, `server.tls.cert` and `server.tls.key` in `setting.json` and relaunch the application.
+Set `server.tls.enabled` to true, `server.tls.selfSigned` to false, `server.tls.cert` and `server.tls.key` in `config.json` and relaunch the application.
 
-Upon start, application should pickup your certificate and start listening on `wss://127.0.0.1:12212` with secured connection.
+Upon start, application should pickup your certificate and start listening with secured connection.
 
-After change, point url to `wss://127.0.0.1:12212` instead of `ws://127.0.0.1:12212`
+After change, point url to `wss://<server.address>:<port>` instead of `ws://<server.address>:<port>`
 
 #### How to obtain real TLS Certificate?
 
