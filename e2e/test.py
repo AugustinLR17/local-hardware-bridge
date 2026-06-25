@@ -65,7 +65,7 @@ def main():
     # 5. List mappings
     status, body = request("GET", "/printer/mappings")
     assert_eq("list mappings status", status, 200)
-    mappings = json.loads(body)
+    mappings = json.loads(body).get("mappings", [])
     assert_eq("mapping type", mappings[0]["type"], "TEST")
 
     # 6. Print via URL (file content)
