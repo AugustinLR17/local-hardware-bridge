@@ -481,10 +481,11 @@
                             <div v-for="path in endpointList" :key="path" class="lhb-mapping-card" style="padding:0.75rem">
                                 <div class="lhb-mapping-header">
                                     <span class="lhb-mapping-title" style="font-size:0.78rem">{{ path }}</span>
-                                    <label class="lhb-toggle" :title="config.security.endpoints[path].enabled ? 'Enabled' : 'Disabled'">
+                                    <label class="lhb-toggle" :title="config.security.endpoints[path].enabled ? 'Enabled' : 'Disabled'" v-if="!lockedEndpoints.includes(path)">
                                         <input type="checkbox" v-model="config.security.endpoints[path].enabled"/>
                                         <span class="lhb-toggle-slider"></span>
                                     </label>
+                                    <span v-else class="lhb-badge" style="background:#e5e7eb;color:#6b6f85">required</span>
                                 </div>
                                 <div class="lhb-row" style="margin-bottom:0">
                                     <span class="lhb-row-label lhb-form-label" style="font-size:0.75rem">Password</span>
@@ -730,6 +731,7 @@ createApp({
     serials: [],
     health: null,
     tab: 'simple',
+    lockedEndpoints: ['/config.json', '/system/health'],
     endpointList: [
         '/config.json',
         '/system/server.json',

@@ -1,0 +1,33 @@
+name: E2E Tests
+
+on:
+  push:
+    branches: [master]
+    tags: ['v*']
+  pull_request:
+    branches: [master]
+
+jobs:
+  e2e:
+    name: End-to-End REST API Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: 21
+          distribution: temurin
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build shadow JAR
+        run: ./gradlew shadowJar
+
+      - name: Build and run E2E Docker image
+        run: |
+          docker build -f e2e/Dockerfile -t lhb-e2e .
+          docker run --rm lhb-e2e
