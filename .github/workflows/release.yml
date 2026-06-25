@@ -1,0 +1,300 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-jar:
+    name: Build Fat JAR
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: 21
+          distribution: temurin
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build shadow JAR
+        run: ./gradlew shadowJar
+
+      - name: Upload JAR artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: fat-jar
+          path: build/libs/webapp-hardware-bridge-*.jar
+
+  windows-installer:
+    name: Windows Installer
+    runs-on: windows-latest
+    needs: build-jar
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: 21
+          distribution: temurin
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build shadow JAR
+        run: ./gradlew shadowJar
+
+      - name: Get version from tag
+        id: version
+        shell: bash
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+
+      - name: Create MSI installer with jpackage
+        run: |
+          jpackage `
+            --type msi `
+            --name "WebApp Hardware Bridge" `
+            --app-version ${{ steps.version.outputs.VERSION }} `
+            --input build/libs/ `
+            --main-jar "webapp-hardware-bridge-${{ steps.version.outputs.VERSION }}.jar" `
+            --main-class tigerworkshop.webapphardwarebridge.GUI `
+            --dest build/dist/windows `
+            --vendor TigerWorkshop `
+            --description "WebApp Hardware Bridge - exposes local printer and serial port to web browsers" `
+            --icon icon.ico `
+            --win-console `
+            --win-dir-chooser `
+            --win-menu `
+            --win-shortcut `
+            --win-per-user-install
+        shell: powershell
+
+      - name: Upload Windows MSI
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-msi
+          path: build/dist/windows/*.msi
+
+      - name: Install InnoSetup for EXE installer
+        run: |
+          choco install innosetup -y
+        shell: powershell
+
+      - name: Create EXE installer with jpackage
+        run: |
+          $env:PATH = "C:\Program Files (x86)\Inno Setup 6;$env:PATH"
+          jpackage `
+            --type exe `
+            --name "WebApp Hardware Bridge" `
+            --app-version ${{ steps.version.outputs.VERSION }} `
+            --input build/libs/ `
+            --main-jar "webapp-hardware-bridge-${{ steps.version.outputs.VERSION }}.jar" `
+            --main-class tigerworkshop.webapphardwarebridge.GUI `
+            --dest build/dist/windows-exe `
+            --vendor TigerWorkshop `
+            --description "WebApp Hardware Bridge - exposes local printer and serial port to web browsers" `
+            --icon icon.ico `
+            --win-console `
+            --win-dir-chooser `
+            --win-menu `
+            --win-shortcut `
+            --win-per-user-install `
+            --win-upgrade-uuid "a8c6f1e0-5d3b-4c9e-8f2a-7b6d0e1c2f3a"
+        shell: powershell
+
+      - name: Upload Windows EXE
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-exe
+          path: build/dist/windows-exe/*.exe
+
+  linux-packages:
+    name: Linux (${{ matrix.package-type }})
+    runs-on: ubuntu-latest
+    needs: build-jar
+    strategy:
+      matrix:
+        include:
+          - package-type: deb
+            artifact-name: linux-deb
+          - package-type: rpm
+            artifact-name: linux-rpm
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: 21
+          distribution: temurin
+
+      - name: Install RPM tools
+        if: matrix.package-type == 'rpm'
+        run: sudo apt-get update && sudo apt-get install -y rpm
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build shadow JAR
+        run: ./gradlew shadowJar
+
+      - name: Get version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+
+      - name: Create ${{ matrix.package-type }} package with jpackage
+        run: |
+          jpackage \
+            --type ${{ matrix.package-type }} \
+            --name webapp-hardware-bridge \
+            --app-version "${{ steps.version.outputs.VERSION }}" \
+            --input build/libs/ \
+            --main-jar "webapp-hardware-bridge-${{ steps.version.outputs.VERSION }}.jar" \
+            --main-class tigerworkshop.webapphardwarebridge.GUI \
+            --dest build/dist/linux-${{ matrix.package-type }} \
+            --vendor TigerWorkshop \
+            --description "WebApp Hardware Bridge - exposes local printer and serial port to web browsers" \
+            --icon src/main/resources/icon.png \
+            --linux-shortcut \
+            --linux-menu-group Utility \
+            --linux-app-category Utility
+
+      - name: Upload ${{ matrix.package-type }} package
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact-name }}
+          path: build/dist/linux-${{ matrix.package-type }}/*
+
+  macos-app:
+    name: macOS Application
+    runs-on: macos-latest
+    needs: build-jar
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: 21
+          distribution: temurin
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build shadow JAR
+        run: ./gradlew shadowJar
+
+      - name: Get version from tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+
+      - name: Convert icon to ICNS for macOS
+        run: |
+          mkdir -p icon.iconset
+          sips -z 16 16     src/main/resources/icon.png --out icon.iconset/icon_16x16.png
+          sips -z 32 32     src/main/resources/icon.png --out icon.iconset/icon_16x16@2x.png
+          sips -z 32 32     src/main/resources/icon.png --out icon.iconset/icon_32x32.png
+          sips -z 64 64     src/main/resources/icon.png --out icon.iconset/icon_32x32@2x.png
+          sips -z 128 128   src/main/resources/icon.png --out icon.iconset/icon_128x128.png
+          sips -z 256 256   src/main/resources/icon.png --out icon.iconset/icon_128x128@2x.png
+          sips -z 256 256   src/main/resources/icon.png --out icon.iconset/icon_256x256.png
+          sips -z 512 512   src/main/resources/icon.png --out icon.iconset/icon_256x256@2x.png
+          sips -z 512 512   src/main/resources/icon.png --out icon.iconset/icon_512x512.png
+          sips -z 1024 1024 src/main/resources/icon.png --out icon.iconset/icon_512x512@2x.png
+          iconutil -c icns icon.iconset -o icon.icns
+
+      - name: Create macOS DMG with jpackage
+        run: |
+          jpackage \
+            --type dmg \
+            --name "WebApp Hardware Bridge" \
+            --app-version "${{ steps.version.outputs.VERSION }}" \
+            --input build/libs/ \
+            --main-jar "webapp-hardware-bridge-${{ steps.version.outputs.VERSION }}.jar" \
+            --main-class tigerworkshop.webapphardwarebridge.GUI \
+            --dest build/dist/macos \
+            --vendor TigerWorkshop \
+            --description "WebApp Hardware Bridge - exposes local printer and serial port to web browsers" \
+            --icon icon.icns \
+            --mac-package-name "WebAppHardwareBridge" \
+            --mac-package-identifier "tigerworkshop.webapphardwarebridge"
+
+      - name: Upload macOS DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-dmg
+          path: build/dist/macos/*.dmg
+
+  release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [build-jar, windows-installer, linux-packages, macos-app]
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: List release artifacts
+        run: find artifacts -type f | sort
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ contains(github.ref_name, '-rc') || contains(github.ref_name, '-beta') || contains(github.ref_name, '-alpha') }}
+          body: |
+            ## Downloads
+
+            | Platform | File |
+            |----------|------|
+            | Cross-platform (JAR) | `webapp-hardware-bridge-*.jar` (requires JDK 21+) |
+            | Windows | `.exe` installer or `.msi` installer |
+            | Linux (Debian/Ubuntu) | `.deb` package |
+            | Linux (Fedora/RHEL) | `.rpm` package |
+            | macOS | `.dmg` installer |
+
+            ### Quick Start (JAR)
+            ```bash
+            java -jar webapp-hardware-bridge-*.jar
+            ```
+
+            ### Run modes
+            - **GUI mode**: `java -cp webapp-hardware-bridge.jar tigerworkshop.webapphardwarebridge.GUI`
+            - **Server mode (headless)**: `java -cp webapp-hardware-bridge.jar tigerworkshop.webapphardwarebridge.Server`
+          files: |
+            artifacts/fat-jar/*.jar
+            artifacts/windows-exe/*.exe
+            artifacts/windows-msi/*.msi
+            artifacts/linux-deb/*.deb
+            artifacts/linux-rpm/*.rpm
+            artifacts/macos-dmg/*.dmg

@@ -1,6 +1,7 @@
 plugins {
     id 'java'
     id 'application'
+    id 'com.gradleup.shadow' version '8.3.6'
 }
 
 group 'webapp-hardware-bridge'
@@ -39,4 +40,70 @@ dependencies {
 
 application {
     mainClass = 'tigerworkshop.webapphardwarebridge.GUI'
+}
+
+jar {
+    manifest {
+        attributes 'Main-Class': 'tigerworkshop.webapphardwarebridge.GUI'
+    }
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+shadowJar {
+    mergeServiceFiles()
+    manifest {
+        attributes 'Main-Class': 'tigerworkshop.webapphardwarebridge.GUI'
+    }
+    archiveClassifier = ''
+    archiveFileName = "webapp-hardware-bridge-${project.version}.jar"
+    exclude 'module-info.class'
+}
+
+tasks.named('build') {
+    dependsOn shadowJar
+}
+
+tasks.register('createLinuxApp') {
+    group = 'distribution'
+    description = 'Creates Linux DEB package using jpackage'
+    dependsOn shadowJar
+    doLast {
+        exec {
+            commandLine 'jpackage',
+                '--type', 'deb',
+                '--name', 'webapp-hardware-bridge',
+                '--app-version', project.version,
+                '--input', 'build/libs/',
+                '--main-jar', "webapp-hardware-bridge-${project.version}.jar",
+                '--main-class', 'tigerworkshop.webapphardwarebridge.GUI',
+                '--dest', 'build/dist/linux',
+                '--icon', 'src/main/resources/icon.png',
+                '--vendor', 'TigerWorkshop',
+                '--description', 'WebApp Hardware Bridge - exposes local printer and serial port to web browsers',
+                '--linux-shortcut',
+                '--linux-menu-group', 'Utility'
+        }
+    }
+}
+
+tasks.register('createRpmApp') {
+    group = 'distribution'
+    description = 'Creates Linux RPM package using jpackage'
+    dependsOn shadowJar
+    doLast {
+        exec {
+            commandLine 'jpackage',
+                '--type', 'rpm',
+                '--name', 'webapp-hardware-bridge',
+                '--app-version', project.version,
+                '--input', 'build/libs/',
+                '--main-jar', "webapp-hardware-bridge-${project.version}.jar",
+                '--main-class', 'tigerworkshop.webapphardwarebridge.GUI',
+                '--dest', 'build/dist/linux-rpm',
+                '--vendor', 'TigerWorkshop',
+                '--description', 'WebApp Hardware Bridge - exposes local printer and serial port to web browsers',
+                '--linux-shortcut',
+                '--linux-menu-group', 'Utility'
+        }
+    }
 }

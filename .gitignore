@@ -1,6 +1,6 @@
 downloads/
 .gradle/
-gradle/
+!gradle/wrapper/
 log/
 out/
 jre/
