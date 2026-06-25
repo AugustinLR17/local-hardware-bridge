@@ -619,6 +619,16 @@ public class Server implements WebSocketServerInterface {
      * HTTP API - System endpoints
      */
     private void registerSystemEndpoints() {
+        // Serve app icon
+        javalinServer.get("/icon.png", ctx -> {
+            var stream = getClass().getClassLoader().getResourceAsStream("icon.png");
+            if (stream != null) {
+                ctx.contentType("image/png").result(stream.readAllBytes());
+            } else {
+                ctx.status(404);
+            }
+        });
+
         // Version
         javalinServer.get("/system/version.json", ctx -> {
             VersionDTO dto = new VersionDTO(Constants.APP_NAME, Constants.APP_ID, Constants.VERSION);
