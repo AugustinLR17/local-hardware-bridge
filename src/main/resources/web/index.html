@@ -7,18 +7,22 @@
     <link href="css/bootstrap.min.css" rel="stylesheet">
     <style>
         :root {
-            --lhb-bg: #0f1117;
-            --lhb-surface: #1a1d27;
-            --lhb-surface2: #242836;
-            --lhb-border: #2e3348;
-            --lhb-text: #e2e4f0;
-            --lhb-text-dim: #8b8fa8;
-            --lhb-accent: #6c72ff;
-            --lhb-accent-hover: #8186ff;
-            --lhb-success: #4ade80;
-            --lhb-danger: #f87171;
-            --lhb-warning: #fbbf24;
-            --lhb-info: #38bdf8;
+            --lhb-bg: #f5f6fa;
+            --lhb-surface: #ffffff;
+            --lhb-surface2: #f0f1f5;
+            --lhb-border: #e0e2ea;
+            --lhb-text: #1a1d27;
+            --lhb-text-dim: #6b6f85;
+            --lhb-accent: #5b5fef;
+            --lhb-accent-hover: #4a4de0;
+            --lhb-accent-light: rgba(91,95,239,0.08);
+            --lhb-success: #22c55e;
+            --lhb-success-bg: rgba(34,197,94,0.1);
+            --lhb-danger: #ef4444;
+            --lhb-danger-bg: rgba(239,68,68,0.08);
+            --lhb-warning: #f59e0b;
+            --lhb-warning-bg: rgba(245,158,11,0.1);
+            --lhb-info: #3b82f6;
         }
         body {
             background: var(--lhb-bg);
@@ -28,74 +32,75 @@
         .lhb-card {
             background: var(--lhb-surface);
             border: 1px solid var(--lhb-border);
-            border-radius: 12px;
-            padding: 1.25rem;
+            border-radius: 14px;
+            padding: 1.5rem;
             margin-bottom: 1rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
         }
         .lhb-card-header {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            margin-bottom: 1rem;
-            padding-bottom: 0.75rem;
+            margin-bottom: 1.25rem;
+            padding-bottom: 1rem;
             border-bottom: 1px solid var(--lhb-border);
         }
         .lhb-card-title {
-            font-size: 0.95rem;
-            font-weight: 600;
+            font-size: 1rem;
+            font-weight: 700;
             color: var(--lhb-text);
             margin: 0;
             display: flex;
             align-items: center;
-            gap: 0.5rem;
+            gap: 0.6rem;
         }
         .lhb-badge {
             font-size: 0.7rem;
-            padding: 2px 8px;
+            padding: 2px 10px;
             border-radius: 99px;
-            background: var(--lhb-accent);
-            color: #fff;
-            font-weight: 500;
+            background: var(--lhb-accent-light);
+            color: var(--lhb-accent);
+            font-weight: 600;
         }
         .lhb-form-label {
             color: var(--lhb-text-dim);
-            font-size: 0.8rem;
+            font-size: 0.82rem;
             font-weight: 500;
-            margin-bottom: 0.3rem;
+            margin-bottom: 0;
         }
         .lhb-form-control {
             background: var(--lhb-surface2);
             border: 1px solid var(--lhb-border);
             border-radius: 8px;
             color: var(--lhb-text);
-            padding: 0.4rem 0.6rem;
+            padding: 0.5rem 0.75rem;
             font-size: 0.85rem;
             width: 100%;
-            transition: border-color 0.2s;
+            transition: border-color 0.2s, box-shadow 0.2s;
         }
         .lhb-form-control:focus {
             border-color: var(--lhb-accent);
             outline: none;
-            box-shadow: 0 0 0 2px rgba(108, 114, 255, 0.2);
+            box-shadow: 0 0 0 3px rgba(91,95,239,0.12);
         }
         select.lhb-form-control {
             appearance: none;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238b8fa8' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%236b6f85' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
             background-repeat: no-repeat;
-            background-position: right 0.5rem center;
-            padding-right: 1.5rem;
+            background-position: right 0.75rem center;
+            padding-right: 2rem;
         }
         .lhb-toggle {
             position: relative;
-            width: 40px;
-            height: 22px;
+            width: 44px;
+            height: 24px;
+            flex-shrink: 0;
         }
-        .lhb-toggle input { opacity: 0; width: 0; height: 0; }
+        .lhb-toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
         .lhb-toggle-slider {
             position: absolute;
             inset: 0;
-            background: var(--lhb-surface2);
-            border: 1px solid var(--lhb-border);
+            background: #d1d5e0;
             border-radius: 99px;
             cursor: pointer;
             transition: 0.2s;
@@ -103,35 +108,36 @@
         .lhb-toggle-slider::before {
             content: '';
             position: absolute;
-            width: 16px;
-            height: 16px;
-            left: 2px;
-            bottom: 2px;
-            background: var(--lhb-text-dim);
+            width: 18px;
+            height: 18px;
+            left: 3px;
+            bottom: 3px;
+            background: #fff;
             border-radius: 50%;
             transition: 0.2s;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.15);
         }
         .lhb-toggle input:checked + .lhb-toggle-slider {
             background: var(--lhb-accent);
-            border-color: var(--lhb-accent);
         }
         .lhb-toggle input:checked + .lhb-toggle-slider::before {
-            transform: translateX(18px);
-            background: #fff;
+            transform: translateX(20px);
         }
         .lhb-row {
             display: flex;
             align-items: center;
-            margin-bottom: 0.75rem;
+            margin-bottom: 0.85rem;
+            gap: 1rem;
         }
+        .lhb-row:last-child { margin-bottom: 0; }
         .lhb-row-label { flex: 1; }
-        .lhb-row-value { width: 200px; }
+        .lhb-row-value { width: 220px; flex-shrink: 0; }
         .lhb-btn {
             border: none;
             border-radius: 8px;
-            padding: 0.45rem 1rem;
+            padding: 0.5rem 1.1rem;
             font-size: 0.85rem;
-            font-weight: 500;
+            font-weight: 600;
             cursor: pointer;
             transition: 0.2s;
             display: inline-flex;
@@ -139,48 +145,92 @@
             gap: 0.4rem;
         }
         .lhb-btn-accent { background: var(--lhb-accent); color: #fff; }
-        .lhb-btn-accent:hover { background: var(--lhb-accent-hover); }
-        .lhb-btn-success { background: rgba(74, 222, 128, 0.15); color: var(--lhb-success); }
-        .lhb-btn-success:hover { background: rgba(74, 222, 128, 0.25); }
-        .lhb-btn-danger { background: rgba(248, 113, 113, 0.15); color: var(--lhb-danger); }
-        .lhb-btn-danger:hover { background: rgba(248, 113, 113, 0.25); }
-        .lhb-btn-warning { background: rgba(251, 191, 36, 0.15); color: var(--lhb-warning); }
-        .lhb-btn-warning:hover { background: rgba(251, 191, 36, 0.25); }
-        .lhb-btn-sm { padding: 0.3rem 0.7rem; font-size: 0.78rem; }
+        .lhb-btn-accent:hover { background: var(--lhb-accent-hover); transform: translateY(-1px); }
+        .lhb-btn-outline {
+            background: transparent;
+            border: 1px solid var(--lhb-border);
+            color: var(--lhb-text-dim);
+        }
+        .lhb-btn-outline:hover { border-color: var(--lhb-accent); color: var(--lhb-accent); }
+        .lhb-btn-success { background: var(--lhb-success-bg); color: var(--lhb-success); border: 1px solid rgba(34,197,94,0.2); }
+        .lhb-btn-success:hover { background: rgba(34,197,94,0.18); }
+        .lhb-btn-danger { background: var(--lhb-danger-bg); color: var(--lhb-danger); border: 1px solid rgba(239,68,68,0.15); }
+        .lhb-btn-danger:hover { background: rgba(239,68,68,0.15); }
+        .lhb-btn-warning { background: var(--lhb-warning-bg); color: var(--lhb-warning); border: 1px solid rgba(245,158,11,0.2); }
+        .lhb-btn-warning:hover { background: rgba(245,158,11,0.18); }
+        .lhb-btn-sm { padding: 0.35rem 0.8rem; font-size: 0.78rem; }
         .lhb-nav {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 1rem 0;
-            margin-bottom: 1.5rem;
-            border-bottom: 1px solid var(--lhb-border);
+            padding: 1.25rem 0;
+            margin-bottom: 1rem;
         }
         .lhb-nav-brand {
-            font-size: 1.1rem;
-            font-weight: 700;
-            color: var(--lhb-text);
             display: flex;
             align-items: center;
-            gap: 0.5rem;
+            gap: 0.75rem;
         }
-        .lhb-nav-brand svg { color: var(--lhb-accent); }
-        .lhb-nav-actions { display: flex; gap: 0.5rem; }
+        .lhb-nav-brand img {
+            width: 36px; height: 36px; border-radius: 10px;
+        }
+        .lhb-nav-brand-text {
+            display: flex;
+            flex-direction: column;
+        }
+        .lhb-nav-brand-name {
+            font-size: 1.15rem;
+            font-weight: 800;
+            color: var(--lhb-text);
+            line-height: 1.2;
+        }
+        .lhb-nav-brand-sub {
+            font-size: 0.72rem;
+            color: var(--lhb-text-dim);
+            font-weight: 400;
+        }
+        .lhb-nav-actions { display: flex; gap: 0.5rem; align-items: center; }
+        .lhb-tabs {
+            display: flex;
+            gap: 0;
+            margin-bottom: 1.5rem;
+            border-bottom: 2px solid var(--lhb-border);
+        }
+        .lhb-tab {
+            padding: 0.65rem 1.5rem;
+            font-size: 0.88rem;
+            font-weight: 600;
+            color: var(--lhb-text-dim);
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            margin-bottom: -2px;
+            transition: 0.2s;
+            background: none;
+            border-top: none;
+            border-left: none;
+            border-right: none;
+        }
+        .lhb-tab:hover { color: var(--lhb-text); }
+        .lhb-tab.active {
+            color: var(--lhb-accent);
+            border-bottom-color: var(--lhb-accent);
+        }
         .lhb-mapping-card {
             background: var(--lhb-surface2);
             border: 1px solid var(--lhb-border);
             border-radius: 10px;
-            padding: 1rem;
+            padding: 1.1rem;
             margin-bottom: 0.75rem;
         }
         .lhb-mapping-header {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            margin-bottom: 0.75rem;
+            margin-bottom: 0.85rem;
         }
         .lhb-mapping-title {
-            font-weight: 600;
-            font-size: 0.85rem;
+            font-weight: 700;
+            font-size: 0.88rem;
             color: var(--lhb-accent);
         }
         .lhb-status-dot {
@@ -188,21 +238,64 @@
         }
         .lhb-status-dot.on { background: var(--lhb-success); }
         .lhb-status-dot.off { background: var(--lhb-danger); }
-        .lhb-section-icon { font-size: 1rem; }
         .lhb-health {
-            display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem;
+            display: flex; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 1.25rem;
         }
         .lhb-health-chip {
-            background: var(--lhb-surface2);
+            background: var(--lhb-surface);
             border: 1px solid var(--lhb-border);
             border-radius: 99px;
-            padding: 0.3rem 0.8rem;
-            font-size: 0.75rem;
+            padding: 0.35rem 0.9rem;
+            font-size: 0.78rem;
+            font-weight: 500;
             display: flex;
             align-items: center;
-            gap: 0.4rem;
+            gap: 0.45rem;
         }
-        .form-check-input { display: none; }
+        .lhb-hero {
+            text-align: center;
+            padding: 2rem 0;
+        }
+        .lhb-hero-title {
+            font-size: 1.3rem;
+            font-weight: 800;
+            margin-bottom: 0.5rem;
+        }
+        .lhb-hero-sub {
+            color: var(--lhb-text-dim);
+            font-size: 0.9rem;
+        }
+        .lhb-empty {
+            text-align: center;
+            padding: 2rem 1rem;
+            color: var(--lhb-text-dim);
+        }
+        .lhb-empty-icon { font-size: 2rem; margin-bottom: 0.5rem; }
+        .lhb-quick-card {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            background: var(--lhb-surface);
+            border: 1px solid var(--lhb-border);
+            border-radius: 12px;
+            padding: 1.25rem;
+            margin-bottom: 0.75rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        }
+        .lhb-quick-icon {
+            width: 48px; height: 48px;
+            border-radius: 12px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.5rem;
+            flex-shrink: 0;
+        }
+        .lhb-quick-icon.printer { background: rgba(91,95,239,0.1); }
+        .lhb-quick-icon.serial { background: rgba(59,130,246,0.1); }
+        .lhb-quick-icon.server { background: rgba(34,197,94,0.1); }
+        .lhb-quick-body { flex: 1; }
+        .lhb-quick-title { font-weight: 700; font-size: 0.9rem; margin-bottom: 0.2rem; }
+        .lhb-quick-desc { color: var(--lhb-text-dim); font-size: 0.78rem; }
+        .lhb-quick-action { flex-shrink: 0; }
     </style>
 </head>
 <body>
@@ -210,16 +303,19 @@
     <div class="container">
         <nav class="lhb-nav">
             <div class="lhb-nav-brand">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 18L18 6M6 6l12 12"/></svg>
-                Local Hardware Bridge
+                <img src="icon.png" alt="LHB"/>
+                <div class="lhb-nav-brand-text">
+                    <span class="lhb-nav-brand-name">Local Hardware Bridge</span>
+                    <span class="lhb-nav-brand-sub" v-if="health">v{{ health.version }} • {{ health.status }}</span>
+                </div>
             </div>
             <div class="lhb-nav-actions">
                 <button @click="saveConfig" class="lhb-btn lhb-btn-success">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v9a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v9a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
                     Save
                 </button>
                 <button @click="restartServer" class="lhb-btn lhb-btn-warning">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
                     Restart
                 </button>
             </div>
@@ -234,20 +330,136 @@
                 <span class="lhb-status-dot" :class="active ? 'on' : 'off'"></span>
                 {{ name }}
             </div>
-            <div class="lhb-health-chip">
-                v{{ health.version }}
+        </div>
+
+        <div class="lhb-tabs">
+            <button class="lhb-tab" :class="{ active: tab === 'simple' }" @click="tab = 'simple'">
+                🏠 Dashboard
+            </button>
+            <button class="lhb-tab" :class="{ active: tab === 'advanced' }" @click="tab = 'advanced'">
+                ⚙️ Advanced
+            </button>
+        </div>
+    </div>
+
+    <!-- SIMPLE TAB -->
+    <div class="container" v-if="tab === 'simple' && config != null">
+        <div class="row">
+            <div class="col-lg-6">
+                <div class="lhb-quick-card">
+                    <div class="lhb-quick-icon printer">🖨️</div>
+                    <div class="lhb-quick-body">
+                        <div class="lhb-quick-title">Printers</div>
+                        <div class="lhb-quick-desc">
+                            <span v-if="config.printer.enabled && config.printer.mappings.length > 0">
+                                {{ config.printer.mappings.length }} printer(s) configured
+                            </span>
+                            <span v-else-if="config.printer.enabled">Enabled, no mappings</span>
+                            <span v-else>Disabled</span>
+                        </div>
+                    </div>
+                    <div class="lhb-quick-action">
+                        <label class="lhb-toggle">
+                            <input type="checkbox" v-model="config.printer.enabled"/>
+                            <span class="lhb-toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div v-if="config.printer.enabled && config.printer.mappings.length === 0" class="lhb-card">
+                    <div class="lhb-empty">
+                        <div class="lhb-empty-icon">🖨️</div>
+                        <p>No printers configured yet</p>
+                        <button @click="addPrinter" class="lhb-btn lhb-btn-accent lhb-btn-sm">+ Add your first printer</button>
+                    </div>
+                </div>
+
+                <div v-for="(printer, index) in config.printer.mappings" class="lhb-card" style="padding:1rem 1.25rem">
+                    <div class="lhb-row" style="margin-bottom:0.5rem">
+                        <div style="flex:1">
+                            <input class="lhb-form-control" type="text" v-model="printer.type" placeholder="Type name (e.g. RECEIPT, INVOICE)"/>
+                        </div>
+                        <div style="width:200px">
+                            <select class="lhb-form-control" v-model="printer.name">
+                                <option value="" disabled>Select a printer...</option>
+                                <option :value="p.name" v-for="p in printers">{{ p.name }}</option>
+                            </select>
+                        </div>
+                        <button @click="removePrinter(index)" class="lhb-btn lhb-btn-danger lhb-btn-sm" style="padding:0.3rem 0.5rem">✕</button>
+                    </div>
+                </div>
+
+                <div v-if="config.printer.enabled && config.printer.mappings.length > 0" style="margin-bottom:1rem">
+                    <button @click="addPrinter" class="lhb-btn lhb-btn-outline lhb-btn-sm">+ Add another printer</button>
+                </div>
+            </div>
+
+            <div class="col-lg-6">
+                <div class="lhb-quick-card">
+                    <div class="lhb-quick-icon serial">🔌</div>
+                    <div class="lhb-quick-body">
+                        <div class="lhb-quick-title">Serial Ports</div>
+                        <div class="lhb-quick-desc">
+                            <span v-if="config.serial.enabled && config.serial.mappings.length > 0">
+                                {{ config.serial.mappings.length }} port(s) configured
+                            </span>
+                            <span v-else-if="config.serial.enabled">Enabled, no mappings</span>
+                            <span v-else>Disabled</span>
+                        </div>
+                    </div>
+                    <div class="lhb-quick-action">
+                        <label class="lhb-toggle">
+                            <input type="checkbox" v-model="config.serial.enabled"/>
+                            <span class="lhb-toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div v-if="config.serial.enabled && config.serial.mappings.length === 0" class="lhb-card">
+                    <div class="lhb-empty">
+                        <div class="lhb-empty-icon">🔌</div>
+                        <p>No serial ports configured yet</p>
+                        <button @click="addSerial" class="lhb-btn lhb-btn-accent lhb-btn-sm">+ Add your first serial port</button>
+                    </div>
+                </div>
+
+                <div v-for="(serial, index) in config.serial.mappings" class="lhb-card" style="padding:1rem 1.25rem">
+                    <div class="lhb-row" style="margin-bottom:0.5rem">
+                        <div style="flex:1">
+                            <input class="lhb-form-control" type="text" v-model="serial.type" placeholder="Type name (e.g. SCALE, SCANNER)"/>
+                        </div>
+                        <div style="width:200px">
+                            <select class="lhb-form-control" v-model="serial.name">
+                                <option value="" disabled>Select a port...</option>
+                                <option :value="s.name" v-for="s in serials">{{ s.name }}</option>
+                            </select>
+                        </div>
+                        <button @click="removeSerial(index)" class="lhb-btn lhb-btn-danger lhb-btn-sm" style="padding:0.3rem 0.5rem">✕</button>
+                    </div>
+                    <div class="lhb-row" style="margin-bottom:0">
+                        <select class="lhb-form-control" v-model="serial.baudRate" style="width:90px;flex:none">
+                            <option :value="b" v-for="b in [1200,2400,4800,9600,19200,38400,57600,115200]">{{ b }}</option>
+                        </select>
+                        <select class="lhb-form-control" v-model="serial.readCharset" style="width:120px;flex:none">
+                            <option :value="c" v-for="c in ['ISO-8859-1', 'UTF-8', 'US-ASCII', 'BINARY']">{{ c }}</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div v-if="config.serial.enabled && config.serial.mappings.length > 0" style="margin-bottom:1rem">
+                    <button @click="addSerial" class="lhb-btn lhb-btn-outline lhb-btn-sm">+ Add another serial port</button>
+                </div>
             </div>
         </div>
     </div>
 
-    <div class="container" v-if="config != null">
+    <!-- ADVANCED TAB -->
+    <div class="container" v-if="tab === 'advanced' && config != null">
         <div class="row">
             <div class="mb-2 col-xl-4">
                 <div class="lhb-card">
                     <div class="lhb-card-header">
-                        <h5 class="lhb-card-title">
-                            <span class="lhb-section-icon">🔔</span> Notifications
-                        </h5>
+                        <h5 class="lhb-card-title">🔔 Notifications</h5>
                     </div>
                     <div class="lhb-row">
                         <span class="lhb-row-label lhb-form-label">Enable notifications</span>
@@ -261,7 +473,7 @@
                 <div class="lhb-card">
                     <div class="lhb-card-header">
                         <h5 class="lhb-card-title">
-                            <span class="lhb-section-icon">🌐</span> Server
+                            🌐 Server
                             <span class="lhb-badge">{{ config.server.tls.enabled ? 'HTTPS' : 'HTTP' }}</span>
                         </h5>
                     </div>
@@ -284,11 +496,9 @@
                             <span class="lhb-toggle-slider"></span>
                         </label>
                     </div>
-                    <div v-if="config.server.authentication.enabled" style="margin-bottom:0.75rem">
-                        <div class="lhb-row">
-                            <span class="lhb-row-label lhb-form-label">Token</span>
-                            <div class="lhb-row-value"><input class="lhb-form-control" type="password" v-model="config.server.authentication.token"/></div>
-                        </div>
+                    <div v-if="config.server.authentication.enabled" class="lhb-row">
+                        <span class="lhb-row-label lhb-form-label">Token</span>
+                        <div class="lhb-row-value"><input class="lhb-form-control" type="password" v-model="config.server.authentication.token"/></div>
                     </div>
                     <div class="lhb-row">
                         <span class="lhb-row-label lhb-form-label">TLS / WSS</span>
@@ -322,9 +532,7 @@
 
                 <div class="lhb-card">
                     <div class="lhb-card-header">
-                        <h5 class="lhb-card-title">
-                            <span class="lhb-section-icon">⬇️</span> Downloader
-                        </h5>
+                        <h5 class="lhb-card-title">⬇️ Downloader</h5>
                     </div>
                     <div class="lhb-row">
                         <span class="lhb-row-label lhb-form-label">Download Path</span>
@@ -348,7 +556,7 @@
                 <div class="lhb-card">
                     <div class="lhb-card-header">
                         <h5 class="lhb-card-title">
-                            <span class="lhb-section-icon">🖨️</span> Printers
+                            🖨️ Printers
                             <span class="lhb-badge">{{ config.printer.mappings.length }}</span>
                         </h5>
                         <button @click="addPrinter" class="lhb-btn lhb-btn-accent lhb-btn-sm">+ Add</button>
@@ -418,7 +626,7 @@
                 <div class="lhb-card">
                     <div class="lhb-card-header">
                         <h5 class="lhb-card-title">
-                            <span class="lhb-section-icon">🔌</span> Serial Ports
+                            🔌 Serial Ports
                             <span class="lhb-badge">{{ config.serial.mappings.length }}</span>
                         </h5>
                         <button @click="addSerial" class="lhb-btn lhb-btn-accent lhb-btn-sm">+ Add</button>
@@ -494,6 +702,7 @@ createApp({
     printers: [],
     serials: [],
     health: null,
+    tab: 'simple',
 
     loadConfig() {
         return axios.get('/config.json')
