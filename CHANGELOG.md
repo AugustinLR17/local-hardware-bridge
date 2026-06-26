@@ -1,5 +1,35 @@
 # Changelogs
 
+## 1.0.3
+
+Security hardening, bug fixes, new features and the first test suite.
+**Security defaults are unchanged** — authentication stays disabled and CORS stays
+open by default; everything below adds configurability, it does not lock you out.
+
+### Security (opt-in)
+- Configurable CORS allow-list (`server.cors`, default open as before).
+- Path-traversal hardening on downloaded/print documents.
+- SSRF mitigations: URL scheme restricted to http/https, type check on the URL
+  path (no `#`/`?` bypass), optional `downloader.blockPrivateNetworks`.
+- Constant-time token/password comparison; empty token never authorizes.
+- TLS private key written with owner-only permissions; trust-all TLS (when
+  `ignoreTLSCertificateError` is set) scoped to the single connection.
+
+### Bug fixes
+- A failed port bind no longer kills the whole process; serial I/O is thread-safe
+  (no dropped writes) and no longer busy-spins at 100% CPU; downloader config
+  changes apply without a JVM restart; downloaded files are cleaned up on success;
+  config saves are atomic; restart is guarded against overlap.
+
+### Features
+- Enriched `/system/health` (printer/serial enabled, connections, uptime).
+- Web UI: token handling + 401 flow, save/restart feedback, test print/serial,
+  live serial monitor, periodic health refresh, dark mode, accessibility.
+- TUI: `--token`/`LHB_TOKEN` auth, navigation keys, service toggles and restart.
+
+### Tests
+- First JUnit unit tests and additional e2e cases (health, path traversal, restart).
+
 ## 1.0.2
 
 ### Restart fixes
