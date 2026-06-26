@@ -32,43 +32,40 @@ public class GUI implements WebSocketServiceInterface {
     SystemTray tray;
 
     public static void main(String[] args) throws Exception {
-        // On Windows, if launched with java (not javaw), re-launch ourselves with javaw
-        // so no console window remains open. javaw is the headless JRE executable that
-        // doesn't allocate a console — this is what the NSIS installer shortcut uses.
-        // Skip this if we detect we're already in a javaw process or if headless mode
-        // is forced via system property.
         String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
-        boolean forceHeadless = Boolean.getBoolean("lhb.headless");
         boolean forceServer = Boolean.getBoolean("lhb.server");
+        boolean forceHeadless = Boolean.getBoolean("lhb.headless");
 
         if (forceServer) {
-            // Delegate to Server.main() directly — equivalent to running the Server class
             Server.main(args);
             return;
         }
 
+        // On Windows: if launched from a console (java.exe), try to re-spawn under javaw.exe
+        // so the console window can close. This is a best-effort — if javaw is not available
+        // or we're already under javaw, we just proceed normally.
         if (os.contains("windows") && !forceHeadless) {
-            // On Windows, if we're running under java.exe (console), re-spawn under javaw.exe
-            // so the console window disappears. Only do this if there's a console attached.
-            String javaHome = System.getProperty("java.home");
-            String javaExe = System.getProperty("java.home") + "/bin/java.exe";
-            String javawExe = System.getProperty("java.home") + "/bin/javaw.exe";
-
-            // Check if we have a console attached. If java.io.Console is null, we're
-            // likely already under javaw or no console is available.
-            if (System.console() != null && new File(javawExe).exists()) {
-                log.info("Re-launching with javaw to detach from console...");
-                String classpath = System.getProperty("java.class.path");
-                String[] command = {
-                    javawExe,
-                    "-cp", classpath,
-                    "io.github.augustinlr17.localhardwarebridge.GUI"
-                };
-                new ProcessBuilder(command)
-                    .directory(new File(System.getProperty("user.dir")))
-                    .start();
-                // Exit the console process — the javaw process continues in background
-                return;
+            // System.console() returns null when running under javaw.exe (no console window)
+            // If it returns non-null, we have a console attached → re-spawn under javaw
+            if (System.console() != null) {
+                String javawExe = System.getProperty("java.home") + "\\bin\\javaw.exe";
+                if (new File(javawExe).exists()) {
+                    String classpath = System.getProperty("java.class.path");
+                    String workingDir = System.getProperty("user.dir");
+                    ProcessBuilder pb = new ProcessBuilder(
+                        javawExe,
+                        "-cp", classpath,
+                        "io.github.augustinlr17.localhardwarebridge.GUI"
+                    );
+                    pb.directory(new File(workingDir));
+                    // Discard all output — javaw process runs silently in background
+                    pb.redirectOutput(ProcessBuilder.Redirect.DISCARD);
+                    pb.redirectError(ProcessBuilder.Redirect.DISCARD);
+                    pb.start();
+                    // Exit the console process immediately
+                    System.exit(0);
+                    return; // unreachable but explicit
+                }
             }
         }
 
@@ -80,13 +77,20 @@ public class GUI implements WebSocketServiceInterface {
         server.start();
 
         String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
+
+        // On Linux, offer to install systemd service for auto-start
         if (os.contains("linux")) {
             offerLinuxServiceInstall();
             runHeadlessNotificationLoop();
             return;
         }
 
-        // Create tray icon
+        // On macOS, offer to install launchd service for auto-start
+        if (os.contains("mac")) {
+            offerMacOSServiceInstall();
+        }
+
+        // Create tray icon (works on Windows and macOS with system tray)
         if (!SystemTray.isSupported()) {
             log.warn("SystemTray is not supported. Running in headless mode.");
             log.info("Web UI available at: {}", config.getServer().getUri());
@@ -103,13 +107,17 @@ public class GUI implements WebSocketServiceInterface {
             server.registerService(this);
         }
 
+        // On Windows, register auto-start in registry (more reliable than Startup folder shortcut)
+        if (os.contains("windows")) {
+            registerWindowsAutoStart();
+        }
+
         MenuItem settingItem = new MenuItem("Web UI");
         settingItem.addActionListener(e -> {
             try {
-                if (desktop == null || !desktop.isSupported(Desktop.Action.BROWSE)) {
-                    throw new Exception("Desktop browse is not supported");
+                if (desktop != null && desktop.isSupported(Desktop.Action.BROWSE)) {
+                    desktop.browse(new URI(config.getServer().getUri()));
                 }
-                desktop.browse(new URI(config.getServer().getUri()));
             } catch (Exception ex) {
                 log.error("Failed to open Web UI", ex);
             }
@@ -118,22 +126,20 @@ public class GUI implements WebSocketServiceInterface {
         MenuItem appDirectoryItem = new MenuItem("App Directory");
         appDirectoryItem.addActionListener(e -> {
             try {
-                if (desktop == null || !desktop.isSupported(Desktop.Action.OPEN)) {
-                    throw new Exception("Desktop open is not supported");
+                if (desktop != null && desktop.isSupported(Desktop.Action.OPEN)) {
+                    desktop.open(new File("."));
                 }
-                desktop.open(new File("."));
             } catch (Exception ex) {
-                log.error("Failed to open log folder", ex);
+                log.error("Failed to open app directory", ex);
             }
         });
 
         MenuItem logDirectoryItem = new MenuItem("Log Directory");
         logDirectoryItem.addActionListener(e -> {
             try {
-                if (desktop == null || !desktop.isSupported(Desktop.Action.OPEN)) {
-                    throw new Exception("Desktop open is not supported");
+                if (desktop != null && desktop.isSupported(Desktop.Action.OPEN)) {
+                    desktop.open(new File("log"));
                 }
-                desktop.open(new File("log"));
             } catch (Exception ex) {
                 log.error("Failed to open log folder", ex);
             }
@@ -162,10 +168,80 @@ public class GUI implements WebSocketServiceInterface {
 
         trayIcon = new TrayIcon(scaledImage, Constants.APP_NAME);
         trayIcon.setPopupMenu(popupMenu);
+        trayIcon.setImageAutoSize(true);
 
         tray.add(trayIcon);
 
         notify(Constants.APP_NAME, " is running in background!", TrayIcon.MessageType.INFO);
+    }
+
+    /**
+     * Register auto-start on Windows via HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Run
+     * This is more reliable than a Startup folder shortcut and persists across reboots.
+     */
+    private void registerWindowsAutoStart() {
+        try {
+            String appPath = getApplicationPath();
+            if (appPath == null) {
+                log.warn("Could not determine application path for auto-start registration");
+                return;
+            }
+
+            // Use reg.exe to add the auto-start entry in HKCU\...\Run
+            // This is the standard Windows mechanism for auto-starting applications
+            ProcessBuilder pb = new ProcessBuilder(
+                "reg", "add",
+                "HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run",
+                "/v", Constants.APP_NAME,
+                "/d", appPath,
+                "/f"
+            );
+            pb.redirectErrorStream(true);
+            Process p = pb.start();
+            p.getOutputStream().close();
+            p.getInputStream().transferTo(java.io.OutputStream.nullOutputStream());
+            int exitCode = p.waitFor();
+            if (exitCode == 0) {
+                log.info("Registered auto-start in Windows registry");
+            } else {
+                log.warn("Failed to register auto-start (reg exit code: {})", exitCode);
+            }
+        } catch (Exception e) {
+            log.warn("Failed to register auto-start: {}", e.getMessage());
+        }
+    }
+
+    /**
+     * Get the command line to launch this application, for auto-start registration.
+     */
+    private String getApplicationPath() {
+        try {
+            // If running from a JAR, use javaw -cp jar GUI
+            String classpath = System.getProperty("java.class.path");
+            String javaHome = System.getProperty("java.home");
+            String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
+
+            String javaExec;
+            if (os.contains("windows")) {
+                javaExec = javaHome + "\\bin\\javaw.exe";
+            } else {
+                javaExec = javaHome + "/bin/java";
+            }
+
+            // If the classpath is a single JAR file, build a direct command
+            if (!classpath.contains(File.pathSeparator)) {
+                File jarFile = new File(classpath);
+                if (jarFile.exists()) {
+                    return "\"" + javaExec + "\" -cp \"" + jarFile.getAbsolutePath() + "\" io.github.augustinlr17.localhardwarebridge.GUI";
+                }
+            }
+
+            // Otherwise, use the full classpath
+            return "\"" + javaExec + "\" -cp \"" + classpath + "\" io.github.augustinlr17.localhardwarebridge.GUI";
+        } catch (Exception e) {
+            log.warn("Failed to determine application path", e);
+            return null;
+        }
     }
 
     private void offerLinuxServiceInstall() {
@@ -241,6 +317,57 @@ public class GUI implements WebSocketServiceInterface {
         }
     }
 
+    private void offerMacOSServiceInstall() {
+        // macOS: register as login item via LaunchAgent plist
+        try {
+            String home = System.getProperty("user.home");
+            Path plistPath = Paths.get(home + "/Library/LaunchAgents/io.github.augustinlr17.localhardwarebridge.plist");
+            if (Files.exists(plistPath)) {
+                return; // Already installed
+            }
+
+            int choice = JOptionPane.showConfirmDialog(
+                null,
+                "Install Local Hardware Bridge as a login item so it starts automatically?",
+                Constants.APP_NAME + " - Install Service",
+                JOptionPane.YES_NO_OPTION,
+                JOptionPane.QUESTION_MESSAGE
+            );
+
+            if (choice == JOptionPane.YES_OPTION) {
+                String classpath = System.getProperty("java.class.path");
+                String javaHome = System.getProperty("java.home");
+                String workingDir = System.getProperty("user.dir");
+                String javaExec = javaHome + "/bin/java";
+
+                String plistContent = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+                    + "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"
+                    + "<plist version=\"1.0\">\n<dict>\n"
+                    + "    <key>Label</key>\n"
+                    + "    <string>io.github.augustinlr17.localhardwarebridge</string>\n"
+                    + "    <key>ProgramArguments</key>\n"
+                    + "    <array>\n"
+                    + "        <string>" + javaExec + "</string>\n"
+                    + "        <string>-cp</string>\n"
+                    + "        <string>" + classpath + "</string>\n"
+                    + "        <string>io.github.augustinlr17.localhardwarebridge.GUI</string>\n"
+                    + "    </array>\n"
+                    + "    <key>WorkingDirectory</key>\n"
+                    + "    <string>" + workingDir + "</string>\n"
+                    + "    <key>RunAtLoad</key>\n"
+                    + "    <true/>\n"
+                    + "    <key>KeepAlive</key>\n"
+                    + "    <true/>\n"
+                    + "</dict>\n</plist>";
+
+                Files.writeString(plistPath, plistContent);
+                log.info("Installed macOS LaunchAgent at {}", plistPath);
+            }
+        } catch (Exception e) {
+            log.error("Failed to install macOS service", e);
+        }
+    }
+
     private void installLinuxService() {
         try {
             String jarPath = Paths.get(GUI.class.getProtectionDomain().getCodeSource().getLocation().toURI()).toAbsolutePath().toString();
@@ -253,7 +380,7 @@ public class GUI implements WebSocketServiceInterface {
                 + "After=network.target\n\n"
                 + "[Service]\n"
                 + "Type=simple\n"
-                + "ExecStart=" + javaExec + " -cp " + jarPath + " io.github.augustinlr17.localhardwarebridge.Server\n"
+                + "ExecStart=" + javaExec + " -cp " + jarPath + " io.github.augustinlr17.localhardwarebridge.GUI\n"
                 + "WorkingDirectory=" + workingDir + "\n"
                 + "Restart=on-failure\n"
                 + "RestartSec=5\n\n"
@@ -309,12 +436,6 @@ public class GUI implements WebSocketServiceInterface {
                 pb.redirectErrorStream(true).start().waitFor();
             } else if (os.contains("mac")) {
                 // Use osascript for native macOS notifications
-                String displayType = switch (messageType) {
-                    case ERROR -> "critical";
-                    case WARNING -> "with title \"" + title + "\"";
-                    default -> "";
-                };
-                // Escape double quotes in message for AppleScript
                 String escapedMessage = message.replace("\\", "\\\\").replace("\"", "\\\"");
                 String escapedTitle = title.replace("\\", "\\\\").replace("\"", "\\\"");
                 String script;

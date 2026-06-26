@@ -104,10 +104,16 @@ Section "!Main Application" ;No components page, name is not important
 SectionEnd ; end the section
 
 Section "Auto-start" autostart
+  ; Register in HKCU\...\Run for auto-start (more reliable than Startup folder)
+  WriteRegStr HKCU "SOFTWARE\Microsoft\Windows\CurrentVersion\Run" "${PRODUCT_NAME}" '"$INSTDIR\jre\bin\javaw.exe" -cp "$INSTDIR\local-hardware-bridge.jar" io.github.augustinlr17.localhardwarebridge.GUI'
+  ; Also create Startup folder shortcut as backup
   CreateShortcut "$SMSTARTUP\Local Hardware Bridge.lnk" "$INSTDIR\jre\bin\javaw.exe" "-cp local-hardware-bridge.jar io.github.augustinlr17.localhardwarebridge.GUI" "$INSTDIR\icon.ico" 0
 SectionEnd
 
 Section "Uninstall"
+  ; Remove auto-start registry entry
+  DeleteRegValue HKCU "SOFTWARE\Microsoft\Windows\CurrentVersion\Run" "${PRODUCT_NAME}"
+  
   ; Remove registry keys
   DeleteRegKey HKCU "${PRODUCT_UNINST_KEY}"
   DeleteRegKey HKCU "SOFTWARE\${PRODUCT_NAME}"
