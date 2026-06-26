@@ -119,10 +119,11 @@ jobs:
             --vendor AugustinLR17 `
             --description "Local Hardware Bridge - exposes local printer and serial port to web browsers" `
             --icon icon.ico `
-            --win-console `
             --win-dir-chooser `
             --win-menu `
+            --win-menu-group "Local Hardware Bridge" `
             --win-shortcut `
+            --win-shortcut-prompt `
             --win-per-user-install
         shell: powershell
 
@@ -151,13 +152,55 @@ jobs:
             --vendor AugustinLR17 `
             --description "Local Hardware Bridge - exposes local printer and serial port to web browsers" `
             --icon icon.ico `
-            --win-console `
             --win-dir-chooser `
             --win-menu `
+            --win-menu-group "Local Hardware Bridge" `
             --win-shortcut `
+            --win-shortcut-prompt `
             --win-per-user-install `
             --win-upgrade-uuid "a8c6f1e0-5d3b-4c9e-8f2a-7b6d0e1c2f3a"
         shell: powershell
+
+      # Sign the EXE and MSI with Authenticode (self-signed cert in CI).
+      # This adds version metadata to the binary. For full SmartScreen trust,
+      # replace the self-signed step with a real OV certificate stored in GitHub Secrets.
+      - name: Generate self-signed Authenticode certificate
+        shell: powershell
+        run: |
+          # Add signtool to PATH (Windows SDK is pre-installed on windows-latest)
+          $signtoolDir = (Get-ChildItem -Path "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe" -ErrorAction SilentlyContinue | Sort-Object -Descending | Select-Object -First 1).DirectoryName
+          if ($signtoolDir) { $env:PATH = "$signtoolDir;$env:PATH" }
+
+          $cert = New-SelfSignedCertificate `
+            -Type CodeSigningCert `
+            -Subject "CN=AugustinLR17, O=AugustinLR17, C=FR" `
+            -HashAlgorithm SHA256 `
+            -CertStoreLocation "Cert:\CurrentUser\My"
+          Export-Certificate -Cert $cert -FilePath build/dist/signing.cer | Out-Null
+          echo "CERT_THUMBPRINT=$($cert.Thumbprint)" >> $env:GITHUB_ENV
+
+      - name: Sign EXE installer with Authenticode
+        shell: powershell
+        run: |
+          $exe = Get-ChildItem -Path build/dist/windows-exe -Filter *.exe | Select-Object -First 1
+          if ($exe) {
+            & signtool sign /fd SHA256 /sha1 $env:CERT_THUMBPRINT /tr http://timestamp.digicert.com /td SHA256 $exe.FullName 2>$null
+            if ($LASTEXITCODE -ne 0) {
+              # Fallback: sign without timestamp (offline CI)
+              & signtool sign /fd SHA256 /sha1 $env:CERT_THUMBPRINT $exe.FullName
+            }
+          }
+
+      - name: Sign MSI installer with Authenticode
+        shell: powershell
+        run: |
+          $msi = Get-ChildItem -Path build/dist/windows -Filter *.msi | Select-Object -First 1
+          if ($msi) {
+            & signtool sign /fd SHA256 /sha1 $env:CERT_THUMBPRINT /tr http://timestamp.digicert.com /td SHA256 $msi.FullName 2>$null
+            if ($LASTEXITCODE -ne 0) {
+              & signtool sign /fd SHA256 /sha1 $env:CERT_THUMBPRINT $msi.FullName
+            }
+          }
 
       - name: Upload Windows EXE
         uses: actions/upload-artifact@v4
