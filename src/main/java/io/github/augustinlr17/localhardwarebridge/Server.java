@@ -48,6 +48,10 @@ public class Server implements WebSocketServerInterface {
     private final ConcurrentHashMap<String, ConcurrentLinkedQueue<WebSocketServiceInterface>> serviceChannelSubscriptions = new ConcurrentHashMap<>();
     private final ConcurrentLinkedQueue<WebSocketServiceInterface> services = new ConcurrentLinkedQueue<>();
 
+    // Services that must outlive a restart (e.g. the GUI notification listener).
+    // Printer/serial services are recreated by start() and are NOT kept here.
+    private final java.util.Set<WebSocketServiceInterface> persistentServices = ConcurrentHashMap.newKeySet();
+
     private PrinterWebSocketService printerWebSocketService;
 
     public static void main(String[] args) {
@@ -257,6 +261,11 @@ public class Server implements WebSocketServerInterface {
         registerSerialEndpoints();
         registerSystemEndpoints();
 
+        // Re-attach services that must survive a restart (stop() removed them).
+        for (WebSocketServiceInterface service : persistentServices) {
+            registerService(service);
+        }
+
         try {
             javalinServer.start(serverConfig.getBind(), serverConfig.getPort());
             log.info("{} {} running on {}", Constants.APP_NAME, Constants.VERSION, serverConfig.getUri());
@@ -341,6 +350,16 @@ public class Server implements WebSocketServerInterface {
     public void registerService(WebSocketServiceInterface service) {
         service.onRegister(this);
         addServiceToChannel(service.getChannel(), service);
+    }
+
+    /**
+     * Register a service that must be re-attached automatically after a restart
+     * (e.g. the GUI notification listener). Unlike {@link #registerService}, the
+     * service is remembered and re-registered by {@link #start()}.
+     */
+    public void registerPersistentService(WebSocketServiceInterface service) {
+        persistentServices.add(service);
+        registerService(service);
     }
 
     @Override
@@ -689,13 +708,23 @@ public class Server implements WebSocketServerInterface {
         javalinServer.post("/system/restart.json", ctx -> {
             messageToService("/notification", objectMapper.writeValueAsString(new NotificationDTO("WARNING", "Restart", "Server is restarting...")));
 
-            stop();
-            ThreadUtil.silentSleep(500);
-            start();
+            // Respond before restarting: stop()/start() must NOT run on this Jetty
+            // worker thread, otherwise javalinServer.stop() deadlocks shutting down the
+            // very thread pool that is serving this request.
+            ctx.contentType(ContentType.APPLICATION_JSON).result("{\"status\": \"restarting\"}");
 
-            messageToService("/notification", objectMapper.writeValueAsString(new NotificationDTO("INFO", "Restart", "Server restarted successfully")));
-
-            ctx.contentType(ContentType.APPLICATION_JSON).result("{\"status\": \"restarted\"}");
+            Thread restartThread = new Thread(() -> {
+                try {
+                    stop();
+                    ThreadUtil.silentSleep(500);
+                    start();
+                    messageToService("/notification", objectMapper.writeValueAsString(new NotificationDTO("INFO", "Restart", "Server restarted successfully")));
+                } catch (Exception e) {
+                    log.error("Failed to restart server", e);
+                }
+            }, "server-restart");
+            restartThread.setDaemon(false);
+            restartThread.start();
         });
 
         // Health check

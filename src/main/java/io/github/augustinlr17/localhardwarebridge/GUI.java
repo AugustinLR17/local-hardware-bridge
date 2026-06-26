@@ -101,7 +101,7 @@ public class GUI implements WebSocketServiceInterface {
             log.info("Web UI available at: {}", config.getServer().getUri());
 
             if (config.getGui().getNotification().isEnabled()) {
-                server.registerService(this);
+                server.registerPersistentService(this);
             }
 
             Thread.currentThread().join();
@@ -109,7 +109,7 @@ public class GUI implements WebSocketServiceInterface {
         }
 
         if (config.getGui().getNotification().isEnabled()) {
-            server.registerService(this);
+            server.registerPersistentService(this);
         }
 
         // Windows auto-start is handled by the installer (HKCU\...\Run pointing at the
@@ -347,7 +347,7 @@ public class GUI implements WebSocketServiceInterface {
         log.info("Web UI available at: {}", config.getServer().getUri());
 
         if (config.getGui().getNotification().isEnabled()) {
-            server.registerService(this);
+            server.registerPersistentService(this);
         }
 
         try {
