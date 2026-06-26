@@ -14,20 +14,22 @@ import javax.net.ssl.X509TrustManager;
 import java.io.File;
 import java.io.IOException;
 import java.net.HttpURLConnection;
-import java.net.MalformedURLException;
+import java.net.InetAddress;
 import java.net.URL;
 import java.net.URLConnection;
+import java.net.UnknownHostException;
 import java.nio.file.Files;
 import java.security.cert.X509Certificate;
 import java.util.Base64;
+import java.util.Locale;
 
 @Log4j2
 public class DocumentService {
     @Getter
     private static final DocumentService instance = new DocumentService();
-    private static final Config.Downloader downloaderConfig = ConfigService.getInstance().getConfig().getDownloader();
 
     public File prepareDocument(PrintDocument printDocument) throws Exception {
+        Config.Downloader downloaderConfig = ConfigService.getInstance().getConfig().getDownloader();
         FileUtils.forceMkdir(new File(downloaderConfig.getPath()));
 
         if (printDocument.getUrl() == null && printDocument.getFileContent() == null) {
@@ -40,7 +42,7 @@ public class DocumentService {
             Files.write(output.toPath(), bytes);
         } else {
             URL url = new URL(printDocument.getUrl());
-            download(url, getOutputFile(printDocument));
+            download(url, output);
         }
 
         return output;
@@ -50,27 +52,55 @@ public class DocumentService {
         FileUtils.deleteQuietly(getOutputFile(printDocument));
     }
 
-    private File getOutputFile(PrintDocument printDocument) throws MalformedURLException {
-        File output;
+    private File getOutputFile(PrintDocument printDocument) throws IOException {
+        Config.Downloader downloaderConfig = ConfigService.getInstance().getConfig().getDownloader();
+        File baseDir = new File(downloaderConfig.getPath());
+
+        String rawName;
         if (printDocument.getFileContent() != null) {
-            output = new File(downloaderConfig.getPath() + "/" + printDocument.getUuid() + "-" + printDocument.getUrl());
+            // For inline content, getUrl() is only a suggested filename; strip any directories.
+            rawName = FilenameUtils.getName(printDocument.getUrl());
         } else {
             URL url = new URL(printDocument.getUrl());
-            String filename = FilenameUtils.getName(url.getPath());
-            if (filename == null || filename.isEmpty()) {
-                filename = printDocument.getUuid().toString();
-            }
-            output = new File(downloaderConfig.getPath() + "/" + printDocument.getUuid() + "-" + filename);
+            rawName = FilenameUtils.getName(url.getPath());
         }
+        if (rawName == null || rawName.isEmpty()) {
+            rawName = printDocument.getUuid().toString();
+        }
+
+        File output = new File(baseDir, printDocument.getUuid() + "-" + rawName);
+
+        // Defense in depth: ensure the resolved file stays inside the downloads directory.
+        String basePath = baseDir.getCanonicalPath();
+        String outputPath = output.getCanonicalPath();
+        if (!outputPath.startsWith(basePath + File.separator)) {
+            throw new IOException("Resolved output path escapes downloads directory: " + outputPath);
+        }
+
         return output;
     }
 
     private void download(URL url, File outputFile) throws Exception {
+        Config.Downloader downloaderConfig = ConfigService.getInstance().getConfig().getDownloader();
         log.info("Downloading file from: {}", url);
+
+        // Only http/https are permitted (block file:, ftp:, jar:, etc.)
+        String protocol = url.getProtocol() == null ? "" : url.getProtocol().toLowerCase(Locale.ROOT);
+        if (!protocol.equals("http") && !protocol.equals("https")) {
+            throw new IOException("Unsupported URL scheme: " + url.getProtocol());
+        }
+
+        // Optionally refuse to reach into private/loopback networks (SSRF mitigation).
+        if (downloaderConfig.isBlockPrivateNetworks()) {
+            verifyPublicHost(url.getHost());
+        }
 
         long timeStart = System.currentTimeMillis();
 
-        if (downloaderConfig.isIgnoreTLSCertificateError()) {
+        URLConnection urlConnection = url.openConnection();
+
+        // Trust-all is scoped to THIS connection only; never mutate the JVM-wide default.
+        if (downloaderConfig.isIgnoreTLSCertificateError() && urlConnection instanceof HttpsURLConnection) {
             TrustManager[] trustAllCerts = new TrustManager[]{
                     new X509TrustManager() {
                         public X509Certificate[] getAcceptedIssuers() {
@@ -82,16 +112,17 @@ public class DocumentService {
 
                         public void checkServerTrusted(X509Certificate[] certs, String authType) {
                         }
-
                     }
             };
 
-            SSLContext sc = SSLContext.getInstance("SSL");
+            SSLContext sc = SSLContext.getInstance("TLS");
             sc.init(null, trustAllCerts, new java.security.SecureRandom());
-            HttpsURLConnection.setDefaultSSLSocketFactory(sc.getSocketFactory());
+
+            HttpsURLConnection httpsConnection = (HttpsURLConnection) urlConnection;
+            httpsConnection.setSSLSocketFactory(sc.getSocketFactory());
+            httpsConnection.setHostnameVerifier((hostname, session) -> true);
         }
 
-        URLConnection urlConnection = url.openConnection();
         urlConnection.setConnectTimeout((int) downloaderConfig.getTimeout() * 1000);
         urlConnection.setReadTimeout((int) downloaderConfig.getTimeout() * 1000);
         urlConnection.connect();
@@ -116,5 +147,32 @@ public class DocumentService {
 
         long timeFinish = System.currentTimeMillis();
         log.info("File {} downloaded in {} ms", outputFile.getName(), timeFinish - timeStart);
+    }
+
+    /**
+     * Reject hosts that resolve to loopback/link-local/site-local/any-local/multicast
+     * (i.e. private or reserved) addresses to mitigate SSRF against internal services.
+     */
+    private void verifyPublicHost(String host) throws IOException {
+        if (host == null || host.isEmpty()) {
+            throw new IOException("Cannot resolve empty host");
+        }
+
+        InetAddress[] addresses;
+        try {
+            addresses = InetAddress.getAllByName(host);
+        } catch (UnknownHostException e) {
+            throw new IOException("Unable to resolve host: " + host, e);
+        }
+
+        for (InetAddress address : addresses) {
+            if (address.isLoopbackAddress()
+                    || address.isLinkLocalAddress()
+                    || address.isSiteLocalAddress()
+                    || address.isAnyLocalAddress()
+                    || address.isMulticastAddress()) {
+                throw new IOException("Refusing to download from private/reserved address: " + address.getHostAddress());
+            }
+        }
     }
 }

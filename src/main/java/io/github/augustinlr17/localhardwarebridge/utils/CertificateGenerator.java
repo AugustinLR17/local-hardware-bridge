@@ -20,6 +20,8 @@ import java.io.FileInputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.math.BigInteger;
+import java.nio.file.Files;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.security.*;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
@@ -107,6 +109,7 @@ public class CertificateGenerator {
                 if (!directory.isDirectory()) {
                     directory.mkdir();
                 }
+                restrictToOwner(directory, "rwx------");
 
                 saveCert(cert, certificatePath);
                 saveKey(keyPair.getPrivate(), keyPath);
@@ -140,8 +143,36 @@ public class CertificateGenerator {
             JcaPEMWriter writer = new JcaPEMWriter(new FileWriter(keyPath));
             writer.writeObject(new JcaPKCS8Generator(key, null));
             writer.close();
+
+            // Lock down the private key so only the owner can read it.
+            restrictToOwner(new File(keyPath), "rw-------");
         } catch (IOException e) {
             log.error(e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Best-effort restriction of a file/directory to owner-only access. Uses POSIX
+     * permissions where available and falls back to {@code java.io.File} setters on
+     * non-POSIX platforms (e.g. Windows). Never throws; permission failures are logged.
+     */
+    private static void restrictToOwner(File file, String posixPerms) {
+        try {
+            Files.setPosixFilePermissions(file.toPath(), PosixFilePermissions.fromString(posixPerms));
+        } catch (IOException | RuntimeException e) {
+            try {
+                // Remove access for everyone, then re-grant to the owner only.
+                file.setReadable(false, false);
+                file.setReadable(true, true);
+                file.setWritable(false, false);
+                file.setWritable(true, true);
+                if (file.isDirectory()) {
+                    file.setExecutable(false, false);
+                    file.setExecutable(true, true);
+                }
+            } catch (Exception fallbackError) {
+                log.warn("Unable to restrict permissions on {}: {}", file, String.valueOf(fallbackError.getMessage()));
+            }
         }
     }
 

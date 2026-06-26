@@ -24,11 +24,36 @@
             --lhb-warning: #f59e0b;
             --lhb-warning-bg: rgba(245,158,11,0.1);
             --lhb-info: #3b82f6;
+            --lhb-toggle-off: #d1d5e0;
+            --lhb-monitor-bg: #0d0f14;
+            --lhb-monitor-text: #cfe3d0;
+        }
+        [data-theme="dark"] {
+            --lhb-bg: #13151c;
+            --lhb-surface: #1b1e27;
+            --lhb-surface2: #232733;
+            --lhb-border: #2e3340;
+            --lhb-text: #e6e8ef;
+            --lhb-text-dim: #9aa0b5;
+            --lhb-accent: #7c80ff;
+            --lhb-accent-hover: #9498ff;
+            --lhb-accent-light: rgba(124,128,255,0.16);
+            --lhb-success: #34d058;
+            --lhb-success-bg: rgba(52,208,88,0.15);
+            --lhb-danger: #f87171;
+            --lhb-danger-bg: rgba(248,113,113,0.15);
+            --lhb-warning: #fbbf24;
+            --lhb-warning-bg: rgba(251,191,36,0.15);
+            --lhb-info: #60a5fa;
+            --lhb-toggle-off: #3a3f4d;
+            --lhb-monitor-bg: #0a0c10;
+            --lhb-monitor-text: #cfe3d0;
         }
         body {
             background: var(--lhb-bg);
             color: var(--lhb-text);
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            transition: background 0.2s, color 0.2s;
         }
         .lhb-card {
             background: var(--lhb-surface);
@@ -101,7 +126,7 @@
         .lhb-toggle-slider {
             position: absolute;
             inset: 0;
-            background: #d1d5e0;
+            background: var(--lhb-toggle-off);
             border-radius: 99px;
             cursor: pointer;
             transition: 0.2s;
@@ -120,6 +145,9 @@
         }
         .lhb-toggle input:checked + .lhb-toggle-slider {
             background: var(--lhb-accent);
+        }
+        .lhb-toggle input:focus-visible + .lhb-toggle-slider {
+            box-shadow: 0 0 0 3px rgba(91,95,239,0.3);
         }
         .lhb-toggle input:checked + .lhb-toggle-slider::before {
             transform: translateX(20px);
@@ -145,6 +173,7 @@
             align-items: center;
             gap: 0.4rem;
         }
+        .lhb-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none !important; }
         .lhb-btn-accent { background: var(--lhb-accent); color: #fff; }
         .lhb-btn-accent:hover { background: var(--lhb-accent-hover); transform: translateY(-1px); }
         .lhb-btn-outline {
@@ -233,12 +262,16 @@
             font-weight: 700;
             font-size: 0.88rem;
             color: var(--lhb-accent);
+            display: flex;
+            align-items: center;
+            gap: 0.45rem;
         }
         .lhb-status-dot {
             width: 8px; height: 8px; border-radius: 50%; display: inline-block;
         }
         .lhb-status-dot.on { background: var(--lhb-success); }
         .lhb-status-dot.off { background: var(--lhb-danger); }
+        .lhb-status-dot.unknown { background: var(--lhb-text-dim); }
         .lhb-health {
             display: flex; gap: 0.6rem; flex-wrap: wrap; margin-bottom: 1.25rem;
         }
@@ -335,6 +368,8 @@
         }
         .lhb-ep-method.get { background: rgba(34,197,94,0.12); color: #16a34a; }
         .lhb-ep-method.post { background: rgba(91,95,239,0.12); color: #5b5fef; }
+        .lhb-ep-method.put { background: rgba(245,158,11,0.14); color: #d97706; }
+        .lhb-ep-method.delete { background: rgba(239,68,68,0.12); color: #dc2626; }
         .lhb-ep-actions { display: flex; align-items: center; gap: 0.6rem; }
         .lhb-ep-badge {
             font-size: 0.65rem;
@@ -344,51 +379,132 @@
         }
         .lhb-ep-badge.locked { background: #e5e7eb; color: #6b6f85; }
         .lhb-ep-badge.disabled { background: var(--lhb-danger-bg); color: var(--lhb-danger); }
+
+        /* Toasts */
+        .lhb-toasts {
+            position: fixed; top: 1rem; right: 1rem; z-index: 1080;
+            display: flex; flex-direction: column; gap: 0.5rem; max-width: 380px;
+        }
+        .lhb-toast {
+            background: var(--lhb-surface);
+            border: 1px solid var(--lhb-border);
+            border-left: 4px solid var(--lhb-accent);
+            border-radius: 10px;
+            padding: 0.7rem 0.9rem;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.18);
+            display: flex; gap: 0.6rem; align-items: flex-start;
+            font-size: 0.82rem; color: var(--lhb-text);
+        }
+        .lhb-toast.success { border-left-color: var(--lhb-success); }
+        .lhb-toast.error { border-left-color: var(--lhb-danger); }
+        .lhb-toast.info { border-left-color: var(--lhb-info); }
+        .lhb-toast-msg { flex: 1; word-break: break-word; }
+        .lhb-toast-close {
+            cursor: pointer; color: var(--lhb-text-dim);
+            background: none; border: none; font-size: 1.1rem; line-height: 1; padding: 0;
+        }
+
+        /* Banner */
+        .lhb-banner {
+            background: var(--lhb-warning-bg);
+            border: 1px solid var(--lhb-warning);
+            color: var(--lhb-text);
+            border-radius: 10px;
+            padding: 0.85rem 1rem;
+            margin-bottom: 1rem;
+            display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;
+        }
+
+        /* Serial monitor */
+        .lhb-monitor {
+            background: var(--lhb-monitor-bg);
+            color: var(--lhb-monitor-text);
+            border-radius: 8px;
+            padding: 0.6rem 0.75rem;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            font-size: 0.74rem;
+            height: 180px;
+            overflow: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+        }
+        .lhb-monitor-empty { color: var(--lhb-text-dim); }
     </style>
 </head>
 <body>
 <div @vue:mounted="mounted" v-scope>
+    <!-- Toasts -->
+    <div class="lhb-toasts" aria-live="polite" aria-atomic="false">
+        <div class="lhb-toast" :class="t.type" v-for="t in toasts" :key="t.id">
+            <span class="lhb-toast-msg">{{ t.message }}</span>
+            <button class="lhb-toast-close" @click="dismissToast(t.id)" aria-label="Dismiss notification">&times;</button>
+        </div>
+    </div>
+
     <div class="container">
         <nav class="lhb-nav">
             <div class="lhb-nav-brand">
-                <img src="icon.png" alt="LHB"/>
+                <img src="icon.png" alt="Local Hardware Bridge logo"/>
                 <div class="lhb-nav-brand-text">
                     <span class="lhb-nav-brand-name">Local Hardware Bridge</span>
-                    <span class="lhb-nav-brand-sub" v-if="health">v{{ health.version }} • {{ health.status }}</span>
+                    <span class="lhb-nav-brand-sub" v-if="health">v{{ health.version }} &bull; {{ health.status }}</span>
                 </div>
             </div>
             <div class="lhb-nav-actions">
-                <button @click="saveConfig" class="lhb-btn lhb-btn-success">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v9a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                    Save
+                <button @click="toggleTheme" class="lhb-btn lhb-btn-outline"
+                        :aria-label="theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'"
+                        :title="theme === 'dark' ? 'Light mode' : 'Dark mode'">
+                    <span aria-hidden="true">{{ theme === 'dark' ? '☀️' : '\u{1F319}' }}</span>
                 </button>
-                <button @click="restartServer" class="lhb-btn lhb-btn-warning">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
-                    Restart
+                <button @click="saveConfig" class="lhb-btn lhb-btn-success" :disabled="saving" aria-label="Save configuration">
+                    <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v9a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                    {{ saving ? 'Saving...' : 'Save' }}
+                </button>
+                <button @click="restartServer" class="lhb-btn lhb-btn-warning" :disabled="restarting" aria-label="Restart server">
+                    <svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 11-2.12-9.36L23 10"/></svg>
+                    {{ restarting ? 'Restarting...' : 'Restart' }}
                 </button>
             </div>
         </nav>
+
+        <!-- Authentication required banner -->
+        <div v-if="authRequired" class="lhb-banner" role="alert">
+            <span aria-hidden="true">&#128274;</span>
+            <span style="flex:1;min-width:200px">Authentication required &mdash; enter your access token to continue.</span>
+            <label class="visually-hidden" for="auth-banner-token">Access token</label>
+            <input id="auth-banner-token" class="lhb-form-control" style="width:220px" type="password"
+                   v-model="tokenInput" placeholder="Access token" autocomplete="off"
+                   @keyup.enter="applyToken" aria-label="Access token"/>
+            <button class="lhb-btn lhb-btn-accent lhb-btn-sm" @click="applyToken">Apply token</button>
+        </div>
 
         <div v-if="health" class="lhb-health">
             <div class="lhb-health-chip">
                 <span class="lhb-status-dot" :class="health.status === 'UP' ? 'on' : 'off'"></span>
                 {{ health.status }}
             </div>
-            <div class="lhb-health-chip" v-for="(active, name) in health.services">
+            <div class="lhb-health-chip" v-for="(active, name) in (health.services || {})">
                 <span class="lhb-status-dot" :class="active ? 'on' : 'off'"></span>
                 {{ name }}
             </div>
+            <div class="lhb-health-chip" v-for="(count, chan) in (health.connections || {})">
+                <span class="lhb-status-dot" :class="count > 0 ? 'on' : 'off'"></span>
+                {{ chan }}: {{ count }}
+            </div>
+            <div class="lhb-health-chip" v-if="health.uptime">
+                <span aria-hidden="true">&#9201;</span> {{ health.uptime }}
+            </div>
         </div>
 
-        <div class="lhb-tabs">
-            <button class="lhb-tab" :class="{ active: tab === 'simple' }" @click="tab = 'simple'">
-                🏠 Dashboard
+        <div class="lhb-tabs" role="tablist" aria-label="Dashboard sections">
+            <button class="lhb-tab" role="tab" :aria-selected="tab === 'simple'" :class="{ active: tab === 'simple' }" @click="tab = 'simple'">
+                <span aria-hidden="true">&#127968;</span> Dashboard
             </button>
-            <button class="lhb-tab" :class="{ active: tab === 'advanced' }" @click="tab = 'advanced'">
-                ⚙️ Advanced
+            <button class="lhb-tab" role="tab" :aria-selected="tab === 'advanced'" :class="{ active: tab === 'advanced' }" @click="tab = 'advanced'">
+                <span aria-hidden="true">&#9881;&#65039;</span> Advanced
             </button>
-            <button class="lhb-tab" :class="{ active: tab === 'security' }" @click="tab = 'security'">
-                🔒 Security
+            <button class="lhb-tab" role="tab" :aria-selected="tab === 'security'" :class="{ active: tab === 'security' }" @click="tab = 'security'">
+                <span aria-hidden="true">&#128274;</span> Security
             </button>
         </div>
     </div>
@@ -398,7 +514,7 @@
         <div class="row">
             <div class="col-lg-6">
                 <div class="lhb-quick-card">
-                    <div class="lhb-quick-icon printer">🖨️</div>
+                    <div class="lhb-quick-icon printer" aria-hidden="true">&#128424;&#65039;</div>
                     <div class="lhb-quick-body">
                         <div class="lhb-quick-title">Printers</div>
                         <div class="lhb-quick-desc">
@@ -411,7 +527,7 @@
                     </div>
                     <div class="lhb-quick-action">
                         <label class="lhb-toggle">
-                            <input type="checkbox" v-model="config.printer.enabled"/>
+                            <input type="checkbox" v-model="config.printer.enabled" aria-label="Enable printer service"/>
                             <span class="lhb-toggle-slider"></span>
                         </label>
                     </div>
@@ -419,7 +535,7 @@
 
                 <div v-if="config.printer.enabled && config.printer.mappings.length === 0" class="lhb-card">
                     <div class="lhb-empty">
-                        <div class="lhb-empty-icon">🖨️</div>
+                        <div class="lhb-empty-icon" aria-hidden="true">&#128424;&#65039;</div>
                         <p>No printers configured yet</p>
                         <button @click="addPrinter" class="lhb-btn lhb-btn-accent lhb-btn-sm">+ Add your first printer</button>
                     </div>
@@ -428,15 +544,20 @@
                 <div v-for="(printer, index) in config.printer.mappings" class="lhb-card" style="padding:1rem 1.25rem">
                     <div class="lhb-row" style="margin-bottom:0.5rem">
                         <div style="flex:1">
-                            <input class="lhb-form-control" type="text" v-model="printer.type" placeholder="Type name (e.g. RECEIPT, INVOICE)"/>
+                            <input class="lhb-form-control" type="text" v-model="printer.type" placeholder="Type name (e.g. RECEIPT, INVOICE)" aria-label="Printer mapping type"/>
                         </div>
                         <div style="width:200px">
-                            <select class="lhb-form-control" v-model="printer.name">
+                            <select class="lhb-form-control" v-model="printer.name" aria-label="Printer">
                                 <option value="" disabled>Select a printer...</option>
                                 <option :value="p.name" v-for="p in printers">{{ p.name }}</option>
                             </select>
                         </div>
-                        <button @click="removePrinter(index)" class="lhb-btn lhb-btn-danger lhb-btn-sm" style="padding:0.3rem 0.5rem">✕</button>
+                        <button @click="removePrinter(index)" class="lhb-btn lhb-btn-danger lhb-btn-sm" style="padding:0.3rem 0.5rem" aria-label="Remove printer mapping">&#10005;</button>
+                    </div>
+                    <div class="lhb-row" style="margin-bottom:0">
+                        <button @click="testPrint(printer)" class="lhb-btn lhb-btn-outline lhb-btn-sm" :disabled="!printer.type || !printer.name">
+                            <span aria-hidden="true">&#129514;</span> Test print
+                        </button>
                     </div>
                 </div>
 
@@ -447,7 +568,7 @@
 
             <div class="col-lg-6">
                 <div class="lhb-quick-card">
-                    <div class="lhb-quick-icon serial">🔌</div>
+                    <div class="lhb-quick-icon serial" aria-hidden="true">&#128268;</div>
                     <div class="lhb-quick-body">
                         <div class="lhb-quick-title">Serial Ports</div>
                         <div class="lhb-quick-desc">
@@ -460,7 +581,7 @@
                     </div>
                     <div class="lhb-quick-action">
                         <label class="lhb-toggle">
-                            <input type="checkbox" v-model="config.serial.enabled"/>
+                            <input type="checkbox" v-model="config.serial.enabled" aria-label="Enable serial service"/>
                             <span class="lhb-toggle-slider"></span>
                         </label>
                     </div>
@@ -468,7 +589,7 @@
 
                 <div v-if="config.serial.enabled && config.serial.mappings.length === 0" class="lhb-card">
                     <div class="lhb-empty">
-                        <div class="lhb-empty-icon">🔌</div>
+                        <div class="lhb-empty-icon" aria-hidden="true">&#128268;</div>
                         <p>No serial ports configured yet</p>
                         <button @click="addSerial" class="lhb-btn lhb-btn-accent lhb-btn-sm">+ Add your first serial port</button>
                     </div>
@@ -476,24 +597,31 @@
 
                 <div v-for="(serial, index) in config.serial.mappings" class="lhb-card" style="padding:1rem 1.25rem">
                     <div class="lhb-row" style="margin-bottom:0.5rem">
-                        <div style="flex:1">
-                            <input class="lhb-form-control" type="text" v-model="serial.type" placeholder="Type name (e.g. SCALE, SCANNER)"/>
+                        <div style="display:flex;align-items:center;gap:0.4rem;flex:1">
+                            <span class="lhb-status-dot" :class="serialDotClass(serial.name)" :title="serialDotTitle(serial.name)"></span>
+                            <input class="lhb-form-control" type="text" v-model="serial.type" placeholder="Type name (e.g. SCALE, SCANNER)" aria-label="Serial mapping type"/>
                         </div>
                         <div style="width:200px">
-                            <select class="lhb-form-control" v-model="serial.name">
+                            <select class="lhb-form-control" v-model="serial.name" aria-label="Serial port">
                                 <option value="" disabled>Select a port...</option>
                                 <option :value="s.name" v-for="s in serials">{{ s.name }}</option>
                             </select>
                         </div>
-                        <button @click="removeSerial(index)" class="lhb-btn lhb-btn-danger lhb-btn-sm" style="padding:0.3rem 0.5rem">✕</button>
+                        <button @click="removeSerial(index)" class="lhb-btn lhb-btn-danger lhb-btn-sm" style="padding:0.3rem 0.5rem" aria-label="Remove serial mapping">&#10005;</button>
                     </div>
-                    <div class="lhb-row" style="margin-bottom:0">
-                        <select class="lhb-form-control" v-model="serial.baudRate" style="width:90px;flex:none">
+                    <div class="lhb-row" style="margin-bottom:0.5rem">
+                        <select class="lhb-form-control" v-model.number="serial.baudRate" style="width:90px;flex:none" aria-label="Baud rate">
                             <option :value="b" v-for="b in [1200,2400,4800,9600,19200,38400,57600,115200]">{{ b }}</option>
                         </select>
-                        <select class="lhb-form-control" v-model="serial.readCharset" style="width:120px;flex:none">
+                        <select class="lhb-form-control" v-model="serial.readCharset" style="width:120px;flex:none" aria-label="Read charset">
                             <option :value="c" v-for="c in ['ISO-8859-1', 'UTF-8', 'US-ASCII', 'BINARY']">{{ c }}</option>
                         </select>
+                    </div>
+                    <div class="lhb-row" style="margin-bottom:0">
+                        <input class="lhb-form-control" type="text" v-model="serialTest[index]" placeholder="Sample payload to write" aria-label="Serial test payload" style="flex:1"/>
+                        <button @click="testSerial(serial, index)" class="lhb-btn lhb-btn-outline lhb-btn-sm" :disabled="!serial.type">
+                            <span aria-hidden="true">&#9993;&#65039;</span> Send
+                        </button>
                     </div>
                 </div>
 
@@ -510,12 +638,12 @@
             <div class="mb-2 col-xl-4">
                 <div class="lhb-card">
                     <div class="lhb-card-header">
-                        <h5 class="lhb-card-title">🔔 Notifications</h5>
+                        <h5 class="lhb-card-title"><span aria-hidden="true">&#128276;</span> Notifications</h5>
                     </div>
                     <div class="lhb-row">
-                        <span class="lhb-row-label lhb-form-label">Enable notifications</span>
+                        <label class="lhb-row-label lhb-form-label" for="notif-enabled">Enable notifications</label>
                         <label class="lhb-toggle">
-                            <input type="checkbox" v-model="config.gui.notification.enabled"/>
+                            <input id="notif-enabled" type="checkbox" v-model="config.gui.notification.enabled" aria-label="Enable notifications"/>
                             <span class="lhb-toggle-slider"></span>
                         </label>
                     </div>
@@ -524,79 +652,86 @@
                 <div class="lhb-card">
                     <div class="lhb-card-header">
                         <h5 class="lhb-card-title">
-                            🌐 Server
+                            <span aria-hidden="true">&#127760;</span> Server
                             <span class="lhb-badge">{{ config.server.tls.enabled ? 'HTTPS' : 'HTTP' }}</span>
                         </h5>
                     </div>
                     <div class="lhb-row">
-                        <span class="lhb-row-label lhb-form-label">Bind Address</span>
-                        <div class="lhb-row-value"><input class="lhb-form-control" type="text" v-model="config.server.bind"/></div>
+                        <label class="lhb-row-label lhb-form-label" for="srv-bind">Bind Address</label>
+                        <div class="lhb-row-value"><input id="srv-bind" class="lhb-form-control" type="text" v-model="config.server.bind"/></div>
                     </div>
                     <div class="lhb-row">
-                        <span class="lhb-row-label lhb-form-label">Public Address</span>
-                        <div class="lhb-row-value"><input class="lhb-form-control" type="text" v-model="config.server.address"/></div>
+                        <label class="lhb-row-label lhb-form-label" for="srv-address">Public Address</label>
+                        <div class="lhb-row-value"><input id="srv-address" class="lhb-form-control" type="text" v-model="config.server.address"/></div>
                     </div>
                     <div class="lhb-row">
-                        <span class="lhb-row-label lhb-form-label">Port</span>
-                        <div class="lhb-row-value"><input class="lhb-form-control" type="number" min="1024" max="65535" v-model="config.server.port"/></div>
+                        <label class="lhb-row-label lhb-form-label" for="srv-port">Port</label>
+                        <div class="lhb-row-value"><input id="srv-port" class="lhb-form-control" type="number" min="1024" max="65535" v-model.number="config.server.port"/></div>
                     </div>
                     <div class="lhb-row">
-                        <span class="lhb-row-label lhb-form-label">Authentication</span>
+                        <label class="lhb-row-label lhb-form-label" for="srv-auth">Authentication</label>
                         <label class="lhb-toggle">
-                            <input type="checkbox" v-model="config.server.authentication.enabled"/>
+                            <input id="srv-auth" type="checkbox" v-model="config.server.authentication.enabled" aria-label="Enable authentication"/>
                             <span class="lhb-toggle-slider"></span>
                         </label>
                     </div>
                     <div v-if="config.server.authentication.enabled" class="lhb-row">
-                        <span class="lhb-row-label lhb-form-label">Token</span>
-                        <div class="lhb-row-value"><input class="lhb-form-control" type="password" v-model="config.server.authentication.token"/></div>
+                        <label class="lhb-row-label lhb-form-label" for="srv-token">
+                            Token
+                            <span style="font-weight:400;font-size:0.72rem">({{ secrets.authToken ? 'set - blank keeps current' : 'not set' }})</span>
+                        </label>
+                        <div class="lhb-row-value">
+                            <input id="srv-token" class="lhb-form-control" type="password" autocomplete="new-password"
+                                   v-model="config.server.authentication.token"
+                                   :placeholder="secrets.authToken ? '•••• (unchanged)' : 'Set a token'"/>
+                        </div>
                     </div>
                     <div class="lhb-row">
-                        <span class="lhb-row-label lhb-form-label">TLS / WSS</span>
+                        <label class="lhb-row-label lhb-form-label" for="srv-tls">TLS / WSS</label>
                         <label class="lhb-toggle">
-                            <input type="checkbox" v-model="config.server.tls.enabled"/>
+                            <input id="srv-tls" type="checkbox" v-model="config.server.tls.enabled" aria-label="Enable TLS"/>
                             <span class="lhb-toggle-slider"></span>
                         </label>
                     </div>
                     <div v-if="config.server.tls.enabled">
                         <div class="lhb-row">
-                            <span class="lhb-row-label lhb-form-label">Self-Signed</span>
+                            <label class="lhb-row-label lhb-form-label" for="tls-selfsigned">Self-Signed</label>
                             <label class="lhb-toggle">
-                                <input type="checkbox" v-model="config.server.tls.selfSigned"/>
+                                <input id="tls-selfsigned" type="checkbox" v-model="config.server.tls.selfSigned" aria-label="Use self-signed certificate"/>
                                 <span class="lhb-toggle-slider"></span>
                             </label>
                         </div>
                         <div class="lhb-row">
-                            <span class="lhb-row-label lhb-form-label">Certificate</span>
-                            <div class="lhb-row-value"><input class="lhb-form-control" type="text" v-model="config.server.tls.cert"/></div>
+                            <label class="lhb-row-label lhb-form-label" for="tls-cert">Certificate</label>
+                            <div class="lhb-row-value"><input id="tls-cert" class="lhb-form-control" type="text" v-model="config.server.tls.cert"/></div>
                         </div>
                         <div class="lhb-row">
-                            <span class="lhb-row-label lhb-form-label">Private Key</span>
-                            <div class="lhb-row-value"><input class="lhb-form-control" type="text" v-model="config.server.tls.key"/></div>
+                            <label class="lhb-row-label lhb-form-label" for="tls-key">Private Key</label>
+                            <div class="lhb-row-value"><input id="tls-key" class="lhb-form-control" type="text" v-model="config.server.tls.key"/></div>
                         </div>
                         <div class="lhb-row">
-                            <span class="lhb-row-label lhb-form-label">CA Bundle</span>
-                            <div class="lhb-row-value"><input class="lhb-form-control" type="text" v-model="config.server.tls.caBundle"/></div>
+                            <label class="lhb-row-label lhb-form-label" for="tls-ca">CA Bundle</label>
+                            <div class="lhb-row-value"><input id="tls-ca" class="lhb-form-control" type="text" v-model="config.server.tls.caBundle"/></div>
                         </div>
                     </div>
                 </div>
 
                 <div class="lhb-card">
                     <div class="lhb-card-header">
-                        <h5 class="lhb-card-title">⬇️ Downloader</h5>
+                        <h5 class="lhb-card-title"><span aria-hidden="true">&#11015;&#65039;</span> Downloader</h5>
                     </div>
                     <div class="lhb-row">
-                        <span class="lhb-row-label lhb-form-label">Download Path</span>
-                        <div class="lhb-row-value"><input class="lhb-form-control" type="text" v-model="config.downloader.path"/></div>
+                        <label class="lhb-row-label lhb-form-label" for="dl-path">Download Path</label>
+                        <div class="lhb-row-value"><input id="dl-path" class="lhb-form-control" type="text" v-model="config.downloader.path"/></div>
                     </div>
                     <div class="lhb-row">
-                        <span class="lhb-row-label lhb-form-label">Timeout (s)</span>
-                        <div class="lhb-row-value"><input class="lhb-form-control" type="number" v-model="config.downloader.timeout"/></div>
+                        <label class="lhb-row-label lhb-form-label" for="dl-timeout">Timeout (s)</label>
+                        <div class="lhb-row-value"><input id="dl-timeout" class="lhb-form-control" type="number" v-model.number="config.downloader.timeout"/></div>
                     </div>
                     <div class="lhb-row">
-                        <span class="lhb-row-label lhb-form-label">Ignore TLS Errors</span>
+                        <label class="lhb-row-label lhb-form-label" for="dl-ignoretls">Ignore TLS Errors</label>
                         <label class="lhb-toggle">
-                            <input type="checkbox" v-model="config.downloader.ignoreTLSCertificateError"/>
+                            <input id="dl-ignoretls" type="checkbox" v-model="config.downloader.ignoreTLSCertificateError" aria-label="Ignore TLS certificate errors"/>
                             <span class="lhb-toggle-slider"></span>
                         </label>
                     </div>
@@ -607,29 +742,29 @@
                 <div class="lhb-card">
                     <div class="lhb-card-header">
                         <h5 class="lhb-card-title">
-                            🖨️ Printers
+                            <span aria-hidden="true">&#128424;&#65039;</span> Printers
                             <span class="lhb-badge">{{ config.printer.mappings.length }}</span>
                         </h5>
                         <button @click="addPrinter" class="lhb-btn lhb-btn-accent lhb-btn-sm">+ Add</button>
                     </div>
                     <div class="lhb-row">
-                        <span class="lhb-row-label lhb-form-label">Enabled</span>
+                        <label class="lhb-row-label lhb-form-label" for="prn-enabled">Enabled</label>
                         <label class="lhb-toggle">
-                            <input type="checkbox" v-model="config.printer.enabled"/>
+                            <input id="prn-enabled" type="checkbox" v-model="config.printer.enabled" aria-label="Enable printer service"/>
                             <span class="lhb-toggle-slider"></span>
                         </label>
                     </div>
                     <div class="lhb-row">
-                        <span class="lhb-row-label lhb-form-label">Auto-add unknown types</span>
+                        <label class="lhb-row-label lhb-form-label" for="prn-autoadd">Auto-add unknown types</label>
                         <label class="lhb-toggle">
-                            <input type="checkbox" v-model="config.printer.autoAddUnknownType"/>
+                            <input id="prn-autoadd" type="checkbox" v-model="config.printer.autoAddUnknownType" aria-label="Auto-add unknown types"/>
                             <span class="lhb-toggle-slider"></span>
                         </label>
                     </div>
                     <div class="lhb-row">
-                        <span class="lhb-row-label lhb-form-label">Fallback to default</span>
+                        <label class="lhb-row-label lhb-form-label" for="prn-fallback">Fallback to default</label>
                         <label class="lhb-toggle">
-                            <input type="checkbox" v-model="config.printer.fallbackToDefault"/>
+                            <input id="prn-fallback" type="checkbox" v-model="config.printer.fallbackToDefault" aria-label="Fallback to default printer"/>
                             <span class="lhb-toggle-slider"></span>
                         </label>
                     </div>
@@ -637,37 +772,42 @@
                     <div class="lhb-mapping-card" v-for="(printer, index) in config.printer.mappings">
                         <div class="lhb-mapping-header">
                             <span class="lhb-mapping-title">{{ printer.type || 'New Mapping' }}</span>
-                            <button @click="removePrinter(index)" class="lhb-btn lhb-btn-danger lhb-btn-sm">Remove</button>
+                            <div style="display:flex;gap:0.4rem">
+                                <button @click="testPrint(printer)" class="lhb-btn lhb-btn-outline lhb-btn-sm" :disabled="!printer.type || !printer.name">
+                                    <span aria-hidden="true">&#129514;</span> Test
+                                </button>
+                                <button @click="removePrinter(index)" class="lhb-btn lhb-btn-danger lhb-btn-sm">Remove</button>
+                            </div>
                         </div>
                         <div class="lhb-row">
-                            <span class="lhb-row-label lhb-form-label">Type</span>
-                            <div class="lhb-row-value"><input class="lhb-form-control" type="text" v-model="printer.type"/></div>
+                            <label class="lhb-row-label lhb-form-label" :for="'prn-type-'+index">Type</label>
+                            <div class="lhb-row-value"><input :id="'prn-type-'+index" class="lhb-form-control" type="text" v-model="printer.type"/></div>
                         </div>
                         <div class="lhb-row">
-                            <span class="lhb-row-label lhb-form-label">Printer</span>
+                            <label class="lhb-row-label lhb-form-label" :for="'prn-name-'+index">Printer</label>
                             <div class="lhb-row-value">
-                                <select class="lhb-form-control" v-model="printer.name">
+                                <select :id="'prn-name-'+index" class="lhb-form-control" v-model="printer.name">
                                     <option :value="p.name" v-for="p in printers">{{ p.name }}</option>
                                 </select>
                             </div>
                         </div>
                         <div class="lhb-row">
-                            <span class="lhb-row-label lhb-form-label">Auto rotate</span>
+                            <label class="lhb-row-label lhb-form-label" :for="'prn-rotate-'+index">Auto rotate</label>
                             <label class="lhb-toggle">
-                                <input type="checkbox" v-model="printer.autoRotate"/>
+                                <input :id="'prn-rotate-'+index" type="checkbox" v-model="printer.autoRotate" aria-label="Auto rotate"/>
                                 <span class="lhb-toggle-slider"></span>
                             </label>
                         </div>
                         <div class="lhb-row">
-                            <span class="lhb-row-label lhb-form-label">Reset imageable area</span>
+                            <label class="lhb-row-label lhb-form-label" :for="'prn-reset-'+index">Reset imageable area</label>
                             <label class="lhb-toggle">
-                                <input type="checkbox" v-model="printer.resetImageableArea"/>
+                                <input :id="'prn-reset-'+index" type="checkbox" v-model="printer.resetImageableArea" aria-label="Reset imageable area"/>
                                 <span class="lhb-toggle-slider"></span>
                             </label>
                         </div>
                         <div class="lhb-row">
-                            <span class="lhb-row-label lhb-form-label">Force DPI</span>
-                            <div class="lhb-row-value"><input class="lhb-form-control" type="number" v-model="printer.forceDPI"/></div>
+                            <label class="lhb-row-label lhb-form-label" :for="'prn-dpi-'+index">Force DPI</label>
+                            <div class="lhb-row-value"><input :id="'prn-dpi-'+index" class="lhb-form-control" type="number" v-model.number="printer.forceDPI"/></div>
                         </div>
                     </div>
                 </div>
@@ -677,67 +817,103 @@
                 <div class="lhb-card">
                     <div class="lhb-card-header">
                         <h5 class="lhb-card-title">
-                            🔌 Serial Ports
+                            <span aria-hidden="true">&#128268;</span> Serial Ports
                             <span class="lhb-badge">{{ config.serial.mappings.length }}</span>
                         </h5>
                         <button @click="addSerial" class="lhb-btn lhb-btn-accent lhb-btn-sm">+ Add</button>
                     </div>
                     <div class="lhb-row">
-                        <span class="lhb-row-label lhb-form-label">Enabled</span>
+                        <label class="lhb-row-label lhb-form-label" for="ser-enabled">Enabled</label>
                         <label class="lhb-toggle">
-                            <input type="checkbox" v-model="config.serial.enabled"/>
+                            <input id="ser-enabled" type="checkbox" v-model="config.serial.enabled" aria-label="Enable serial service"/>
                             <span class="lhb-toggle-slider"></span>
                         </label>
                     </div>
 
                     <div class="lhb-mapping-card" v-for="(serial, index) in config.serial.mappings">
                         <div class="lhb-mapping-header">
-                            <span class="lhb-mapping-title">{{ serial.type || 'New Mapping' }}</span>
+                            <span class="lhb-mapping-title">
+                                <span class="lhb-status-dot" :class="serialDotClass(serial.name)" :title="serialDotTitle(serial.name)"></span>
+                                {{ serial.type || 'New Mapping' }}
+                            </span>
                             <button @click="removeSerial(index)" class="lhb-btn lhb-btn-danger lhb-btn-sm">Remove</button>
                         </div>
                         <div class="lhb-row">
-                            <span class="lhb-row-label lhb-form-label">Type</span>
-                            <div class="lhb-row-value"><input class="lhb-form-control" type="text" v-model="serial.type"/></div>
+                            <label class="lhb-row-label lhb-form-label" :for="'ser-type-'+index">Type</label>
+                            <div class="lhb-row-value"><input :id="'ser-type-'+index" class="lhb-form-control" type="text" v-model="serial.type"/></div>
                         </div>
                         <div class="lhb-row">
-                            <span class="lhb-row-label lhb-form-label">Port</span>
+                            <label class="lhb-row-label lhb-form-label" :for="'ser-name-'+index">Port</label>
                             <div class="lhb-row-value">
-                                <select class="lhb-form-control" v-model="serial.name">
-                                    <option :value="s.name" v-for="s in serials">{{ s.name }} — {{ s.description }}</option>
+                                <select :id="'ser-name-'+index" class="lhb-form-control" v-model="serial.name">
+                                    <option :value="s.name" v-for="s in serials">{{ s.name }} &mdash; {{ s.description }}</option>
                                 </select>
                             </div>
                         </div>
                         <div class="lhb-row">
-                            <span class="lhb-row-label lhb-form-label">Baud Rate</span>
-                            <div class="lhb-row-value"><input class="lhb-form-control" type="number" v-model="serial.baudRate"/></div>
+                            <label class="lhb-row-label lhb-form-label" :for="'ser-baud-'+index">Baud Rate</label>
+                            <div class="lhb-row-value"><input :id="'ser-baud-'+index" class="lhb-form-control" type="number" v-model.number="serial.baudRate"/></div>
                         </div>
                         <div class="lhb-row">
-                            <span class="lhb-row-label lhb-form-label">Data Bits</span>
-                            <div class="lhb-row-value"><input class="lhb-form-control" type="number" v-model="serial.numDataBits"/></div>
+                            <label class="lhb-row-label lhb-form-label" :for="'ser-databits-'+index">Data Bits</label>
+                            <div class="lhb-row-value"><input :id="'ser-databits-'+index" class="lhb-form-control" type="number" v-model.number="serial.numDataBits"/></div>
                         </div>
                         <div class="lhb-row">
-                            <span class="lhb-row-label lhb-form-label">Stop Bits</span>
-                            <div class="lhb-row-value"><input class="lhb-form-control" type="number" v-model="serial.numStopBits"/></div>
+                            <label class="lhb-row-label lhb-form-label" :for="'ser-stopbits-'+index">Stop Bits</label>
+                            <div class="lhb-row-value"><input :id="'ser-stopbits-'+index" class="lhb-form-control" type="number" v-model.number="serial.numStopBits"/></div>
                         </div>
                         <div class="lhb-row">
-                            <span class="lhb-row-label lhb-form-label">Parity</span>
-                            <div class="lhb-row-value"><input class="lhb-form-control" type="number" v-model="serial.parity"/></div>
+                            <label class="lhb-row-label lhb-form-label" :for="'ser-parity-'+index">Parity</label>
+                            <div class="lhb-row-value"><input :id="'ser-parity-'+index" class="lhb-form-control" type="number" v-model.number="serial.parity"/></div>
                         </div>
                         <div class="lhb-row">
-                            <span class="lhb-row-label lhb-form-label">Read Charset</span>
+                            <label class="lhb-row-label lhb-form-label" :for="'ser-charset-'+index">Read Charset</label>
                             <div class="lhb-row-value">
-                                <select class="lhb-form-control" v-model="serial.readCharset">
+                                <select :id="'ser-charset-'+index" class="lhb-form-control" v-model="serial.readCharset">
                                     <option :value="c" v-for="c in ['ISO-8859-1', 'UTF-8', 'US-ASCII', 'BINARY']">{{ c }}</option>
                                 </select>
                             </div>
                         </div>
                         <div class="lhb-row">
-                            <span class="lhb-row-label lhb-form-label">Read Multi-bytes</span>
+                            <label class="lhb-row-label lhb-form-label" :for="'ser-multibytes-'+index">Read Multi-bytes</label>
                             <label class="lhb-toggle">
-                                <input type="checkbox" v-model="serial.readMultipleBytes"/>
+                                <input :id="'ser-multibytes-'+index" type="checkbox" v-model="serial.readMultipleBytes" aria-label="Read multiple bytes"/>
                                 <span class="lhb-toggle-slider"></span>
                             </label>
                         </div>
+                        <div class="lhb-row" style="margin-top:0.5rem">
+                            <input class="lhb-form-control" type="text" v-model="serialTest[index]" placeholder="Sample payload to write" aria-label="Serial test payload" style="flex:1"/>
+                            <button @click="testSerial(serial, index)" class="lhb-btn lhb-btn-outline lhb-btn-sm" :disabled="!serial.type">
+                                <span aria-hidden="true">&#9993;&#65039;</span> Send
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Serial monitor -->
+                <div class="lhb-card">
+                    <div class="lhb-card-header">
+                        <h5 class="lhb-card-title"><span aria-hidden="true">&#128225;</span> Serial Monitor</h5>
+                        <span class="lhb-badge">{{ monitor.connected ? 'live' : 'idle' }}</span>
+                    </div>
+                    <div class="lhb-row">
+                        <label class="lhb-row-label lhb-form-label" for="mon-type">Type</label>
+                        <div class="lhb-row-value">
+                            <select id="mon-type" class="lhb-form-control" v-model="monitor.type" :disabled="monitor.connected">
+                                <option value="" disabled>Select a type...</option>
+                                <option :value="m.type" v-for="m in config.serial.mappings.filter(x => x.type)">{{ m.type }}</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="lhb-row">
+                        <button @click="toggleMonitor" class="lhb-btn lhb-btn-sm" :class="monitor.connected ? 'lhb-btn-danger' : 'lhb-btn-accent'">
+                            {{ monitor.connected ? 'Disconnect' : 'Connect' }}
+                        </button>
+                        <button @click="clearMonitor" class="lhb-btn lhb-btn-outline lhb-btn-sm">Clear</button>
+                    </div>
+                    <div class="lhb-monitor" aria-live="polite">
+                        <div v-if="monitor.log.length === 0" class="lhb-monitor-empty">No data yet. Connect to a serial type to view incoming data.</div>
+                        <div v-for="line in monitor.log">{{ line }}</div>
                     </div>
                 </div>
             </div>
@@ -750,10 +926,32 @@
             <div class="col-12">
                 <div class="lhb-card">
                     <div class="lhb-card-header">
-                        <h5 class="lhb-card-title">🔒 Endpoint Security</h5>
+                        <h5 class="lhb-card-title"><span aria-hidden="true">&#128273;</span> Access Token (this browser session)</h5>
+                        <span class="lhb-badge">{{ token ? 'token active' : 'no token' }}</span>
+                    </div>
+                    <p style="font-size:0.82rem;color:var(--lhb-text-dim);margin-bottom:1rem">
+                        When server authentication is enabled, requests from this UI must carry a token.
+                        It is stored only in this browser session (sessionStorage) and sent as a Bearer header.
+                    </p>
+                    <div class="lhb-row">
+                        <label class="lhb-row-label lhb-form-label" for="sec-token">Token</label>
+                        <div class="lhb-row-value">
+                            <input id="sec-token" class="lhb-form-control" type="password" autocomplete="off"
+                                   v-model="tokenInput" :placeholder="token ? 'Token active - enter to replace' : 'Enter access token'"
+                                   @keyup.enter="applyToken"/>
+                        </div>
+                        <button @click="applyToken" class="lhb-btn lhb-btn-accent lhb-btn-sm">Apply</button>
+                        <button @click="clearToken" class="lhb-btn lhb-btn-outline lhb-btn-sm" :disabled="!token">Clear</button>
+                    </div>
+                </div>
+
+                <div class="lhb-card">
+                    <div class="lhb-card-header">
+                        <h5 class="lhb-card-title"><span aria-hidden="true">&#128274;</span> Endpoint Security</h5>
                     </div>
                     <p style="font-size:0.82rem;color:var(--lhb-text-dim);margin-bottom:1.25rem">
                         Disable endpoints or set per-endpoint passwords. Empty password means no extra protection.
+                        Existing passwords are hidden &mdash; leave the field blank to keep the current value, or type to replace it.
                         Endpoints marked <span class="lhb-ep-badge locked">required</span> cannot be disabled (needed for this UI to work).
                     </p>
 
@@ -766,12 +964,14 @@
                             <span v-else-if="!getEndpointRule(ep.path).enabled" class="lhb-ep-badge disabled">disabled</span>
                             <div class="lhb-ep-actions">
                                 <label v-if="!lockedEndpoints.includes(ep.path)" class="lhb-toggle" :title="getEndpointRule(ep.path).enabled ? 'Enabled' : 'Disabled'">
-                                    <input type="checkbox" v-model="getEndpointRule(ep.path).enabled"/>
+                                    <input type="checkbox" v-model="getEndpointRule(ep.path).enabled" :aria-label="'Toggle endpoint ' + ep.method + ' ' + ep.path"/>
                                     <span class="lhb-toggle-slider"></span>
                                 </label>
                                 <input v-if="!lockedEndpoints.includes(ep.path)"
-                                    class="lhb-form-control" style="width:140px;font-size:0.78rem"
-                                    type="password" placeholder="password"
+                                    class="lhb-form-control" style="width:160px;font-size:0.78rem"
+                                    type="password" autocomplete="new-password"
+                                    :placeholder="secrets.endpoints[ep.path] ? '••• set (unchanged)' : 'password'"
+                                    :aria-label="'Password for ' + ep.path"
                                     v-model="getEndpointRule(ep.path).password"/>
                             </div>
                         </div>
@@ -786,19 +986,74 @@
 <script src="js/axios.min.js"></script>
 <script type="module">import { createApp } from './js/petite-vue.js'
 
+// Module-level reference to the reactive app, used by the axios interceptor.
+let vm = null
+
+function currentToken() {
+    return sessionStorage.getItem('lhb-token') || ''
+}
+
+function applyAuthHeader() {
+    const t = currentToken()
+    if (t) {
+        axios.defaults.headers.common['Authorization'] = 'Bearer ' + t
+    } else {
+        delete axios.defaults.headers.common['Authorization']
+    }
+}
+
+// Apply any persisted token immediately so the first requests are authenticated.
+applyAuthHeader()
+
+// On 401, surface the auth prompt so the user is never silently locked out.
+axios.interceptors.response.use(
+    response => response,
+    error => {
+        if (error && error.response && error.response.status === 401) {
+            if (vm) vm.authRequired = true
+        }
+        return Promise.reject(error)
+    }
+)
+
 createApp({
     config: null,
     printers: [],
     serials: [],
     health: null,
+    serialStatus: [],
     tab: 'simple',
+    theme: 'light',
+    // Auth
+    token: '',
+    tokenInput: '',
+    authRequired: false,
+    // In-flight flags
+    saving: false,
+    restarting: false,
+    // Feedback
+    toasts: [],
+    toastId: 0,
+    // Secrets are stripped from the editable config and held here so they are
+    // never rendered as readable prefilled values.
+    secrets: { authToken: '', endpoints: {} },
+    configSnapshot: '',
+    savedServer: { port: null, tls: false },
+    // Serial test payloads keyed by mapping index
+    serialTest: {},
+    // Serial monitor (live WebSocket)
+    monitor: { type: '', connected: false, log: [], ws: null },
+    // Polling timers
+    healthTimer: null,
+    statusTimer: null,
+
     lockedEndpoints: ['/config.json', '/system/health'],
     endpointGroups: [
         { label: '⚙️ Configuration', items: [
             { method: 'GET', path: '/config.json' },
             { method: 'PUT', path: '/config.json' },
         ]},
-        { label: '🖥️ System', items: [
+        { label: '\u{1F5A5}️ System', items: [
             { method: 'GET', path: '/system/server.json' },
             { method: 'PUT', path: '/system/server.json' },
             { method: 'GET', path: '/system/downloader.json' },
@@ -813,14 +1068,14 @@ createApp({
             { method: 'POST', path: '/system/install-service' },
             { method: 'POST', path: '/system/uninstall-service' },
         ]},
-        { label: '🖨️ Printer', items: [
+        { label: '\u{1F5A8}️ Printer', items: [
             { method: 'POST', path: '/printer' },
             { method: 'GET', path: '/printer/mappings' },
             { method: 'POST', path: '/printer/mappings' },
             { method: 'PUT', path: '/printer/enabled' },
             { method: 'GET', path: '/system/printers.json' },
         ]},
-        { label: '🔌 Serial', items: [
+        { label: '\u{1F50C} Serial', items: [
             { method: 'POST', path: '/serial/{type}' },
             { method: 'GET', path: '/serial/mappings' },
             { method: 'GET', path: '/serial/enabled' },
@@ -830,6 +1085,66 @@ createApp({
             { method: 'GET', path: '/system/serials.json' },
         ]},
     ],
+
+    /* ---------------- Toast / error helpers ---------------- */
+    toast(message, type) {
+        const id = ++this.toastId
+        this.toasts.push({ id, message, type: type || 'info' })
+        setTimeout(() => this.dismissToast(id), 6000)
+    },
+    dismissToast(id) {
+        this.toasts = this.toasts.filter(t => t.id !== id)
+    },
+    handleError(err, context) {
+        // 401 is handled by the interceptor (auth banner); don't double-report.
+        if (err && err.response && err.response.status === 401) return
+        let msg = context || 'Request failed'
+        if (err && err.response) {
+            const data = err.response.data
+            const detail = typeof data === 'string' ? data : (data && (data.error || data.message))
+            msg += ': ' + err.response.status + (detail ? ' ' + detail : '')
+        } else if (err && err.message) {
+            msg += ': ' + err.message
+        }
+        this.toast(msg, 'error')
+    },
+
+    /* ---------------- Theme ---------------- */
+    initTheme() {
+        const saved = localStorage.getItem('lhb-theme')
+        const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+        this.theme = saved || (prefersDark ? 'dark' : 'light')
+        document.documentElement.setAttribute('data-theme', this.theme)
+    },
+    toggleTheme() {
+        this.theme = this.theme === 'dark' ? 'light' : 'dark'
+        localStorage.setItem('lhb-theme', this.theme)
+        document.documentElement.setAttribute('data-theme', this.theme)
+    },
+
+    /* ---------------- Auth token ---------------- */
+    applyToken() {
+        const t = (this.tokenInput || '').trim()
+        if (t) {
+            sessionStorage.setItem('lhb-token', t)
+        } else {
+            sessionStorage.removeItem('lhb-token')
+        }
+        this.token = t
+        applyAuthHeader()
+        this.authRequired = false
+        this.tokenInput = ''
+        this.toast(t ? 'Token applied' : 'Token cleared', 'info')
+        this.reloadAll()
+    },
+    clearToken() {
+        sessionStorage.removeItem('lhb-token')
+        this.token = ''
+        applyAuthHeader()
+        this.toast('Token cleared', 'info')
+    },
+
+    /* ---------------- Endpoint rules ---------------- */
     getEndpointRule(path) {
         if (!this.config) return { enabled: true, password: '' }
         if (!this.config.security) this.config.security = { endpoints: {} }
@@ -839,50 +1154,123 @@ createApp({
         }
         return this.config.security.endpoints[path]
     },
-    loadConfig() {
-        return axios.get('/config.json')
-            .then(response => {
-                const serverData = response.data
-                // Preserve existing endpoint rules that user has already configured
-                const existingEndpoints = this.config?.security?.endpoints || {}
-                this.config = serverData
-                if (!this.config.security) this.config.security = { endpoints: {} }
-                if (!this.config.security.endpoints) this.config.security.endpoints = {}
-                // Merge: keep user-modified rules, add new endpoints with defaults
-                const allPaths = new Set([
-                    ...Object.keys(existingEndpoints),
-                    ...Object.keys(this.config.security.endpoints)
-                ])
-                // Also include all paths from the UI endpoint groups
-                this.endpointGroups.forEach(g => g.items.forEach(ep => allPaths.add(ep.path)))
-                for (const path of allPaths) {
-                    if (!this.config.security.endpoints[path]) {
-                        // Prefer existing user config, otherwise default to enabled
-                        this.config.security.endpoints[path] = existingEndpoints[path] || { enabled: true, password: '' }
-                    }
-                }
-            })
+
+    /* ---------------- Config load / save ---------------- */
+    applyLoadedConfig(serverData) {
+        const existingEndpoints = this.config?.security?.endpoints || {}
+        this.config = serverData
+        if (!this.config.security) this.config.security = { endpoints: {} }
+        if (!this.config.security.endpoints) this.config.security.endpoints = {}
+
+        const allPaths = new Set([
+            ...Object.keys(existingEndpoints),
+            ...Object.keys(this.config.security.endpoints)
+        ])
+        this.endpointGroups.forEach(g => g.items.forEach(ep => allPaths.add(ep.path)))
+        for (const path of allPaths) {
+            if (!this.config.security.endpoints[path]) {
+                this.config.security.endpoints[path] = existingEndpoints[path] || { enabled: true, password: '' }
+            }
+        }
+
+        // Strip secrets: never render real values. Keep originals separately and
+        // only re-send them when the user does NOT enter a replacement.
+        this.secrets.endpoints = {}
+        for (const [path, rule] of Object.entries(this.config.security.endpoints)) {
+            this.secrets.endpoints[path] = rule.password || ''
+            rule.password = ''
+        }
+        if (this.config.server && this.config.server.authentication) {
+            this.secrets.authToken = this.config.server.authentication.token || ''
+            this.config.server.authentication.token = ''
+        }
+
+        this.savedServer = {
+            port: Number(this.config?.server?.port),
+            tls: !!(this.config?.server?.tls && this.config.server.tls.enabled)
+        }
+        this.configSnapshot = JSON.stringify(this.config)
     },
-    saveConfig() {
-        // Clean up: only send endpoint rules that differ from defaults
-        const cleanConfig = JSON.parse(JSON.stringify(this.config))
-        if (cleanConfig.security && cleanConfig.security.endpoints) {
+    loadConfig() {
+        return axios.get('/config.json').then(response => this.applyLoadedConfig(response.data))
+    },
+    prepareConfigForSave() {
+        const c = JSON.parse(JSON.stringify(this.config))
+
+        // Re-inject secrets when left blank (= keep current value).
+        if (c.server && c.server.authentication) {
+            if (!c.server.authentication.token) c.server.authentication.token = this.secrets.authToken || ''
+        }
+        if (c.security && c.security.endpoints) {
+            for (const [path, rule] of Object.entries(c.security.endpoints)) {
+                if (!rule.password) rule.password = this.secrets.endpoints[path] || ''
+            }
+            // Only persist rules that are meaningful (disabled or password-protected).
             const cleaned = {}
-            for (const [path, rule] of Object.entries(cleanConfig.security.endpoints)) {
-                // Only include rules that are actually disabled or have a password set
+            for (const [path, rule] of Object.entries(c.security.endpoints)) {
                 if (!rule.enabled || (rule.password && rule.password.length > 0)) {
                     cleaned[path] = rule
                 }
             }
-            cleanConfig.security.endpoints = cleaned
+            c.security.endpoints = cleaned
         }
-        return axios.put('/config.json', cleanConfig)
-            .then(response => {
-                this.config = response.data
-                if (!this.config.security) this.config.security = { endpoints: {} }
-                if (!this.config.security.endpoints) this.config.security.endpoints = {}
+
+        // Numeric coercion (inputs yield strings).
+        if (c.server && c.server.port != null) c.server.port = Number(c.server.port)
+        if (c.downloader && c.downloader.timeout != null && c.downloader.timeout !== '') c.downloader.timeout = Number(c.downloader.timeout)
+        if (c.printer && Array.isArray(c.printer.mappings)) {
+            c.printer.mappings.forEach(m => {
+                m.forceDPI = (m.forceDPI == null || m.forceDPI === '') ? 0 : Number(m.forceDPI)
             })
+        }
+        if (c.serial && Array.isArray(c.serial.mappings)) {
+            c.serial.mappings.forEach(m => {
+                if (m.baudRate != null && m.baudRate !== '') m.baudRate = Number(m.baudRate)
+                if (m.numDataBits != null && m.numDataBits !== '') m.numDataBits = Number(m.numDataBits)
+                if (m.numStopBits != null && m.numStopBits !== '') m.numStopBits = Number(m.numStopBits)
+                if (m.parity != null && m.parity !== '') m.parity = Number(m.parity)
+            })
+        }
+        return c
     },
+    saveConfig() {
+        if (this.saving) return
+        this.saving = true
+        return axios.put('/config.json', this.prepareConfigForSave())
+            .then(response => {
+                this.applyLoadedConfig(response.data)
+                this.toast('Configuration saved', 'success')
+            })
+            .catch(err => this.handleError(err, 'Save failed'))
+            .finally(() => { this.saving = false })
+    },
+    isDirty() {
+        return this.config != null && this.configSnapshot !== JSON.stringify(this.config)
+    },
+    restartServer() {
+        if (this.restarting) return
+        if (this.isDirty() && !window.confirm('You have unsaved configuration changes. They will NOT be applied by a restart and may be lost. Restart anyway?')) {
+            return
+        }
+        this.restarting = true
+        // Do NOT send the config: the backend ignores the body and a restart
+        // does not persist anything.
+        axios.post('/system/restart.json')
+            .then(() => {
+                this.toast('Server is restarting...', 'info')
+                const newScheme = this.savedServer.tls ? 'https' : 'http'
+                const newPort = this.savedServer.port
+                const curScheme = window.location.protocol.replace(':', '')
+                const curPort = Number(window.location.port || (curScheme === 'https' ? 443 : 80))
+                if (newPort && (newScheme !== curScheme || newPort !== curPort)) {
+                    this.toast('The server origin changed to ' + newScheme + '://' + window.location.hostname + ':' + newPort + '/ - you may need to reconnect there.', 'info')
+                }
+            })
+            .catch(err => this.handleError(err, 'Restart failed'))
+            .finally(() => { setTimeout(() => { this.restarting = false }, 1500) })
+    },
+
+    /* ---------------- Mappings ---------------- */
     addPrinter() {
         this.config.printer.mappings.push({type: '', name: '', autoRotate: false, resetImageableArea: true, forceDPI: 0})
     },
@@ -895,26 +1283,148 @@ createApp({
     removeSerial(index) {
         this.config.serial.mappings.splice(index, 1)
     },
+
+    /* ---------------- Loaders ---------------- */
     loadPrinters() {
-        return axios.get('/system/printers.json')
-            .then(response => this.printers = response.data)
+        return axios.get('/system/printers.json').then(response => this.printers = response.data)
     },
     loadSerials() {
-        return axios.get('/system/serials.json')
-            .then(response => this.serials = response.data)
+        return axios.get('/system/serials.json').then(response => this.serials = response.data)
     },
     loadHealth() {
-        return axios.get('/system/health')
-            .then(response => this.health = response.data)
+        return axios.get('/system/health').then(response => this.health = response.data)
     },
-    restartServer() {
-        return axios.post('/system/restart.json', this.config)
+    loadSerialStatus() {
+        return axios.get('/serial/status').then(response => this.serialStatus = response.data)
     },
+    reloadAll() {
+        // Decoupled: a single failure must not blank the whole page.
+        this.loadPrinters().catch(err => this.handleError(err, 'Load printers'))
+        this.loadSerials().catch(err => this.handleError(err, 'Load serial ports'))
+        this.loadConfig().catch(err => this.handleError(err, 'Load configuration'))
+        this.loadHealth().catch(err => this.handleError(err, 'Load health'))
+        this.loadSerialStatus().catch(() => {})
+    },
+
+    /* ---------------- Serial status indicators ---------------- */
+    serialPortState(name) {
+        if (!name) return null
+        return (this.serialStatus || []).find(s => s.port === name) || null
+    },
+    serialDotClass(name) {
+        const s = this.serialPortState(name)
+        if (!s) return 'unknown'
+        return s.open ? 'on' : 'off'
+    },
+    serialDotTitle(name) {
+        const s = this.serialPortState(name)
+        if (!s) return name ? 'Port not detected' : 'No port selected'
+        return s.port + (s.open ? ' - open' : ' - closed') + (s.mapped ? ' (mapped' + (s.type ? ': ' + s.type : '') + ')' : '')
+    },
+
+    /* ---------------- Test print ---------------- */
+    testPrint(printer) {
+        if (!printer.type) { this.toast('Set a type name first', 'error'); return }
+        // Small ESC/POS raw sample: init, text, feed, full cut. Base64 encoded.
+        const init = '\x1B\x40'
+        const cut = '\x1D\x56\x00'
+        const text = init + 'Local Hardware Bridge\nTest Print\n' + new Date().toLocaleString() + '\n\n\n\n' + cut
+        const raw = btoa(text)
+        axios.post('/printer', { type: printer.type, raw_content: raw, id: 'test-' + Date.now() })
+            .then(response => {
+                const d = response.data || {}
+                if (d.success === false) {
+                    this.toast('Print failed: ' + (d.message || 'unknown error'), 'error')
+                } else {
+                    this.toast('Test print sent to ' + (d.printerName || printer.name || printer.type), 'success')
+                }
+            })
+            .catch(err => this.handleError(err, 'Test print'))
+    },
+
+    /* ---------------- Test serial write ---------------- */
+    testSerial(serial, index) {
+        if (!serial.type) { this.toast('Set a type name first', 'error'); return }
+        const payload = this.serialTest[index] != null ? this.serialTest[index] : ''
+        axios.post('/serial/' + encodeURIComponent(serial.type), payload, { headers: { 'Content-Type': 'text/plain' } })
+            .then(() => this.toast('Sent to ' + serial.type, 'success'))
+            .catch(err => this.handleError(err, 'Serial write'))
+    },
+
+    /* ---------------- Serial monitor (WebSocket) ---------------- */
+    monitorLog(line) {
+        this.monitor.log.push(new Date().toLocaleTimeString() + '  ' + line)
+        if (this.monitor.log.length > 200) this.monitor.log.shift()
+    },
+    clearMonitor() {
+        this.monitor.log = []
+    },
+    toggleMonitor() {
+        if (this.monitor.connected || this.monitor.ws) { this.closeMonitor(); return }
+        const type = this.monitor.type
+        if (!type) { this.toast('Select a serial type to monitor', 'error'); return }
+        try {
+            const scheme = window.location.protocol === 'https:' ? 'wss' : 'ws'
+            let url = scheme + '://' + window.location.host + '/serial/' + encodeURIComponent(type)
+            if (this.token) url += '?token=' + encodeURIComponent(this.token)
+            const ws = new WebSocket(url)
+            this.monitor.ws = ws
+            ws.onopen = () => { this.monitor.connected = true; this.monitorLog('-- connected to ' + type + ' --') }
+            ws.onmessage = (ev) => {
+                if (typeof ev.data === 'string') {
+                    this.monitorLog(ev.data)
+                } else if (ev.data && ev.data.size != null) {
+                    this.monitorLog('[binary ' + ev.data.size + ' bytes]')
+                } else {
+                    this.monitorLog('[binary data]')
+                }
+            }
+            ws.onclose = () => { this.monitor.connected = false; this.monitor.ws = null; this.monitorLog('-- disconnected --') }
+            ws.onerror = () => { this.toast('Serial monitor connection error', 'error') }
+        } catch (e) {
+            this.handleError(e, 'Serial monitor')
+        }
+    },
+    closeMonitor() {
+        if (this.monitor.ws) {
+            try { this.monitor.ws.close() } catch (e) { /* noop */ }
+            this.monitor.ws = null
+        }
+        this.monitor.connected = false
+    },
+
+    /* ---------------- Polling ---------------- */
+    startPolling() {
+        this.stopPolling()
+        this.healthTimer = setInterval(() => { this.loadHealth().catch(() => {}) }, 5000)
+        this.statusTimer = setInterval(() => { this.loadSerialStatus().catch(() => {}) }, 4000)
+    },
+    stopPolling() {
+        if (this.healthTimer) { clearInterval(this.healthTimer); this.healthTimer = null }
+        if (this.statusTimer) { clearInterval(this.statusTimer); this.statusTimer = null }
+    },
+
     mounted() {
-        Promise.all([this.loadPrinters(), this.loadSerials()]).then(() => {
-            this.loadConfig()
+        vm = this
+        this.initTheme()
+        this.token = currentToken()
+        applyAuthHeader()
+        this.reloadAll()
+        this.startPolling()
+
+        // Pause polling when the tab is hidden; resume (with proper cleanup) when visible.
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                this.stopPolling()
+            } else {
+                this.startPolling()
+                this.loadHealth().catch(() => {})
+            }
         })
-        this.loadHealth()
+        window.addEventListener('beforeunload', () => {
+            this.stopPolling()
+            this.closeMonitor()
+        })
     }
 }).mount()</script>
 </body>

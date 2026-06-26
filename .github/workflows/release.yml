@@ -106,6 +106,16 @@ jobs:
         shell: bash
         run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
 
+      - name: Verify tag matches build.gradle version
+        shell: bash
+        run: |
+          GRADLE_VERSION=$(grep "^version " build.gradle | sed "s/version '\(.*\)'/\1/")
+          if [ "$GRADLE_VERSION" != "${{ steps.version.outputs.VERSION }}" ]; then
+            echo "::error::Tag version '${{ steps.version.outputs.VERSION }}' does not match build.gradle version '$GRADLE_VERSION'. Bump build.gradle (and Constants.VERSION / install.nsi) or fix the tag."
+            exit 1
+          fi
+          echo "Version check passed: $GRADLE_VERSION"
+
       # Build a self-contained app-image: bundled JRE + a windowless native launcher
       # (GUI subsystem -> no console window). The NSIS installer wraps this.
       - name: Create app-image with jpackage
@@ -207,6 +217,15 @@ jobs:
         id: version
         run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
 
+      - name: Verify tag matches build.gradle version
+        run: |
+          GRADLE_VERSION=$(grep "^version " build.gradle | sed "s/version '\(.*\)'/\1/")
+          if [ "$GRADLE_VERSION" != "${{ steps.version.outputs.VERSION }}" ]; then
+            echo "::error::Tag version '${{ steps.version.outputs.VERSION }}' does not match build.gradle version '$GRADLE_VERSION'. Bump build.gradle (and Constants.VERSION / install.nsi) or fix the tag."
+            exit 1
+          fi
+          echo "Version check passed: $GRADLE_VERSION"
+
       - name: Create AppDir structure
         run: |
           mkdir -p AppDir/usr/bin
@@ -221,7 +240,7 @@ jobs:
           #!/bin/bash
           SELF=$(readlink -f "$0")
           APPDIR=$(dirname "$SELF")/..
-          exec "${JAVA_HOME:-/usr/bin/java}" -cp "${APPDIR}/usr/share/local-hardware-bridge/local-hardware-bridge.jar" io.github.augustinlr17.localhardwarebridge.GUI "$@"
+          exec "${JAVA_HOME:-/usr/bin/java}" -cp "${APPDIR}/usr/share/local-hardware-bridge/local-hardware-bridge.jar" io.github.augustinlr17.localhardwarebridge.Launcher "$@"
           SCRIPT
           chmod +x AppDir/usr/bin/local-hardware-bridge
 
@@ -240,7 +259,7 @@ jobs:
           #!/bin/bash
           SELF=$(readlink -f "$0")
           APPDIR=$(dirname "$SELF")
-          exec "${JAVA_HOME:-/usr/bin/java}" -cp "${APPDIR}/usr/share/local-hardware-bridge/local-hardware-bridge.jar" io.github.augustinlr17.localhardwarebridge.GUI "$@"
+          exec "${JAVA_HOME:-/usr/bin/java}" -cp "${APPDIR}/usr/share/local-hardware-bridge/local-hardware-bridge.jar" io.github.augustinlr17.localhardwarebridge.Launcher "$@"
           APPRUN
           chmod +x AppDir/AppRun
 
@@ -289,6 +308,15 @@ jobs:
         id: version
         run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
 
+      - name: Verify tag matches build.gradle version
+        run: |
+          GRADLE_VERSION=$(grep "^version " build.gradle | sed "s/version '\(.*\)'/\1/")
+          if [ "$GRADLE_VERSION" != "${{ steps.version.outputs.VERSION }}" ]; then
+            echo "::error::Tag version '${{ steps.version.outputs.VERSION }}' does not match build.gradle version '$GRADLE_VERSION'. Bump build.gradle (and Constants.VERSION / install.nsi) or fix the tag."
+            exit 1
+          fi
+          echo "Version check passed: $GRADLE_VERSION"
+
       - name: Convert icon to ICNS for macOS
         run: |
           mkdir -p icon.iconset
@@ -312,7 +340,7 @@ jobs:
             --app-version "${{ steps.version.outputs.VERSION }}" \
             --input build/libs/ \
             --main-jar "local-hardware-bridge-${{ steps.version.outputs.VERSION }}.jar" \
-            --main-class io.github.augustinlr17.localhardwarebridge.GUI \
+            --main-class io.github.augustinlr17.localhardwarebridge.Launcher \
             --dest build/dist/macos \
             --vendor AugustinLR17 \
             --description "Local Hardware Bridge - exposes local printer and serial port to web browsers" \
@@ -342,6 +370,16 @@ jobs:
 
       - name: List release artifacts
         run: find artifacts -type f | sort
+
+      - name: Generate SHA256SUMS
+        run: |
+          cd artifacts
+          # Hash every collected artifact; store paths relative to artifacts/.
+          find . -type f ! -name SHA256SUMS -print0 \
+            | sort -z \
+            | xargs -0 sha256sum > SHA256SUMS
+          echo "----- SHA256SUMS -----"
+          cat SHA256SUMS
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -413,3 +451,4 @@ jobs:
             artifacts/linux-appimage/*.AppImage
             artifacts/macos-dmg/*.dmg
             artifacts/lhb-tui-*/*
+            artifacts/SHA256SUMS

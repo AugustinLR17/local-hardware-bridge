@@ -259,75 +259,62 @@ You can also enable global Bearer/Basic auth under **Advanced → Server → Aut
 | [Architecture](ARCHITECTURE.md) | Internal architecture and design |
 | [Changelog](CHANGELOG.md) | Version history |
 
-## Server Mode Integration
+## Browser Integration
 
-For **Server Mode**, include the SDK on your public website and use it from the user's browser. The bridge does not need to be installed on the user's machine; it runs on a machine on the network with printer access.
+There is no bundled SDK package. Web apps talk to the bridge directly over the
+raw HTTP/WebSocket API documented above. The [`demo/`](demo) directory contains
+small, dependency-free JavaScript helper clients you can copy into your app, plus
+runnable HTML examples.
 
-### SDK API
+### Helper clients (in `demo/`)
 
-| Method | Description |
-|----------|-------------|
-| `LHB.listPrinters(serverUrl)` | List printers available on the bridge machine |
-| `LHB.listMappings(serverUrl)` | List configured type → printer mappings |
-| `LHB.choosePrinter(serverUrl, type, printerName)` | Persist a type → printer mapping on the bridge |
-| `LHB.print(serverUrl, document)` | Submit a print job |
-| `LHB.connect(serverUrl, callbacks)` | WebSocket for live print status |
-| `LHB.ensurePrinter(serverUrl, type, token, {prompt})` | Auto-map or prompt the user to choose a printer |
+| File | Global | Purpose |
+|------|--------|---------|
+| [`websocket-printer.js`](demo/websocket-printer.js) | `WebSocketPrinter` | Connects to `/printer`, submits print jobs, reports status via callbacks |
+| [`websocket-serial.js`](demo/websocket-serial.js) | `WebSocketSerial` | Connects to `/serial/{type}`, sends/receives raw serial data |
+| [`websocket-weigh.js`](demo/websocket-weigh.js) | `WebSocketWeigh` | Connects to `/serial/WEIGH`, parses weight scale output (regex-based) |
 
-### Example
+Each is a plain constructor function with auto-reconnect — no build step, no
+package manager. Include the file with a `<script>` tag and instantiate it.
+
+### Example: submit a print job
 
 ```html
-<script src="https://your-cdn.com/local-hardware-bridge/printer-sdk.js"></script>
+<script src="websocket-printer.js"></script>
 <script>
-const serverUrl = 'http://192.168.1.100:12212';
-const documentType = 'INVOICE';
+const printer = new WebSocketPrinter({
+  url: 'ws://127.0.0.1:12212/printer',
+  onConnect: () => console.log('connected'),
+  onUpdate: (result) => console.log('print result:', result),
+});
 
-async function printInvoice(pdfUrl) {
-  // Make sure the user has chosen a printer for this type
-  await LHB.ensurePrinter(serverUrl, documentType, null, {
-    prompt: async (printers) => {
-      const names = printers.map(p => p.name);
-      const chosen = await showPrinterDialog(names); // your UI
-      return chosen;
-    }
-  });
-
-  // Submit the print job
-  await LHB.print(serverUrl, { type: documentType, url: pdfUrl });
-}
+// result objects are PrintResult JSON: {success, message, id, printerName}
+printer.submit({ type: 'INVOICE', url: 'https://example.com/invoice.pdf' });
 </script>
 ```
 
-The chosen printer is persisted both in the bridge config (`/printer/mappings`) and in the browser's `localStorage`, so the next print job can skip the dialog.
+### Example: read a weight scale
 
-### Workflow
-
-```mermaid
-sequenceDiagram
-    participant U as User Browser
-    participant W as Website
-    participant B as LHB Server
-    participant P as OS Printer
-
-    U->>W: Open page, click Print
-    W->>U: Load LHB SDK
-    U->>B: GET /system/printers.json
-    B-->>U: Available printers
-    U->>U: Show printer chooser
-    U->>B: POST /printer/mappings {type, name}
-    B-->>U: Mapping saved
-    U->>B: POST /printer {type, url}
-    B->>P: Print document
-    B-->>U: WebSocket PrintResult
+```html
+<script src="websocket-weigh.js"></script>
+<script>
+new WebSocketWeigh({
+  url: 'ws://127.0.0.1:12212/serial/WEIGH',
+  onUpdate: (weight, stable) => {
+    console.log(`weight: ${weight} kg, stable: ${stable}`);
+  },
+});
+</script>
 ```
 
-## JS SDK
+### Runnable HTML demos
 
-Integration examples for web apps are in the [`demo/`](demo) directory:
+The `demo/` directory also has ready-to-open HTML pages:
+`printer-basic.htm`, `printer-advanced.htm`, `printer-annotation.htm`,
+`serial-basic.html`, and `serial-weigh.htm`.
 
-- [`websocket-printer.js`](demo/websocket-printer.js) — Printer WebSocket client
-- [`websocket-serial.js`](demo/websocket-serial.js) — Serial WebSocket client
-- [`websocket-weigh.js`](demo/websocket-weigh.js) — Weight scale client (AWH-SA30)
+Prefer plain HTTP instead of WebSocket? `POST /printer` accepts the same job
+payload and returns the `PrintResult` synchronously — see the REST API above.
 
 ## License
 

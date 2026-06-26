@@ -46,10 +46,18 @@ public class Config {
         private int port = 12212;
         private Authentication authentication = new Authentication();
         private TLS tls = new TLS();
+        private Cors cors = new Cors();
 
         @JsonIgnore
         public String getUri() {
             return (tls.isEnabled() ? "https://" : "http://") + address + ":" + port;
+        }
+
+        @Data
+        @NoArgsConstructor
+        public static class Cors {
+            private boolean allowAllOrigins = true;
+            private java.util.List<String> allowedOrigins = new java.util.ArrayList<>();
         }
     }
 
@@ -87,6 +95,7 @@ public class Config {
     @NoArgsConstructor
     public static class Downloader {
         private boolean ignoreTLSCertificateError = false;
+        private boolean blockPrivateNetworks = false;
         private double timeout = 30;
         private String path = "downloads";
     }
