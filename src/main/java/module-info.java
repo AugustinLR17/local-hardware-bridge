@@ -21,4 +21,5 @@ module io.github.augustinlr17.localhardwarebridge {
 
     exports io.github.augustinlr17.localhardwarebridge;
     exports io.github.augustinlr17.localhardwarebridge.interfaces;
+    exports tigerworkshop.webapphardwarebridge;
 }

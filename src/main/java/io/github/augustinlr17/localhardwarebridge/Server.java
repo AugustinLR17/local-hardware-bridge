@@ -669,7 +669,7 @@ public class Server implements WebSocketServerInterface {
             }
         });
 
-        // Version
+        // Version (includes legacy identifiers for backward compatibility)
         javalinServer.get("/system/version.json", ctx -> {
             VersionDTO dto = new VersionDTO(Constants.APP_NAME, Constants.APP_ID, Constants.VERSION);
             ctx.contentType(ContentType.APPLICATION_JSON).result(objectMapper.writeValueAsString(dto));
@@ -771,7 +771,7 @@ public class Server implements WebSocketServerInterface {
             ctx.contentType(ContentType.APPLICATION_JSON).result(objectMapper.writeValueAsString(configService.getConfig().getGui()));
         });
 
-        // Install systemd service (Linux only)
+        // Install systemd service (Linux only) — also migrates from legacy service name
         javalinServer.post("/system/install-service", ctx -> {
             String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
             if (!os.contains("linux")) {
@@ -785,6 +785,7 @@ public class Server implements WebSocketServerInterface {
             String javaExec = javaHome + "/bin/java";
 
             String serviceContent = "[Unit]\n"
+                + "# LHB_VERSION=" + Constants.VERSION + "\n"
                 + "Description=Local Hardware Bridge\n"
                 + "After=network.target\n\n"
                 + "[Service]\n"
@@ -797,9 +798,19 @@ public class Server implements WebSocketServerInterface {
                 + "WantedBy=multi-user.target\n";
 
             String serviceName = "local-hardware-bridge.service";
+            String legacyServiceName = Constants.LEGACY_SERVICE_NAME + ".service";
             Path serviceFile = Path.of("/etc/systemd/system/" + serviceName);
 
             try {
+                // Migrate from legacy service name if it exists
+                Path legacyServiceFile = Path.of("/etc/systemd/system/" + legacyServiceName);
+                if (Files.exists(legacyServiceFile)) {
+                    log.info("Migrating legacy service {} to {}", legacyServiceName, serviceName);
+                    ProcessBuilder disableLegacy = new ProcessBuilder("systemctl", "disable", "--now", legacyServiceName);
+                    disableLegacy.redirectErrorStream(true).start().waitFor();
+                    Files.deleteIfExists(legacyServiceFile);
+                }
+
                 Files.writeString(serviceFile, serviceContent, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
 
                 ProcessBuilder daemonReload = new ProcessBuilder("systemctl", "daemon-reload");
@@ -817,7 +828,7 @@ public class Server implements WebSocketServerInterface {
             }
         });
 
-        // Uninstall systemd service (Linux only)
+        // Uninstall systemd service (Linux only) — also cleans up legacy service
         javalinServer.post("/system/uninstall-service", ctx -> {
             String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
             if (!os.contains("linux")) {
@@ -826,12 +837,18 @@ public class Server implements WebSocketServerInterface {
             }
 
             String serviceName = "local-hardware-bridge.service";
+            String legacyServiceName = Constants.LEGACY_SERVICE_NAME + ".service";
 
             try {
+                // Uninstall current service
                 ProcessBuilder disable = new ProcessBuilder("systemctl", "disable", "--now", serviceName);
                 disable.redirectErrorStream(true).start().waitFor();
-
                 Files.deleteIfExists(Path.of("/etc/systemd/system/" + serviceName));
+
+                // Also clean up legacy service if it exists
+                ProcessBuilder disableLegacy = new ProcessBuilder("systemctl", "disable", "--now", legacyServiceName);
+                disableLegacy.redirectErrorStream(true).start().waitFor();
+                Files.deleteIfExists(Path.of("/etc/systemd/system/" + legacyServiceName));
 
                 ProcessBuilder daemonReload = new ProcessBuilder("systemctl", "daemon-reload");
                 daemonReload.redirectErrorStream(true).start().waitFor();
