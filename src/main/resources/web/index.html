@@ -297,6 +297,53 @@
         .lhb-quick-title { font-weight: 700; font-size: 0.9rem; margin-bottom: 0.2rem; }
         .lhb-quick-desc { color: var(--lhb-text-dim); font-size: 0.78rem; }
         .lhb-quick-action { flex-shrink: 0; }
+        .lhb-ep-group { margin-bottom: 1.25rem; }
+        .lhb-ep-group-title {
+            font-size: 0.78rem;
+            font-weight: 700;
+            color: var(--lhb-text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            margin-bottom: 0.5rem;
+            padding-left: 0.25rem;
+        }
+        .lhb-ep-row {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.6rem 0.75rem;
+            border-radius: 8px;
+            margin-bottom: 0.35rem;
+            background: var(--lhb-surface2);
+            border: 1px solid var(--lhb-border);
+        }
+        .lhb-ep-row:hover { border-color: var(--lhb-accent); }
+        .lhb-ep-path {
+            flex: 1;
+            font-size: 0.82rem;
+            font-weight: 600;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            color: var(--lhb-text);
+        }
+        .lhb-ep-method {
+            font-size: 0.68rem;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .lhb-ep-method.get { background: rgba(34,197,94,0.12); color: #16a34a; }
+        .lhb-ep-method.post { background: rgba(91,95,239,0.12); color: #5b5fef; }
+        .lhb-ep-actions { display: flex; align-items: center; gap: 0.6rem; }
+        .lhb-ep-badge {
+            font-size: 0.65rem;
+            padding: 1px 6px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+        .lhb-ep-badge.locked { background: #e5e7eb; color: #6b6f85; }
+        .lhb-ep-badge.disabled { background: var(--lhb-danger-bg); color: var(--lhb-danger); }
     </style>
 </head>
 <body>
@@ -696,7 +743,45 @@
             </div>
         </div>
     </div>
+
+    <!-- SECURITY TAB -->
+    <div class="container" v-if="tab === 'security' && config != null">
+        <div class="row">
+            <div class="col-12">
+                <div class="lhb-card">
+                    <div class="lhb-card-header">
+                        <h5 class="lhb-card-title">🔒 Endpoint Security</h5>
+                    </div>
+                    <p style="font-size:0.82rem;color:var(--lhb-text-dim);margin-bottom:1.25rem">
+                        Disable endpoints or set per-endpoint passwords. Empty password means no extra protection.
+                        Endpoints marked <span class="lhb-ep-badge locked">required</span> cannot be disabled (needed for this UI to work).
+                    </p>
+
+                    <div v-for="group in endpointGroups" class="lhb-ep-group">
+                        <div class="lhb-ep-group-title">{{ group.label }}</div>
+                        <div v-for="ep in group.items" class="lhb-ep-row">
+                            <span class="lhb-ep-method" :class="ep.method.toLowerCase()">{{ ep.method }}</span>
+                            <span class="lhb-ep-path">{{ ep.path }}</span>
+                            <span v-if="lockedEndpoints.includes(ep.path)" class="lhb-ep-badge locked">required</span>
+                            <span v-else-if="!getEndpointRule(ep.path).enabled" class="lhb-ep-badge disabled">disabled</span>
+                            <div class="lhb-ep-actions">
+                                <label v-if="!lockedEndpoints.includes(ep.path)" class="lhb-toggle" :title="getEndpointRule(ep.path).enabled ? 'Enabled' : 'Disabled'">
+                                    <input type="checkbox" v-model="getEndpointRule(ep.path).enabled"/>
+                                    <span class="lhb-toggle-slider"></span>
+                                </label>
+                                <input v-if="!lockedEndpoints.includes(ep.path)"
+                                    class="lhb-form-control" style="width:140px;font-size:0.78rem"
+                                    type="password" placeholder="password"
+                                    v-model="getEndpointRule(ep.path).password"/>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
+
 <script src="js/bootstrap.bundle.min.js"></script>
 <script src="js/axios.min.js"></script>
 <script type="module">import { createApp } from './js/petite-vue.js'
@@ -708,44 +793,95 @@ createApp({
     health: null,
     tab: 'simple',
     lockedEndpoints: ['/config.json', '/system/health'],
-    endpointList: [
-        '/config.json',
-        '/system/server.json',
-        '/system/downloader.json',
-        '/system/gui.json',
-        '/system/printers.json',
-        '/system/serials.json',
-        '/system/version.json',
-        '/system/health',
-        '/system/connections',
-        '/system/notification',
-        '/system/restart.json',
-        '/system/install-service',
-        '/system/uninstall-service',
-        '/printer',
-        '/printer/mappings',
-        '/printer/enabled',
-        '/serial/mappings',
-        '/serial/enabled',
-        '/serial/status',
-        '/serial/connections'
+    endpointGroups: [
+        { label: '⚙️ Configuration', items: [
+            { method: 'GET', path: '/config.json' },
+            { method: 'PUT', path: '/config.json' },
+        ]},
+        { label: '🖥️ System', items: [
+            { method: 'GET', path: '/system/server.json' },
+            { method: 'PUT', path: '/system/server.json' },
+            { method: 'GET', path: '/system/downloader.json' },
+            { method: 'PUT', path: '/system/downloader.json' },
+            { method: 'GET', path: '/system/gui.json' },
+            { method: 'PUT', path: '/system/gui.json' },
+            { method: 'GET', path: '/system/version.json' },
+            { method: 'GET', path: '/system/health' },
+            { method: 'GET', path: '/system/connections' },
+            { method: 'POST', path: '/system/restart.json' },
+            { method: 'POST', path: '/system/notification' },
+            { method: 'POST', path: '/system/install-service' },
+            { method: 'POST', path: '/system/uninstall-service' },
+        ]},
+        { label: '🖨️ Printer', items: [
+            { method: 'POST', path: '/printer' },
+            { method: 'GET', path: '/printer/mappings' },
+            { method: 'POST', path: '/printer/mappings' },
+            { method: 'PUT', path: '/printer/enabled' },
+            { method: 'GET', path: '/system/printers.json' },
+        ]},
+        { label: '🔌 Serial', items: [
+            { method: 'POST', path: '/serial/{type}' },
+            { method: 'GET', path: '/serial/mappings' },
+            { method: 'GET', path: '/serial/enabled' },
+            { method: 'PUT', path: '/serial/enabled' },
+            { method: 'GET', path: '/serial/status' },
+            { method: 'GET', path: '/serial/connections' },
+            { method: 'GET', path: '/system/serials.json' },
+        ]},
     ],
+    getEndpointRule(path) {
+        if (!this.config) return { enabled: true, password: '' }
+        if (!this.config.security) this.config.security = { endpoints: {} }
+        if (!this.config.security.endpoints) this.config.security.endpoints = {}
+        if (!this.config.security.endpoints[path]) {
+            this.config.security.endpoints[path] = { enabled: true, password: '' }
+        }
+        return this.config.security.endpoints[path]
+    },
     loadConfig() {
         return axios.get('/config.json')
             .then(response => {
-                this.config = response.data;
-                if (!this.config.security) this.config.security = { endpoints: {} };
-                if (!this.config.security.endpoints) this.config.security.endpoints = {};
-                this.endpointList.forEach(path => {
+                const serverData = response.data
+                // Preserve existing endpoint rules that user has already configured
+                const existingEndpoints = this.config?.security?.endpoints || {}
+                this.config = serverData
+                if (!this.config.security) this.config.security = { endpoints: {} }
+                if (!this.config.security.endpoints) this.config.security.endpoints = {}
+                // Merge: keep user-modified rules, add new endpoints with defaults
+                const allPaths = new Set([
+                    ...Object.keys(existingEndpoints),
+                    ...Object.keys(this.config.security.endpoints)
+                ])
+                // Also include all paths from the UI endpoint groups
+                this.endpointGroups.forEach(g => g.items.forEach(ep => allPaths.add(ep.path)))
+                for (const path of allPaths) {
                     if (!this.config.security.endpoints[path]) {
-                        this.config.security.endpoints[path] = { enabled: true, password: '' };
+                        // Prefer existing user config, otherwise default to enabled
+                        this.config.security.endpoints[path] = existingEndpoints[path] || { enabled: true, password: '' }
                     }
-                });
+                }
             })
     },
     saveConfig() {
-        return axios.put('/config.json', this.config)
-            .then(response => this.config = response.data)
+        // Clean up: only send endpoint rules that differ from defaults
+        const cleanConfig = JSON.parse(JSON.stringify(this.config))
+        if (cleanConfig.security && cleanConfig.security.endpoints) {
+            const cleaned = {}
+            for (const [path, rule] of Object.entries(cleanConfig.security.endpoints)) {
+                // Only include rules that are actually disabled or have a password set
+                if (!rule.enabled || (rule.password && rule.password.length > 0)) {
+                    cleaned[path] = rule
+                }
+            }
+            cleanConfig.security.endpoints = cleaned
+        }
+        return axios.put('/config.json', cleanConfig)
+            .then(response => {
+                this.config = response.data
+                if (!this.config.security) this.config.security = { endpoints: {} }
+                if (!this.config.security.endpoints) this.config.security.endpoints = {}
+            })
     },
     addPrinter() {
         this.config.printer.mappings.push({type: '', name: '', autoRotate: false, resetImageableArea: true, forceDPI: 0})
@@ -781,41 +917,5 @@ createApp({
         this.loadHealth()
     }
 }).mount()</script>
-
-    <!-- SECURITY TAB -->
-    <div class="container" v-if="tab === 'security' && config != null">
-        <div class="row">
-            <div class="col-12">
-<div class="lhb-card">
-                    <div class="lhb-card-header">
-                        <h5 class="lhb-card-title">🔒 Endpoint Security</h5>
-                    </div>
-                    <div class="lhb-row">
-                        <div class="lhb-row-label" style="width:100%">
-                            <div class="text-muted mb-2" style="font-size:0.78rem">Disable endpoints or set per-endpoint passwords. Empty password = no extra protection.</div>
-                            <div v-for="path in endpointList" :key="path" class="lhb-mapping-card" style="padding:0.75rem">
-                                <div class="lhb-mapping-header">
-                                    <span class="lhb-mapping-title" style="font-size:0.78rem">{{ path }}</span>
-                                    <label class="lhb-toggle" :title="config.security.endpoints[path].enabled ? 'Enabled' : 'Disabled'" v-if="!lockedEndpoints.includes(path)">
-                                        <input type="checkbox" v-model="config.security.endpoints[path].enabled"/>
-                                        <span class="lhb-toggle-slider"></span>
-                                    </label>
-                                    <span v-else class="lhb-badge" style="background:#e5e7eb;color:#6b6f85">required</span>
-                                </div>
-                                <div class="lhb-row" style="margin-bottom:0">
-                                    <span class="lhb-row-label lhb-form-label" style="font-size:0.75rem">Password</span>
-                                    <div class="lhb-row-value" style="width:140px">
-                                        <input class="lhb-form-control" type="password" placeholder="none" v-model="config.security.endpoints[path].password" style="font-size:0.75rem"/>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                
-            </div>
-        </div>
-    </div>
 </body>
 </html>

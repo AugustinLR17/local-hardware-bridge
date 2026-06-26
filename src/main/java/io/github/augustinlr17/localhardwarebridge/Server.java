@@ -184,12 +184,19 @@ public class Server implements WebSocketServerInterface {
             });
         }
 
-        // Add HTTP Auth
+        // Add HTTP Auth & endpoint security
         javalinServer.before(ctx -> {
             Config.Security security = configService.getConfig().getSecurity();
-
             String path = ctx.path();
+
+            // Find matching endpoint rule: exact match first, then prefix match (e.g. /serial/*)
             Config.EndpointRule rule = security.getEndpoints().get(path);
+            if (rule == null) {
+                // Try prefix match for dynamic paths like /serial/SCALE → /serial/{type}
+                if (path.startsWith("/serial/")) {
+                    rule = security.getEndpoints().get("/serial/{type}");
+                }
+            }
 
             // Critical endpoints required for the Web UI must always stay enabled
             if ("/config.json".equals(path) || "/system/health".equals(path)) {
