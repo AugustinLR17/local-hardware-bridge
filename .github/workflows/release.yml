@@ -173,7 +173,7 @@ jobs:
             Add-Content -Path $env:GITHUB_PATH -Value $signtool.DirectoryName
             Write-Host "Added signtool from: $($signtool.FullName)"
           } else {
-            Write-Host "signtool.exe not found — skipping code signing"
+            Write-Host "signtool.exe not found, skipping code signing"
           }
 
       - name: Generate self-signed Authenticode certificate
