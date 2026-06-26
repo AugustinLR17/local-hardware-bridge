@@ -113,3 +113,29 @@ tasks.register('createRpmApp') {
         }
     }
 }
+
+tasks.register('createWindowsApp') {
+    group = 'distribution'
+    description = 'Creates Windows EXE installer using jpackage'
+    dependsOn shadowJar
+    doLast {
+        exec {
+            commandLine 'jpackage',
+                '--type', 'exe',
+                '--name', 'Local Hardware Bridge',
+                '--app-version', project.version,
+                '--input', 'build/libs/',
+                '--main-jar', "local-hardware-bridge-${project.version}.jar",
+                '--main-class', 'io.github.augustinlr17.localhardwarebridge.GUI',
+                '--dest', 'build/dist/windows',
+                '--icon', 'src/main/resources/icon.ico',
+                '--vendor', 'AugustinLR17',
+                '--description', 'Local Hardware Bridge - exposes local printer and serial port to web browsers',
+                '--win-dir-chooser',
+                '--win-menu',
+                '--win-shortcut',
+                '--win-per-user-install',
+                '--resource-dir', 'src/main/resources/windows'
+        }
+    }
+}

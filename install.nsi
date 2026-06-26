@@ -1,19 +1,36 @@
+; Local Hardware Bridge NSIS Installer
+; Version metadata — this is what Windows shows in "Properties > Details"
+!define PRODUCT_NAME "Local Hardware Bridge"
+!define PRODUCT_VERSION "1.0.1"
+!define PRODUCT_PUBLISHER "AugustinLR17"
+!define PRODUCT_URL "https://github.com/AugustinLR17/local-hardware-bridge"
+!define PRODUCT_UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\Local Hardware Bridge"
+
 ; The name of the installer
-Name "Local Hardware Bridge"
+Name "${PRODUCT_NAME}"
 
 ; The file to write
 OutFile "lhb.exe"
 
 ; The default installation directory
-InstallDir "$LOCALAPPDATA\Local Hardware Bridge"
+InstallDir "$LOCALAPPDATA\${PRODUCT_NAME}"
 
-; Request application privileges for Windows Vista
+; Request application privileges for Windows Vista+
 RequestExecutionLevel user
+
+; Version info embedded in the EXE — reduces SmartScreen distrust
+VIProductVersion "${PRODUCT_VERSION}.0"
+VIAddVersionKey "ProductName" "${PRODUCT_NAME}"
+VIAddVersionKey "CompanyName" "${PRODUCT_PUBLISHER}"
+VIAddVersionKey "FileDescription" "${PRODUCT_NAME} Installer"
+VIAddVersionKey "FileVersion" "${PRODUCT_VERSION}"
+VIAddVersionKey "ProductVersion" "${PRODUCT_VERSION}"
+VIAddVersionKey "LegalCopyright" "Copyright (C) 2024-2026 ${PRODUCT_PUBLISHER}"
+VIAddVersionKey "OriginalFilename" "lhb.exe"
 
 ;--------------------------------
 
 ; Pages
-;Page directory
 Page components
 Page instfiles
 
@@ -68,13 +85,18 @@ Section "!Main Application" ;No components page, name is not important
   CreateShortcut "$SMPROGRAMS\Local Hardware Bridge (CLI).lnk" "$INSTDIR\jre\bin\java.exe" "-cp local-hardware-bridge.jar io.github.augustinlr17.localhardwarebridge.Server" "$INSTDIR\icon.ico" 0
 
   ; Write the installation path into the registry
-  WriteRegStr HKCU "SOFTWARE\Local Hardware Bridge" "Install_Dir" "$INSTDIR"
+  WriteRegStr HKCU "SOFTWARE\${PRODUCT_NAME}" "Install_Dir" "$INSTDIR"
   
-  ; Write the uninstall keys for Windows
-  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Local Hardware Bridge" "DisplayName" "Local Hardware Bridge"
-  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Local Hardware Bridge" "UninstallString" '"$INSTDIR\uninstall.exe"'
-  WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Local Hardware Bridge" "NoModify" 1
-  WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Local Hardware Bridge" "NoRepair" 1
+  ; Write the uninstall keys for Windows — with full version metadata
+  WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "DisplayName" "${PRODUCT_NAME}"
+  WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "UninstallString" '"$INSTDIR\uninstall.exe"'
+  WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "DisplayVersion" "${PRODUCT_VERSION}"
+  WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "Publisher" "${PRODUCT_PUBLISHER}"
+  WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "URLInfoAbout" "${PRODUCT_URL}"
+  WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "DisplayIcon" '"$INSTDIR\icon.ico"'
+  WriteRegDWORD HKCU "${PRODUCT_UNINST_KEY}" "NoModify" 1
+  WriteRegDWORD HKCU "${PRODUCT_UNINST_KEY}" "NoRepair" 1
+  WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "EstimatedSize" "150000"
   WriteUninstaller "uninstall.exe"
 
   ; Auto close when finished
@@ -82,13 +104,13 @@ Section "!Main Application" ;No components page, name is not important
 SectionEnd ; end the section
 
 Section "Auto-start" autostart
-  CreateShortcut "$SMSTARTUP\Local Hardware Bridge.lnk" "$INSTDIR\jre\bin\javaw.exe" "-cp local-hardware-bridge.jar io.github.augustinlr17.localhardwarebridge.GUI"
+  CreateShortcut "$SMSTARTUP\Local Hardware Bridge.lnk" "$INSTDIR\jre\bin\javaw.exe" "-cp local-hardware-bridge.jar io.github.augustinlr17.localhardwarebridge.GUI" "$INSTDIR\icon.ico" 0
 SectionEnd
 
 Section "Uninstall"
   ; Remove registry keys
-  DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\Local Hardware Bridge"
-  DeleteRegKey HKCU "SOFTWARE\Local Hardware Bridge"
+  DeleteRegKey HKCU "${PRODUCT_UNINST_KEY}"
+  DeleteRegKey HKCU "SOFTWARE\${PRODUCT_NAME}"
   
   ; Also clean up legacy registry keys if they still exist
   DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\WebApp Hardware Bridge"
