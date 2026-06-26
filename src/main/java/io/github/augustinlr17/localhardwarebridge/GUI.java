@@ -32,6 +32,11 @@ public class GUI implements WebSocketServiceInterface {
     SystemTray tray;
 
     public static void main(String[] args) throws Exception {
+        // Defensive: the Launcher already anchors before this class loads, but anchor
+        // again in case GUI is used as a direct entry point (e.g. running the JAR with
+        // -cp). Anchoring is idempotent and a no-op outside a packaged JAR.
+        AppHome.anchor();
+
         String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
         boolean forceServer = Boolean.getBoolean("lhb.server");
         boolean forceHeadless = Boolean.getBoolean("lhb.headless");
@@ -107,10 +112,9 @@ public class GUI implements WebSocketServiceInterface {
             server.registerService(this);
         }
 
-        // On Windows, register auto-start in registry (more reliable than Startup folder shortcut)
-        if (os.contains("windows")) {
-            registerWindowsAutoStart();
-        }
+        // Windows auto-start is handled by the installer (HKCU\...\Run pointing at the
+        // bundled launcher). Registering it from the running JVM is unreliable and flashes
+        // a console window, so it is intentionally not done here.
 
         MenuItem settingItem = new MenuItem("Web UI");
         settingItem.addActionListener(e -> {
@@ -173,75 +177,6 @@ public class GUI implements WebSocketServiceInterface {
         tray.add(trayIcon);
 
         notify(Constants.APP_NAME, " is running in background!", TrayIcon.MessageType.INFO);
-    }
-
-    /**
-     * Register auto-start on Windows via HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Run
-     * This is more reliable than a Startup folder shortcut and persists across reboots.
-     */
-    private void registerWindowsAutoStart() {
-        try {
-            String appPath = getApplicationPath();
-            if (appPath == null) {
-                log.warn("Could not determine application path for auto-start registration");
-                return;
-            }
-
-            // Use reg.exe to add the auto-start entry in HKCU\...\Run
-            // This is the standard Windows mechanism for auto-starting applications
-            ProcessBuilder pb = new ProcessBuilder(
-                "reg", "add",
-                "HKCU\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run",
-                "/v", Constants.APP_NAME,
-                "/d", appPath,
-                "/f"
-            );
-            pb.redirectErrorStream(true);
-            Process p = pb.start();
-            p.getOutputStream().close();
-            p.getInputStream().transferTo(java.io.OutputStream.nullOutputStream());
-            int exitCode = p.waitFor();
-            if (exitCode == 0) {
-                log.info("Registered auto-start in Windows registry");
-            } else {
-                log.warn("Failed to register auto-start (reg exit code: {})", exitCode);
-            }
-        } catch (Exception e) {
-            log.warn("Failed to register auto-start: {}", e.getMessage());
-        }
-    }
-
-    /**
-     * Get the command line to launch this application, for auto-start registration.
-     */
-    private String getApplicationPath() {
-        try {
-            // If running from a JAR, use javaw -cp jar GUI
-            String classpath = System.getProperty("java.class.path");
-            String javaHome = System.getProperty("java.home");
-            String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
-
-            String javaExec;
-            if (os.contains("windows")) {
-                javaExec = javaHome + "\\bin\\javaw.exe";
-            } else {
-                javaExec = javaHome + "/bin/java";
-            }
-
-            // If the classpath is a single JAR file, build a direct command
-            if (!classpath.contains(File.pathSeparator)) {
-                File jarFile = new File(classpath);
-                if (jarFile.exists()) {
-                    return "\"" + javaExec + "\" -cp \"" + jarFile.getAbsolutePath() + "\" io.github.augustinlr17.localhardwarebridge.GUI";
-                }
-            }
-
-            // Otherwise, use the full classpath
-            return "\"" + javaExec + "\" -cp \"" + classpath + "\" io.github.augustinlr17.localhardwarebridge.GUI";
-        } catch (Exception e) {
-            log.warn("Failed to determine application path", e);
-            return null;
-        }
     }
 
     private void offerLinuxServiceInstall() {

@@ -51,6 +51,9 @@ public class Server implements WebSocketServerInterface {
     private PrinterWebSocketService printerWebSocketService;
 
     public static void main(String[] args) {
+        // Defensive anchor in case Server is used as a direct entry point; the Launcher
+        // already anchors before any app class loads. Idempotent, no-op outside a JAR.
+        AppHome.anchor();
         try {
             new Server().start();
         } catch (Exception e) {

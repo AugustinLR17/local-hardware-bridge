@@ -1,5 +1,21 @@
 # Changelogs
 
+## Unreleased
+
+### Windows packaging fixes
+- The Windows release is now a **single self-contained `.exe`** installer (NSIS),
+  bundling a Java runtime — no JDK/JRE required on the target machine.
+- The app now launches **windowless** (no terminal/console window) via a native
+  launcher.
+- **Auto-start at boot** is registered reliably by the installer via
+  `HKCU\...\Run` pointing at the windowless launcher, replacing the unreliable
+  runtime `reg add` (which failed with exit code 1 and flashed a console).
+- New `Launcher` entry point anchors the working directory to the install dir
+  (`AppHome.anchor()`), so `config.json`, `log/` and `tls/` are found even when
+  the app is started from a shortcut or auto-start (where the working directory
+  is `system32`).
+- Dropped the `.msi` artifact; the `.exe` is the single supported installer.
+
 ## From 0.x to 1.0.0
 
 - 1.0 is a major rewrite, while maintain compatibility with existing WebApps

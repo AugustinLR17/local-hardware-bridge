@@ -1,7 +1,22 @@
-; Local Hardware Bridge — NSIS Installer
+; Local Hardware Bridge - NSIS Installer
 ; ==========================================
-; Modern UI installer with custom branding, optional components, and
-; auto-start registration via HKCU\...\Run (more reliable than Startup folder).
+; Single self-contained .exe installer.
+;
+; It packages the jpackage *app-image* produced by the build:
+;   - a bundled Java runtime (no JRE required on the target machine)
+;   - a windowless native launcher "Local Hardware Bridge.exe"
+;     (GUI subsystem -> no console/terminal window)
+;
+; The installer wires up Start Menu / Desktop shortcuts and registers
+; auto-start via HKCU\...\Run pointing at that windowless launcher.
+;
+; Build:
+;   1. ./gradlew shadowJar
+;   2. jpackage --type app-image --name "Local Hardware Bridge" \
+;        --input build/libs --main-jar local-hardware-bridge-<ver>.jar \
+;        --main-class io.github.augustinlr17.localhardwarebridge.Launcher \
+;        --dest build/dist/appimage --icon icon.ico
+;   3. makensis /DPRODUCT_VERSION=<ver> install.nsi   ->  lhb.exe
 
 ; --------------------------------
 ; Includes
@@ -13,11 +28,22 @@
 ; Defines
 ; --------------------------------
 !define PRODUCT_NAME "Local Hardware Bridge"
-!define PRODUCT_VERSION "1.0.1"
+!ifndef PRODUCT_VERSION
+  !define PRODUCT_VERSION "1.0.1"
+!endif
 !define PRODUCT_PUBLISHER "AugustinLR17"
 !define PRODUCT_URL "https://github.com/AugustinLR17/local-hardware-bridge"
 !define PRODUCT_UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\Local Hardware Bridge"
 !define PRODUCT_REGKEY "SOFTWARE\${PRODUCT_NAME}"
+!define RUN_KEY "Software\Microsoft\Windows\CurrentVersion\Run"
+
+; Directory holding the jpackage app-image (relative to this .nsi)
+!ifndef APPIMAGE_DIR
+  !define APPIMAGE_DIR "build\dist\appimage\${PRODUCT_NAME}"
+!endif
+
+; The windowless native launcher created by jpackage (named after --name)
+!define LAUNCHER_EXE "${PRODUCT_NAME}.exe"
 
 ; --------------------------------
 ; Installer attributes
@@ -25,6 +51,7 @@
 Name "${PRODUCT_NAME}"
 OutFile "lhb.exe"
 InstallDir "$LOCALAPPDATA\${PRODUCT_NAME}"
+InstallDirRegKey HKCU "${PRODUCT_REGKEY}" "Install_Dir"
 RequestExecutionLevel user
 
 ; Version info embedded in the EXE
@@ -40,17 +67,11 @@ VIAddVersionKey "OriginalFilename" "lhb.exe"
 ; --------------------------------
 ; Modern UI Configuration
 ; --------------------------------
-; Header / footer images (150x57 BMP for header, 150x70 BMP for wizard image)
-; If you have branding images, uncomment and place them in the project root:
-; !define MUI_HEADERIMAGE
-; !define MUI_HEADERIMAGE_BITMAP "header.bmp"
-; !define MUI_WELCOMEFINISHPAGE_BITMAP "wizard.bmp"
-; !define MUI_UNWELCOMEFINISHPAGE_BITMAP "wizard.bmp"
-
 !define MUI_ICON "icon.ico"
 !define MUI_UNICON "icon.ico"
+!define MUI_ABORTWARNING
 
-; Show license page
+; License page
 !define MUI_LICENSEPAGE_CHECKBOX
 !insertmacro MUI_PAGE_LICENSE "LICENSE"
 
@@ -63,7 +84,7 @@ VIAddVersionKey "OriginalFilename" "lhb.exe"
 ; Install progress
 !insertmacro MUI_PAGE_INSTFILES
 
-; Finish page — offer to launch app
+; Finish page - offer to launch app
 !define MUI_FINISHPAGE_RUN
 !define MUI_FINISHPAGE_RUN_TEXT "Launch ${PRODUCT_NAME}"
 !define MUI_FINISHPAGE_RUN_FUNCTION "LaunchApp"
@@ -82,22 +103,24 @@ VIAddVersionKey "OriginalFilename" "lhb.exe"
 Section "!Main Application" SEC_MAIN
   SectionIn RO
 
+  ; Stop a running instance so files can be overwritten
+  ExecWait 'taskkill /F /IM "${LAUNCHER_EXE}"' $0
+
   SetOutPath $INSTDIR
 
-  ; Remove old Local Hardware Bridge files
+  ; Remove previous payload (old layouts: bundled jre/, loose jars)
+  RMDir /r "$INSTDIR\runtime"
+  RMDir /r "$INSTDIR\app"
   RMDir /r "$INSTDIR\jre"
   Delete "$INSTDIR\*.jar"
-  Delete "$INSTDIR\setting.default.json"
 
   ; Remove old shortcuts (from previous installs)
-  Delete "$DESKTOP\Local Hardware Bridge.lnk"
-  Delete "$DESKTOP\Local Hardware Bridge (CLI).lnk"
-  Delete "$DESKTOP\Local Hardware Bridge (GUI).lnk"
-  Delete "$DESKTOP\Local Hardware Bridge (Configurator).lnk"
-  Delete "$SMPROGRAMS\Local Hardware Bridge.lnk"
-  Delete "$SMPROGRAMS\Local Hardware Bridge (CLI).lnk"
-  Delete "$SMPROGRAMS\Local Hardware Bridge (GUI).lnk"
-  Delete "$SMPROGRAMS\Local Hardware Bridge (Configurator).lnk"
+  Delete "$DESKTOP\${PRODUCT_NAME}.lnk"
+  Delete "$DESKTOP\${PRODUCT_NAME} (CLI).lnk"
+  Delete "$DESKTOP\${PRODUCT_NAME} (GUI).lnk"
+  Delete "$SMPROGRAMS\${PRODUCT_NAME}.lnk"
+  Delete "$SMPROGRAMS\${PRODUCT_NAME} (Server CLI).lnk"
+  Delete "$SMSTARTUP\${PRODUCT_NAME}.lnk"
 
   ; Remove old TigerWorkshop shortcuts (migration from original fork)
   Delete "$DESKTOP\WebApp Hardware Bridge.lnk"
@@ -105,14 +128,12 @@ Section "!Main Application" SEC_MAIN
   Delete "$SMPROGRAMS\WebApp Hardware Bridge.lnk"
   Delete "$SMPROGRAMS\WebApp Hardware Bridge (CLI).lnk"
   Delete "$SMSTARTUP\WebApp Hardware Bridge.lnk"
-
-  ; Remove old TigerWorkshop registry keys
   DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\WebApp Hardware Bridge"
   DeleteRegKey HKCU "SOFTWARE\WebApp Hardware Bridge"
+  DeleteRegValue HKCU "${RUN_KEY}" "WebApp Hardware Bridge"
 
-  ; Install files
-  File /r "out\artifacts\webapp_hardware_bridge_jar\*"
-  File /r "jre"
+  ; Install the jpackage app-image (bundled JRE + windowless launcher) and icon
+  File /r "${APPIMAGE_DIR}\*"
   File "icon.ico"
 
   ; Write registry
@@ -121,13 +142,14 @@ Section "!Main Application" SEC_MAIN
 
   WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "DisplayName" "${PRODUCT_NAME}"
   WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "UninstallString" '"$INSTDIR\uninstall.exe"'
+  WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "InstallLocation" "$INSTDIR"
   WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "DisplayVersion" "${PRODUCT_VERSION}"
   WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "Publisher" "${PRODUCT_PUBLISHER}"
   WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "URLInfoAbout" "${PRODUCT_URL}"
   WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "DisplayIcon" '"$INSTDIR\icon.ico"'
   WriteRegDWORD HKCU "${PRODUCT_UNINST_KEY}" "NoModify" 1
   WriteRegDWORD HKCU "${PRODUCT_UNINST_KEY}" "NoRepair" 1
-  WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "EstimatedSize" "150000"
+  WriteRegDWORD HKCU "${PRODUCT_UNINST_KEY}" "EstimatedSize" 150000
 
   WriteUninstaller "$INSTDIR\uninstall.exe"
 
@@ -138,34 +160,34 @@ SectionEnd
 ; Section: Desktop Shortcut (optional)
 ; --------------------------------
 Section "Desktop Shortcut" SEC_DESKTOP
-  CreateShortcut "$DESKTOP\Local Hardware Bridge.lnk" "$INSTDIR\jre\bin\javaw.exe" "-cp local-hardware-bridge.jar io.github.augustinlr17.localhardwarebridge.GUI" "$INSTDIR\icon.ico" 0
+  SetOutPath $INSTDIR
+  CreateShortcut "$DESKTOP\${PRODUCT_NAME}.lnk" "$INSTDIR\${LAUNCHER_EXE}" "" "$INSTDIR\icon.ico" 0
 SectionEnd
 
 ; --------------------------------
 ; Section: Start Menu Shortcut (optional)
 ; --------------------------------
 Section "Start Menu Shortcut" SEC_STARTMENU
-  CreateShortcut "$SMPROGRAMS\Local Hardware Bridge.lnk" "$INSTDIR\jre\bin\javaw.exe" "-cp local-hardware-bridge.jar io.github.augustinlr17.localhardwarebridge.GUI" "$INSTDIR\icon.ico" 0
-  CreateShortcut "$SMPROGRAMS\Local Hardware Bridge (Server CLI).lnk" "$INSTDIR\jre\bin\java.exe" "-cp local-hardware-bridge.jar io.github.augustinlr17.localhardwarebridge.Server" "$INSTDIR\icon.ico" 0
+  SetOutPath $INSTDIR
+  CreateShortcut "$SMPROGRAMS\${PRODUCT_NAME}.lnk" "$INSTDIR\${LAUNCHER_EXE}" "" "$INSTDIR\icon.ico" 0
 SectionEnd
 
 ; --------------------------------
 ; Section: Auto-start on boot (optional)
 ; --------------------------------
 Section "Start automatically when Windows starts" SEC_AUTOSTART
-  ; Register in HKCU\...\Run (most reliable method)
-  WriteRegStr HKCU "SOFTWARE\Microsoft\Windows\CurrentVersion\Run" "${PRODUCT_NAME}" '"$INSTDIR\jre\bin\javaw.exe" -cp "$INSTDIR\local-hardware-bridge.jar" io.github.augustinlr17.localhardwarebridge.GUI'
-  ; Also create Startup folder shortcut as backup
-  CreateShortcut "$SMSTARTUP\Local Hardware Bridge.lnk" "$INSTDIR\jre\bin\javaw.exe" "-cp local-hardware-bridge.jar io.github.augustinlr17.localhardwarebridge.GUI" "$INSTDIR\icon.ico" 0
+  ; Point HKCU\...\Run at the windowless launcher. A single quoted path with no
+  ; arguments is parsed reliably by Windows and starts the app in the background.
+  WriteRegStr HKCU "${RUN_KEY}" "${PRODUCT_NAME}" '"$INSTDIR\${LAUNCHER_EXE}"'
 SectionEnd
 
 ; --------------------------------
 ; Section descriptions (shown on components page)
 ; --------------------------------
-LangString DESC_SEC_MAIN ${LANG_ENGLISH} "Core application files (required)"
+LangString DESC_SEC_MAIN ${LANG_ENGLISH} "Core application files including a bundled Java runtime (required)"
 LangString DESC_SEC_DESKTOP ${LANG_ENGLISH} "Create a shortcut on your desktop"
-LangString DESC_SEC_STARTMENU ${LANG_ENGLISH} "Create shortcuts in the Start Menu"
-LangString DESC_SEC_AUTOSTART ${LANG_ENGLISH} "Automatically start Local Hardware Bridge when Windows starts (runs in system tray)"
+LangString DESC_SEC_STARTMENU ${LANG_ENGLISH} "Create a shortcut in the Start Menu"
+LangString DESC_SEC_AUTOSTART ${LANG_ENGLISH} "Automatically start Local Hardware Bridge when Windows starts (runs in the system tray, no window)"
 
 !insertmacro MUI_FUNCTION_DESCRIPTION_BEGIN
   !insertmacro MUI_DESCRIPTION_TEXT ${SEC_MAIN} $(DESC_SEC_MAIN)
@@ -178,27 +200,27 @@ LangString DESC_SEC_AUTOSTART ${LANG_ENGLISH} "Automatically start Local Hardwar
 ; Component default selections
 ; --------------------------------
 Function .onInit
-  ; Desktop shortcut: checked by default
   !insertmacro SetSectionFlag ${SEC_DESKTOP} ${SF_SELECTED}
-  ; Start Menu shortcut: checked by default
   !insertmacro SetSectionFlag ${SEC_STARTMENU} ${SF_SELECTED}
-  ; Auto-start: checked by default
   !insertmacro SetSectionFlag ${SEC_AUTOSTART} ${SF_SELECTED}
 FunctionEnd
 
 ; --------------------------------
-; Launch app after install
+; Launch app after install (windowless launcher)
 ; --------------------------------
 Function LaunchApp
-  ExecShell "" "$INSTDIR\jre\bin\javaw.exe" "-cp local-hardware-bridge.jar io.github.augustinlr17.localhardwarebridge.GUI"
+  ExecShell "" "$INSTDIR\${LAUNCHER_EXE}"
 FunctionEnd
 
 ; --------------------------------
 ; Uninstaller
 ; --------------------------------
 Section "Uninstall"
+  ; Stop a running instance
+  ExecWait 'taskkill /F /IM "${LAUNCHER_EXE}"' $0
+
   ; Remove auto-start
-  DeleteRegValue HKCU "SOFTWARE\Microsoft\Windows\CurrentVersion\Run" "${PRODUCT_NAME}"
+  DeleteRegValue HKCU "${RUN_KEY}" "${PRODUCT_NAME}"
 
   ; Remove registry keys
   DeleteRegKey HKCU "${PRODUCT_UNINST_KEY}"
@@ -207,12 +229,12 @@ Section "Uninstall"
   ; Clean up legacy registry keys
   DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\WebApp Hardware Bridge"
   DeleteRegKey HKCU "SOFTWARE\WebApp Hardware Bridge"
+  DeleteRegValue HKCU "${RUN_KEY}" "WebApp Hardware Bridge"
 
   ; Delete shortcuts
-  Delete "$DESKTOP\Local Hardware Bridge.lnk"
-  Delete "$SMPROGRAMS\Local Hardware Bridge.lnk"
-  Delete "$SMPROGRAMS\Local Hardware Bridge (Server CLI).lnk"
-  Delete "$SMSTARTUP\Local Hardware Bridge.lnk"
+  Delete "$DESKTOP\${PRODUCT_NAME}.lnk"
+  Delete "$SMPROGRAMS\${PRODUCT_NAME}.lnk"
+  Delete "$SMSTARTUP\${PRODUCT_NAME}.lnk"
 
   ; Delete legacy shortcuts
   Delete "$DESKTOP\WebApp Hardware Bridge.lnk"

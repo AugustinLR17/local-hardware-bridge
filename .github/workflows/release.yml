@@ -106,62 +106,37 @@ jobs:
         shell: bash
         run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
 
-      - name: Create MSI installer with jpackage
+      # Build a self-contained app-image: bundled JRE + a windowless native launcher
+      # (GUI subsystem -> no console window). The NSIS installer wraps this.
+      - name: Create app-image with jpackage
         run: |
           jpackage `
-            --type msi `
+            --type app-image `
             --name "Local Hardware Bridge" `
             --app-version ${{ steps.version.outputs.VERSION }} `
             --input build/libs/ `
             --main-jar "local-hardware-bridge-${{ steps.version.outputs.VERSION }}.jar" `
-            --main-class io.github.augustinlr17.localhardwarebridge.GUI `
-            --dest build/dist/windows `
+            --main-class io.github.augustinlr17.localhardwarebridge.Launcher `
+            --dest build/dist/appimage `
             --vendor AugustinLR17 `
             --description "Local Hardware Bridge - exposes local printer and serial port to web browsers" `
-            --icon icon.ico `
-            --win-dir-chooser `
-            --win-menu `
-            --win-menu-group "Local Hardware Bridge" `
-            --win-shortcut `
-            --win-shortcut-prompt `
-            --win-per-user-install
+            --icon icon.ico
         shell: powershell
 
-      - name: Upload Windows MSI
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-msi
-          path: build/dist/windows/*.msi
+      - name: Install NSIS
+        run: choco install nsis -y
+        shell: powershell
 
-      - name: Install InnoSetup for EXE installer
+      - name: Build single .exe installer with NSIS
         run: |
-          choco install innosetup -y
+          $nsis = "C:\Program Files (x86)\NSIS\makensis.exe"
+          & $nsis "/DPRODUCT_VERSION=${{ steps.version.outputs.VERSION }}" install.nsi
+          if ($LASTEXITCODE -ne 0) { throw "makensis failed with exit code $LASTEXITCODE" }
+          New-Item -ItemType Directory -Force -Path build/dist/windows-exe | Out-Null
+          Move-Item -Force lhb.exe "build/dist/windows-exe/Local-Hardware-Bridge-${{ steps.version.outputs.VERSION }}.exe"
         shell: powershell
 
-      - name: Create EXE installer with jpackage
-        run: |
-          $env:PATH = "C:\Program Files (x86)\Inno Setup 6;$env:PATH"
-          jpackage `
-            --type exe `
-            --name "Local Hardware Bridge" `
-            --app-version ${{ steps.version.outputs.VERSION }} `
-            --input build/libs/ `
-            --main-jar "local-hardware-bridge-${{ steps.version.outputs.VERSION }}.jar" `
-            --main-class io.github.augustinlr17.localhardwarebridge.GUI `
-            --dest build/dist/windows-exe `
-            --vendor AugustinLR17 `
-            --description "Local Hardware Bridge - exposes local printer and serial port to web browsers" `
-            --icon icon.ico `
-            --win-dir-chooser `
-            --win-menu `
-            --win-menu-group "Local Hardware Bridge" `
-            --win-shortcut `
-            --win-shortcut-prompt `
-            --win-per-user-install `
-            --win-upgrade-uuid "a8c6f1e0-5d3b-4c9e-8f2a-7b6d0e1c2f3a"
-        shell: powershell
-
-      # Sign the EXE and MSI with Authenticode (self-signed cert in CI).
+      # Sign the EXE with Authenticode (self-signed cert in CI).
       # This adds version metadata to the binary. For full SmartScreen trust,
       # replace the self-signed step with a real OV certificate stored in GitHub Secrets.
       - name: Add signtool to PATH
@@ -196,17 +171,6 @@ jobs:
             if ($LASTEXITCODE -ne 0) {
               # Fallback: sign without timestamp (offline CI)
               & signtool sign /fd SHA256 /sha1 $env:CERT_THUMBPRINT $exe.FullName
-            }
-          }
-
-      - name: Sign MSI installer with Authenticode
-        shell: powershell
-        run: |
-          $msi = Get-ChildItem -Path build/dist/windows -Filter *.msi | Select-Object -First 1
-          if ($msi) {
-            & signtool sign /fd SHA256 /sha1 $env:CERT_THUMBPRINT /tr http://timestamp.digicert.com /td SHA256 $msi.FullName 2>$null
-            if ($LASTEXITCODE -ne 0) {
-              & signtool sign /fd SHA256 /sha1 $env:CERT_THUMBPRINT $msi.FullName
             }
           }
 
@@ -405,8 +369,7 @@ jobs:
             | Platform | File | Notes |
             |----------|------|-------|
             | Cross-platform | `local-hardware-bridge-*.jar` | Requires JDK 21+ |
-            | Windows | `.exe` installer | Full installer with shortcuts |
-            | Windows | `.msi` installer | MSI for enterprise deployment |
+            | Windows | `Local-Hardware-Bridge-*.exe` | Single installer, bundled Java, runs in background, auto-start |
             | Linux | `.AppImage` | Requires JDK 21+, portable |
             | macOS | `.dmg` installer | Intel & Apple Silicon |
             | Terminal | `lhb-tui-*` | Admin dashboard, no JVM needed |
@@ -447,7 +410,6 @@ jobs:
           files: |
             artifacts/fat-jar/*.jar
             artifacts/windows-exe/*.exe
-            artifacts/windows-msi/*.msi
             artifacts/linux-appimage/*.AppImage
             artifacts/macos-dmg/*.dmg
             artifacts/lhb-tui-*/*

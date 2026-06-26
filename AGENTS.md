@@ -17,14 +17,15 @@ Local Hardware Bridge — a Java desktop application that exposes local printer 
 Output JAR goes to `build/libs/`.
 
 ### Run
+- **Default**: `java -jar build/libs/local-hardware-bridge-1.0.1.jar` (runs `Launcher`, which dispatches to GUI; pass `-Dlhb.server=true` for headless)
 - **GUI mode** (system tray icon): `java -cp build/libs/local-hardware-bridge-1.0.1.jar io.github.augustinlr17.localhardwarebridge.GUI`
 - **Server-only mode** (no GUI, headless): `java -cp build/libs/local-hardware-bridge-1.0.1.jar io.github.augustinlr17.localhardwarebridge.Server`
-- Via Gradle: `./gradlew run` (runs `GUI` main class as configured in `build.gradle`)
+- Via Gradle: `./gradlew run` (runs the `Launcher` main class as configured in `build.gradle`)
 
 ### Windows Installer
-- Requires NSIS and a JRE 21 in `./jre` directory
-- Run `install.nsi` to produce `lhb.exe`
-- The IntelliJ IDEA artifact build (`out/artifacts/webapp_hardware_bridge_jar/`) is used by the NSIS installer, not the Gradle output
+- Single self-contained `lhb.exe` (bundled JRE, windowless launcher, shortcuts, HKCU auto-start). No JRE required on target.
+- Build: `./gradlew createWindowsApp` (jpackage app-image) then `makensis /DPRODUCT_VERSION=<ver> install.nsi`.
+- `install.nsi` packages the jpackage app-image at `build/dist/appimage/Local Hardware Bridge/` — **not** any IntelliJ artifact. There is no `./jre` directory; the runtime is bundled by jpackage.
 
 ### Tests
 ```bash
@@ -35,7 +36,8 @@ JUnit 4 is on the test classpath, but **no test files exist yet** (`src/test/` i
 ## Architecture & Control Flow
 
 ### Entry Points
-- `GUI.main()` — launches `Server.start()`, then creates a system tray icon. Also registers itself as a `WebSocketServiceInterface` on the `/notification` channel to display desktop notifications.
+- `Launcher.main()` — the packaged `Main-Class`. Has **no** logging/config static deps so it can call `AppHome.anchor()` (sets `user.dir` to the install dir, so `config.json`/`log/`/`tls/` resolve correctly under shortcut/auto-start launches with CWD=`system32`) **before** any other app class loads. Then dispatches to `GUI` (default) or `Server` (`-Dlhb.server=true`).
+- `GUI.main()` — launches `Server.start()`, then creates a system tray icon. Also registers itself as a `WebSocketServiceInterface` on the `/notification` channel to display desktop notifications. Windows auto-start is handled by the installer, not at runtime.
 - `Server.main()` — headless mode, just calls `Server.start()`.
 
 ### Core Messaging Pattern
@@ -129,8 +131,9 @@ src/main/resources/
 - **Logging**: Use `@Log4j2` (Lombok) then `log.info(...)` / `log.error(...)`. Do not create loggers by hand. Log4j2 config is in `src/main/resources/log4j2.xml`.
 - **No test suite**: `src/test/` is empty. JUnit 4 dependency exists but no tests are written.
 - **Config file is runtime-created**: `config.json` is in `.gitignore` and created on first run. Don't look for it in the repo.
-- **Version must be kept in sync**: `Constants.VERSION` and `build.gradle` `version` must match.
-- **IntelliJ artifact vs Gradle**: The NSIS installer uses IntelliJ's artifact output (`out/artifacts/`), not Gradle's `build/libs/`. The `MANIFEST.MF` Class-Path is maintained manually for the IntelliJ artifact build.
+- **Version must be kept in sync**: `Constants.VERSION`, `build.gradle` `version`, and the `PRODUCT_VERSION` default in `install.nsi` must match. CI passes the tag version into NSIS via `/DPRODUCT_VERSION`.
+- **Installer uses Gradle output**: The NSIS installer packages the jpackage app-image built from Gradle's `build/libs/` shadow JAR (`build/dist/appimage/`). The old IntelliJ `out/artifacts/` + `./jre` flow is gone.
+- **Working directory anchoring**: relative paths (`config.json`, `log/`, `tls/`) resolve against `user.dir`, which `AppHome.anchor()` (called first from `Launcher`) repoints to the install dir. If you add a new entry point, anchor before touching files or loggers.
 - **AnnotatedPrintable platform quirk**: `getDefaultTransform()` works on Windows but throws `NullPointerException` on macOS — the catch block falls back to a blank `AffineTransform`. Don't remove this try/catch.
 - **Serial write is single-buffer**: `writeBuffer` is a single byte array, not a queue. Rapid successive writes will overwrite. This is by design (last-write-wins for serial commands).
 - **HTTP Print API**: `POST /printer` calls `PrinterWebSocketService.printDocument()` synchronously and returns `PrintResult` JSON. This allows remote servers to submit print jobs without WebSocket.

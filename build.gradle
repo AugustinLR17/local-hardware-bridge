@@ -39,12 +39,12 @@ dependencies {
 }
 
 application {
-    mainClass = 'io.github.augustinlr17.localhardwarebridge.GUI'
+    mainClass = 'io.github.augustinlr17.localhardwarebridge.Launcher'
 }
 
 jar {
     manifest {
-        attributes 'Main-Class': 'io.github.augustinlr17.localhardwarebridge.GUI'
+        attributes 'Main-Class': 'io.github.augustinlr17.localhardwarebridge.Launcher'
     }
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
@@ -52,7 +52,7 @@ jar {
 shadowJar {
     mergeServiceFiles()
     manifest {
-        attributes 'Main-Class': 'io.github.augustinlr17.localhardwarebridge.GUI'
+        attributes 'Main-Class': 'io.github.augustinlr17.localhardwarebridge.Launcher'
     }
     archiveClassifier = ''
     archiveFileName = "local-hardware-bridge-${project.version}.jar"
@@ -81,7 +81,7 @@ tasks.register('createLinuxApp') {
                 '--app-version', project.version,
                 '--input', 'build/libs/',
                 '--main-jar', "local-hardware-bridge-${project.version}.jar",
-                '--main-class', 'io.github.augustinlr17.localhardwarebridge.GUI',
+                '--main-class', 'io.github.augustinlr17.localhardwarebridge.Launcher',
                 '--dest', 'build/dist/linux',
                 '--icon', 'src/main/resources/icon.png',
                 '--vendor', 'AugustinLR17',
@@ -104,7 +104,7 @@ tasks.register('createRpmApp') {
                 '--app-version', project.version,
                 '--input', 'build/libs/',
                 '--main-jar', "local-hardware-bridge-${project.version}.jar",
-                '--main-class', 'io.github.augustinlr17.localhardwarebridge.GUI',
+                '--main-class', 'io.github.augustinlr17.localhardwarebridge.Launcher',
                 '--dest', 'build/dist/linux-rpm',
                 '--vendor', 'AugustinLR17',
                 '--description', 'Local Hardware Bridge - exposes local printer and serial port to web browsers',
@@ -116,26 +116,22 @@ tasks.register('createRpmApp') {
 
 tasks.register('createWindowsApp') {
     group = 'distribution'
-    description = 'Creates Windows EXE installer using jpackage'
+    description = 'Creates the Windows app-image (bundled JRE + windowless launcher) for the NSIS installer'
     dependsOn shadowJar
     doLast {
         exec {
             commandLine 'jpackage',
-                '--type', 'exe',
+                '--type', 'app-image',
                 '--name', 'Local Hardware Bridge',
                 '--app-version', project.version,
                 '--input', 'build/libs/',
                 '--main-jar', "local-hardware-bridge-${project.version}.jar",
-                '--main-class', 'io.github.augustinlr17.localhardwarebridge.GUI',
-                '--dest', 'build/dist/windows',
+                '--main-class', 'io.github.augustinlr17.localhardwarebridge.Launcher',
+                '--dest', 'build/dist/appimage',
                 '--icon', 'src/main/resources/icon.ico',
                 '--vendor', 'AugustinLR17',
-                '--description', 'Local Hardware Bridge - exposes local printer and serial port to web browsers',
-                '--win-dir-chooser',
-                '--win-menu',
-                '--win-shortcut',
-                '--win-per-user-install',
-                '--resource-dir', 'src/main/resources/windows'
+                '--description', 'Local Hardware Bridge - exposes local printer and serial port to web browsers'
         }
+        println "App-image created. Now run: makensis /DPRODUCT_VERSION=${project.version} install.nsi"
     }
 }

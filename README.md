@@ -26,7 +26,7 @@ Grab the latest release from [Releases](https://github.com/AugustinLR17/local-ha
 | Platform | File |
 |----------|------|
 | Cross-platform | `local-hardware-bridge-*.jar` (requires JDK 21+) |
-| Windows | `.exe` or `.msi` installer |
+| Windows | `Local-Hardware-Bridge-*.exe` (single installer, bundled Java, runs in background, auto-start) |
 | Linux | `.AppImage` (requires JDK 21+) |
 | macOS | `.dmg` installer |
 
@@ -220,7 +220,7 @@ Receive `PrintResult`:
 
 | Platform | GUI Mode | Server Mode | Install | Service |
 |----------|----------|-------------|---------|---------|
-| Windows | System tray, `.exe`/`.msi` | `java -cp ... Server` | Installer | Startup shortcut |
+| Windows | System tray, `.exe` | `java -cp ... Server` | Single `.exe` installer | HKCU auto-start (registered by installer) |
 | Linux | Headless fallback | `java -cp ... Server` | `.AppImage` | systemd |
 | macOS | Headless fallback | `java -cp ... Server` | `.dmg` | launchd |
 
