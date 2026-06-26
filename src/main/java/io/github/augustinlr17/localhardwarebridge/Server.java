@@ -26,14 +26,17 @@ import io.github.augustinlr17.localhardwarebridge.websocketservices.SerialWebSoc
 import javax.print.PrintService;
 import java.awt.print.PrinterJob;
 import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
+import java.security.MessageDigest;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 import java.util.Locale;
 
@@ -54,12 +57,22 @@ public class Server implements WebSocketServerInterface {
 
     private PrinterWebSocketService printerWebSocketService;
 
+    // Guards against overlapping restarts triggered via /system/restart.json.
+    private final AtomicBoolean restarting = new AtomicBoolean(false);
+
+    // Process start timestamp, used to report uptime in the health endpoint.
+    private static final long START_TIME = System.currentTimeMillis();
+
     public static void main(String[] args) {
         // Defensive anchor in case Server is used as a direct entry point; the Launcher
         // already anchors before any app class loads. Idempotent, no-op outside a JAR.
         AppHome.anchor();
         try {
             new Server().start();
+        } catch (JavalinBindException e) {
+            // Top-level entry point only: a bind failure here is fatal for the process.
+            log.error("Unable to bind port, another instance is already running?");
+            System.exit(1);
         } catch (Exception e) {
             throw new RuntimeException(e);
         }
@@ -74,7 +87,18 @@ public class Server implements WebSocketServerInterface {
         javalinServer = Javalin.create(cfg -> {
             cfg.showJavalinBanner = false;
             cfg.staticFiles.add(staticFiles -> staticFiles.directory = "web");
-            cfg.bundledPlugins.enableCors(cors -> cors.addRule(CorsPluginConfig.CorsRule::anyHost));
+
+            Config.Server.Cors corsConfig = serverConfig.getCors();
+            cfg.bundledPlugins.enableCors(cors -> {
+                if (corsConfig.isAllowAllOrigins() || corsConfig.getAllowedOrigins() == null || corsConfig.getAllowedOrigins().isEmpty()) {
+                    // Default behaviour (and safe fallback for an empty allow-list): open to any host.
+                    cors.addRule(CorsPluginConfig.CorsRule::anyHost);
+                } else {
+                    for (String origin : corsConfig.getAllowedOrigins()) {
+                        cors.addRule(it -> it.allowHost(origin));
+                    }
+                }
+            });
 
             if (serverConfig.getTls().isEnabled()) {
                 if (serverConfig.getTls().isSelfSigned()) {
@@ -104,7 +128,9 @@ public class Server implements WebSocketServerInterface {
                 wsConnectContext.enableAutomaticPings(5, TimeUnit.SECONDS);
 
                 if (serverConfig.getAuthentication().isEnabled()) {
-                    if (Optional.ofNullable(wsConnectContext.queryParam("token")).orElse("").equals(serverConfig.getAuthentication().getToken())) {
+                    String expectedToken = serverConfig.getAuthentication().getToken();
+                    String providedToken = wsConnectContext.queryParam("token");
+                    if (expectedToken != null && !expectedToken.isBlank() && constantTimeEquals(providedToken, expectedToken)) {
                         return;
                     }
 
@@ -212,18 +238,23 @@ public class Server implements WebSocketServerInterface {
 
             // Check global token if enabled
             if (serverConfig.getAuthentication().isEnabled()) {
-                try {
-                    // Bearer Token
-                    if (Optional.ofNullable(ctx.header("Authorization")).orElse("").endsWith(serverConfig.getAuthentication().getToken())) {
-                        return;
-                    }
+                String expectedToken = serverConfig.getAuthentication().getToken();
+                // A null/empty/blank configured token never auto-passes.
+                if (expectedToken != null && !expectedToken.isBlank()) {
+                    try {
+                        // Bearer Token
+                        String bearer = extractBearerToken(ctx.header("Authorization"));
+                        if (bearer != null && constantTimeEquals(bearer, expectedToken)) {
+                            return;
+                        }
 
-                    // Basic Auth
-                    if (ctx.basicAuthCredentials() != null && Objects.equals(ctx.basicAuthCredentials().getPassword(), serverConfig.getAuthentication().getToken())) {
-                        return;
+                        // Basic Auth
+                        if (ctx.basicAuthCredentials() != null && constantTimeEquals(ctx.basicAuthCredentials().getPassword(), expectedToken)) {
+                            return;
+                        }
+                    } catch (Exception e) {
+                        // NOOP
                     }
-                } catch (Exception e) {
-                    // NOOP
                 }
 
                 ctx.header("WWW-Authenticate", "Basic realm=\"Token required\"");
@@ -239,12 +270,13 @@ public class Server implements WebSocketServerInterface {
 
             // Check endpoint-specific password if set
             if (rule != null && rule.getPassword() != null && !rule.getPassword().isEmpty()) {
+                String expectedPassword = rule.getPassword();
                 try {
-                    String provided = Optional.ofNullable(ctx.header("Authorization")).orElse("");
-                    if (provided.endsWith(rule.getPassword())) {
+                    String bearer = extractBearerToken(ctx.header("Authorization"));
+                    if (bearer != null && constantTimeEquals(bearer, expectedPassword)) {
                         return;
                     }
-                    if (ctx.basicAuthCredentials() != null && Objects.equals(ctx.basicAuthCredentials().getPassword(), rule.getPassword())) {
+                    if (ctx.basicAuthCredentials() != null && constantTimeEquals(ctx.basicAuthCredentials().getPassword(), expectedPassword)) {
                         return;
                     }
                 } catch (Exception e) {
@@ -270,8 +302,10 @@ public class Server implements WebSocketServerInterface {
             javalinServer.start(serverConfig.getBind(), serverConfig.getPort());
             log.info("{} {} running on {}", Constants.APP_NAME, Constants.VERSION, serverConfig.getUri());
         } catch (JavalinBindException e) {
-            log.info("Unable to bind port, another instance is already running?");
-            System.exit(1);
+            // Do NOT kill the process here: callers (GUI.restart, the restart thread, main)
+            // decide how to handle a bind failure. Rethrow so they can log/recover.
+            log.error("Unable to bind port {}, another instance is already running?", serverConfig.getPort());
+            throw e;
         }
     }
 
@@ -283,7 +317,31 @@ public class Server implements WebSocketServerInterface {
             it.remove();
         }
 
-        javalinServer.stop();
+        if (javalinServer != null) {
+            javalinServer.stop();
+        }
+    }
+
+    /**
+     * Constant-time string comparison to avoid leaking secrets via timing side-channels.
+     * Returns false if either argument is null.
+     */
+    private static boolean constantTimeEquals(String provided, String expected) {
+        if (provided == null || expected == null) {
+            return false;
+        }
+        return MessageDigest.isEqual(provided.getBytes(StandardCharsets.UTF_8), expected.getBytes(StandardCharsets.UTF_8));
+    }
+
+    /**
+     * Extract the token from an {@code Authorization: Bearer <token>} header.
+     * Returns null if the header is missing or not a Bearer credential.
+     */
+    private static String extractBearerToken(String authorizationHeader) {
+        if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) {
+            return null;
+        }
+        return authorizationHeader.substring("Bearer ".length());
     }
 
     /*
@@ -376,15 +434,14 @@ public class Server implements WebSocketServerInterface {
     }
 
     void addSocketToChannel(String channel, WsContext socket) {
-        ConcurrentLinkedQueue<WsContext> connectionList = getSocketsForChannel(channel);
-        connectionList.add(socket);
-        socketChannelSubscriptions.put(channel, connectionList);
+        socketChannelSubscriptions.computeIfAbsent(channel, k -> new ConcurrentLinkedQueue<>()).add(socket);
     }
 
     private void removeSocketFromChannel(String channel, WsContext socket) {
-        ConcurrentLinkedQueue<WsContext> connectionList = getSocketsForChannel(channel);
-        connectionList.remove(socket);
-        socketChannelSubscriptions.put(channel, connectionList);
+        ConcurrentLinkedQueue<WsContext> connectionList = socketChannelSubscriptions.get(channel);
+        if (connectionList != null) {
+            connectionList.remove(socket);
+        }
     }
 
     /*
@@ -400,10 +457,7 @@ public class Server implements WebSocketServerInterface {
     }
 
     private void addServiceToChannel(String channel, WebSocketServiceInterface service) {
-        ConcurrentLinkedQueue<WebSocketServiceInterface> serviceList = serviceChannelSubscriptions.getOrDefault(channel, new ConcurrentLinkedQueue<>());
-
-        serviceList.add(service);
-        serviceChannelSubscriptions.put(channel, serviceList);
+        serviceChannelSubscriptions.computeIfAbsent(channel, k -> new ConcurrentLinkedQueue<>()).add(service);
 
         if (!services.contains(service)) {
             services.add(service);
@@ -411,9 +465,10 @@ public class Server implements WebSocketServerInterface {
     }
 
     private void removeServiceFromChannel(String channel, WebSocketServiceInterface service) {
-        ConcurrentLinkedQueue<WebSocketServiceInterface> serviceList = getServicesForChannel(channel);
-        serviceList.remove(service);
-        serviceChannelSubscriptions.put(channel, serviceList);
+        ConcurrentLinkedQueue<WebSocketServiceInterface> serviceList = serviceChannelSubscriptions.get(channel);
+        if (serviceList != null) {
+            serviceList.remove(service);
+        }
 
         services.remove(service);
     }
@@ -465,7 +520,7 @@ public class Server implements WebSocketServerInterface {
                 ctx.contentType(ContentType.APPLICATION_JSON).result(objectMapper.writeValueAsString(result));
             } catch (Exception e) {
                 log.error("HTTP print error: {}", e.getMessage());
-                ctx.status(500).json("{\"error\": \"" + e.getMessage().replace("\"", "'") + "\"}");
+                ctx.status(500).json("{\"error\": \"" + String.valueOf(e.getMessage()).replace("\"", "'") + "\"}");
             }
         });
 
@@ -706,6 +761,12 @@ public class Server implements WebSocketServerInterface {
 
         // Restart
         javalinServer.post("/system/restart.json", ctx -> {
+            // No-op if a restart is already in progress.
+            if (!restarting.compareAndSet(false, true)) {
+                ctx.status(409).contentType(ContentType.APPLICATION_JSON).result("{\"status\": \"already restarting\"}");
+                return;
+            }
+
             messageToService("/notification", objectMapper.writeValueAsString(new NotificationDTO("WARNING", "Restart", "Server is restarting...")));
 
             // Respond before restarting: stop()/start() must NOT run on this Jetty
@@ -721,6 +782,8 @@ public class Server implements WebSocketServerInterface {
                     messageToService("/notification", objectMapper.writeValueAsString(new NotificationDTO("INFO", "Restart", "Server restarted successfully")));
                 } catch (Exception e) {
                     log.error("Failed to restart server", e);
+                } finally {
+                    restarting.set(false);
                 }
             }, "server-restart");
             restartThread.setDaemon(false);
@@ -734,16 +797,24 @@ public class Server implements WebSocketServerInterface {
             health.put("appName", Constants.APP_NAME);
             health.put("version", Constants.VERSION);
 
+            Config currentConfig = configService.getConfig();
+            health.put("printerEnabled", currentConfig.getPrinter().isEnabled());
+            health.put("serialEnabled", currentConfig.getSerial().isEnabled());
+            health.put("uptimeMillis", System.currentTimeMillis() - START_TIME);
+
             ObjectNode servicesNode = objectMapper.createObjectNode();
             for (WebSocketServiceInterface svc : services) {
                 servicesNode.put(svc.getClass().getSimpleName(), true);
             }
             health.set("services", servicesNode);
 
+            int activeConnections = 0;
             ObjectNode connectionsNode = objectMapper.createObjectNode();
             for (Map.Entry<String, ConcurrentLinkedQueue<WsContext>> entry : socketChannelSubscriptions.entrySet()) {
                 connectionsNode.put(entry.getKey(), entry.getValue().size());
+                activeConnections += entry.getValue().size();
             }
+            health.put("activeConnections", activeConnections);
             health.set("connections", connectionsNode);
 
             ctx.contentType(ContentType.APPLICATION_JSON).result(objectMapper.writeValueAsString(health));
@@ -863,7 +934,7 @@ public class Server implements WebSocketServerInterface {
                 ctx.contentType(ContentType.APPLICATION_JSON).result("{\"status\": \"installed\", \"service\": \"" + serviceName + "\"}");
             } catch (Exception e) {
                 log.error("Failed to install systemd service", e);
-                ctx.status(500).result("{\"error\": \"" + e.getMessage().replace("\"", "'") + "\"}");
+                ctx.status(500).result("{\"error\": \"" + String.valueOf(e.getMessage()).replace("\"", "'") + "\"}");
             }
         });
 
@@ -897,7 +968,7 @@ public class Server implements WebSocketServerInterface {
                 ctx.contentType(ContentType.APPLICATION_JSON).result("{\"status\": \"uninstalled\"}");
             } catch (Exception e) {
                 log.error("Failed to uninstall systemd service", e);
-                ctx.status(500).result("{\"error\": \"" + e.getMessage().replace("\"", "'") + "\"}");
+                ctx.status(500).result("{\"error\": \"" + String.valueOf(e.getMessage()).replace("\"", "'") + "\"}");
             }
         });
     }

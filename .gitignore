@@ -5,6 +5,13 @@ log/
 out/
 jre/
 build/
-.idea/workspace.xml
+.idea/
 config.json
 *.exe
+# Go TUI build output
+/tui/tui
+/tui/lhb-tui
+
+# Python caches
+__pycache__/
+*.pyc

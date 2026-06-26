@@ -47,7 +47,7 @@
 
 #### Key
 
-- (Default) `tls/default-cert.pem`
+- (Default) `tls/default-key.pem`
 
 #### CA Bundle
 

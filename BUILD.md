@@ -10,7 +10,7 @@
 ./gradlew build
 ```
 
-Output JAR: `build/libs/local-hardware-bridge-1.0.1.jar`
+Output JAR: `build/libs/local-hardware-bridge-1.0.2.jar`
 
 ## Run
 
@@ -54,7 +54,7 @@ Steps:
 2. Wrap it into the installer:
 
    ```bash
-   makensis /DPRODUCT_VERSION=1.0.1 install.nsi
+   makensis /DPRODUCT_VERSION=1.0.2 install.nsi
    ```
 
    This yields `lhb.exe`. (CI renames it to `Local-Hardware-Bridge-<version>.exe`.)
@@ -88,9 +88,13 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now local-hardware-bridge
 ```
 
-The service runs as the current user. To run as a specific user, use an instantiated service:
+The system service runs as `root` by default. To run it as a specific
+unprivileged user instead, add a drop-in (no need to edit the shipped unit):
 ```bash
-sudo systemctl enable --now local-hardware-bridge@yourusername
+sudo systemctl edit local-hardware-bridge
+# In the editor, add:
+#   [Service]
+#   User=youruser
 ```
 
 ### Check status

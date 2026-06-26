@@ -25,7 +25,10 @@ import javax.print.*;
 import java.awt.*;
 import java.awt.print.*;
 import java.io.File;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Log4j2
 public class PrinterWebSocketService implements WebSocketServiceInterface {
@@ -35,8 +38,10 @@ public class PrinterWebSocketService implements WebSocketServiceInterface {
     private static final DocumentService documentService = DocumentService.getInstance();
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
-    private final Object printLock = new Object();
-    
+    // Per-type lock so prints to different printers/types don't serialize globally.
+    private final ConcurrentHashMap<String, Object> printLocks = new ConcurrentHashMap<>();
+    private static final String DEFAULT_LOCK_KEY = "__default__";
+
     public PrinterWebSocketService() {
         log.info("Starting PrinterWebSocketService");
     }
@@ -85,6 +90,9 @@ public class PrinterWebSocketService implements WebSocketServiceInterface {
      * Prints a PrintDocument
      */
     public PrintResult printDocument(PrintDocument printDocument) throws Exception {
+        String lockKey = printDocument.getType() != null ? printDocument.getType() : DEFAULT_LOCK_KEY;
+        Object printLock = printLocks.computeIfAbsent(lockKey, k -> new Object());
+
         synchronized (printLock) {
             log.info("Printing Document {}, {}", printDocument.getType(), printDocument.getUrl());
 
@@ -116,19 +124,21 @@ public class PrinterWebSocketService implements WebSocketServiceInterface {
 
             log.error("Print Error: {}, {}", e.getClass().getName(), errorMessage);
 
-            if (!isRaw(printDocument)) {
-                try {
-                    documentService.deleteDocument(printDocument);
-                } catch (Exception deleteEx) {
-                    log.warn("Failed to delete document after print error: {}", deleteEx.getMessage());
-                }
-            }
-
-            server.messageToService("/notification", objectMapper.writeValueAsString(new NotificationDTO("ERROR", "Print Error " + printDocument.getType(), errorMessage)));
+            server.messageToService("/notification", objectMapper.writeValueAsString(new NotificationDTO("ERROR", "Print Error " + printDocument.getType(), String.valueOf(errorMessage))));
 
             PrintResult result = new PrintResult(false, errorMessage, printDocument.getId(), printerSearchResult != null ? printerSearchResult.getName() : null);
             server.messageToServer(getChannel(), objectMapper.writeValueAsString(result));
             return result;
+        } finally {
+            // Always clean up the prepared/downloaded file for non-raw prints (success or
+            // failure) so the downloads/ directory does not grow unbounded.
+            if (!isRaw(printDocument)) {
+                try {
+                    documentService.deleteDocument(printDocument);
+                } catch (Exception deleteEx) {
+                    log.warn("Failed to delete document after print: {}", String.valueOf(deleteEx.getMessage()));
+                }
+            }
         }
         }
     }
@@ -141,21 +151,37 @@ public class PrinterWebSocketService implements WebSocketServiceInterface {
     }
 
     /**
+     * Extract a directory-stripped filename from the URL path only, so a query string
+     * or fragment (e.g. {@code http://host/file.exe#x.pdf}) cannot spoof the type.
+     */
+    private String urlFilename(PrintDocument printDocument) {
+        String url = printDocument.getUrl();
+        if (url == null) {
+            return "";
+        }
+        try {
+            return FilenameUtils.getName(new URL(url).getPath());
+        } catch (MalformedURLException e) {
+            return FilenameUtils.getName(url);
+        }
+    }
+
+    /**
      * Return if PrintDocument is image
      */
     private Boolean isImage(PrintDocument printDocument) {
-        String filename = FilenameUtils.getName(printDocument.getUrl());
+        String filename = urlFilename(printDocument);
 
-        return filename.matches("^.*\\.(jpg|jpeg|png|gif)$");
+        return filename.toLowerCase().matches("^.*\\.(jpg|jpeg|png|gif)$");
     }
 
     /**
      * Return if PrintDocument is PDF
      */
     private Boolean isPDF(PrintDocument printDocument) {
-        String filename = FilenameUtils.getName(printDocument.getUrl());
+        String filename = urlFilename(printDocument);
 
-        return filename.matches("^.*\\.(pdf)$");
+        return filename.toLowerCase().matches("^.*\\.(pdf)$");
     }
 
     /**

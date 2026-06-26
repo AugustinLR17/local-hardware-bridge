@@ -13,6 +13,8 @@ import io.github.augustinlr17.localhardwarebridge.utils.ThreadUtil;
 
 import java.nio.charset.Charset;
 import java.util.Objects;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 
 @Log4j2
 public class SerialWebSocketService implements WebSocketServiceInterface {
@@ -22,13 +24,13 @@ public class SerialWebSocketService implements WebSocketServiceInterface {
 
     private final Config.SerialMapping mapping;
     private final SerialPort serialPort;
-    private byte[] writeBuffer = {};
+    private final BlockingQueue<byte[]> writeQueue = new LinkedBlockingQueue<>();
 
     private Thread readThread;
     private Thread writeThread;
     private Thread monitorThread;
 
-    private Boolean isRunning = true;
+    private volatile boolean isRunning = true;
 
     private static final String BINARY = "BINARY";
 
@@ -83,6 +85,9 @@ public class SerialWebSocketService implements WebSocketServiceInterface {
                         if (Objects.equals(mapping.getReadCharset(), BINARY)) server.messageToServer(getChannel(), receivedData);
                         else server.messageToServer(getChannel(), new String(receivedData, Charset.forName(mapping.getReadCharset())));
                     }
+                } else {
+                    // Port closed (e.g. unplugged / awaiting reconnect): avoid busy-spinning.
+                    ThreadUtil.silentSleep(100);
                 }
             }
 
@@ -94,13 +99,18 @@ public class SerialWebSocketService implements WebSocketServiceInterface {
 
             while (isRunning) {
                 if (serialPort.isOpen()) {
-                    if (writeBuffer.length > 0) {
-                        log.trace("Bytes: {}", Hex.encodeHexString(writeBuffer));
-
-                        serialPort.writeBytes(writeBuffer, writeBuffer.length);
-                        writeBuffer = new byte[]{};
+                    // Drain everything queued since the last cycle (no last-write-wins loss).
+                    byte[] data;
+                    while ((data = writeQueue.poll()) != null) {
+                        if (data.length > 0) {
+                            log.trace("Bytes: {}", Hex.encodeHexString(data));
+                            serialPort.writeBytes(data, data.length);
+                        }
                     }
                     ThreadUtil.silentSleep(10);
+                } else {
+                    // Port closed: avoid busy-spinning at 100% CPU.
+                    ThreadUtil.silentSleep(100);
                 }
             }
 
@@ -153,7 +163,9 @@ public class SerialWebSocketService implements WebSocketServiceInterface {
 
     @Override
     public void messageToService(byte[] message) {
-        writeBuffer = message;
+        if (message != null) {
+            writeQueue.offer(message);
+        }
     }
 
     @Override

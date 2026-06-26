@@ -1,6 +1,8 @@
 package main
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -56,40 +58,48 @@ var (
 			PaddingLeft(2)
 )
 
+// httpClient is shared across all requests. A per-request context with its own
+// timeout is used on top of this for cancellation; the client timeout is a
+// backstop covering the entire request lifecycle.
+var httpClient = &http.Client{Timeout: 10 * time.Second}
+
+// requestTimeout bounds a single HTTP request via context.
+const requestTimeout = 8 * time.Second
+
 type tickMsg time.Time
 
 type healthResp struct {
-	Status      string            `json:"status"`
-	AppName     string            `json:"appName"`
-	Version     string            `json:"version"`
-	Services    map[string]bool   `json:"services"`
-	Connections map[string]int    `json:"connections"`
+	Status      string          `json:"status"`
+	AppName     string          `json:"appName"`
+	Version     string          `json:"version"`
+	Services    map[string]bool `json:"services"`
+	Connections map[string]int  `json:"connections"`
 }
 
 type printerMapping struct {
-	Type                string `json:"type"`
-	Name                string `json:"name"`
-	AutoRotate          bool   `json:"autoRotate"`
-	ResetImageableArea  bool   `json:"resetImageableArea"`
-	ForceDPI            int    `json:"forceDPI"`
+	Type               string `json:"type"`
+	Name               string `json:"name"`
+	AutoRotate         bool   `json:"autoRotate"`
+	ResetImageableArea bool   `json:"resetImageableArea"`
+	ForceDPI           int    `json:"forceDPI"`
 }
 
 type printerConfig struct {
-	Enabled           bool             `json:"enabled"`
-	AutoAddUnknown    bool             `json:"autoAddUnknownType"`
-	FallbackDefault   bool             `json:"fallbackToDefault"`
-	Mappings          []printerMapping `json:"mappings"`
+	Enabled         bool             `json:"enabled"`
+	AutoAddUnknown  bool             `json:"autoAddUnknownType"`
+	FallbackDefault bool             `json:"fallbackToDefault"`
+	Mappings        []printerMapping `json:"mappings"`
 }
 
 type serialMapping struct {
-	Type             string `json:"type"`
-	Name             string `json:"name"`
-	BaudRate         int    `json:"baudRate"`
-	NumDataBits      int    `json:"numDataBits"`
-	NumStopBits      int    `json:"numStopBits"`
-	Parity           int    `json:"parity"`
-	ReadMultiple     bool   `json:"readMultipleBytes"`
-	ReadCharset      string `json:"readCharset"`
+	Type         string `json:"type"`
+	Name         string `json:"name"`
+	BaudRate     int    `json:"baudRate"`
+	NumDataBits  int    `json:"numDataBits"`
+	NumStopBits  int    `json:"numStopBits"`
+	Parity       int    `json:"parity"`
+	ReadMultiple bool   `json:"readMultipleBytes"`
+	ReadCharset  string `json:"readCharset"`
 }
 
 type serialConfig struct {
@@ -106,16 +116,19 @@ type serialStatus struct {
 }
 
 type model struct {
-	serverURL    string
-	menuIndex    int
-	health       *healthResp
-	printerCfg   *printerConfig
-	serialCfg    *serialConfig
-	serialStatus []serialStatus
-	err          string
-	width        int
-	height       int
-	loaded       bool
+	serverURL      string
+	token          string
+	menuIndex      int
+	health         *healthResp
+	printerCfg     *printerConfig
+	serialCfg      *serialConfig
+	serialStatus   []serialStatus
+	err            string
+	status         string
+	confirmRestart bool
+	width          int
+	height         int
+	loaded         bool
 }
 
 type page int
@@ -138,29 +151,53 @@ func (p page) String() string {
 
 func main() {
 	serverURL := "http://127.0.0.1:12212"
-	if len(os.Args) > 1 {
-		if strings.HasPrefix(os.Args[1], "http") {
-			serverURL = os.Args[1]
-		} else if os.Args[1] == "--server" && len(os.Args) > 2 {
-			serverURL = os.Args[2]
+	token := os.Getenv("LHB_TOKEN")
+
+	args := os.Args[1:]
+	for i := 0; i < len(args); i++ {
+		switch {
+		case args[i] == "--server" && i+1 < len(args):
+			serverURL = args[i+1]
+			i++
+		case args[i] == "--token" && i+1 < len(args):
+			token = args[i+1]
+			i++
+		case strings.HasPrefix(args[i], "http"):
+			serverURL = args[i]
 		}
 	}
 
-	p := tea.NewProgram(initialModel(serverURL), tea.WithAltScreen())
+	p := tea.NewProgram(initialModel(serverURL, token), tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		os.Exit(1)
 	}
 }
 
-func initialModel(serverURL string) model {
+func initialModel(serverURL, token string) model {
 	return model{
 		serverURL: serverURL,
+		token:     token,
 	}
 }
 
 func (m model) Init() tea.Cmd {
-	return tea.Batch(tickCmd(), fetchHealthCmd(m.serverURL), fetchPrinterConfigCmd(m.serverURL), fetchSerialConfigCmd(m.serverURL), fetchSerialStatusCmd(m.serverURL))
+	return tea.Batch(
+		tickCmd(),
+		fetchHealthCmd(m.serverURL, m.token),
+		fetchPrinterConfigCmd(m.serverURL, m.token),
+		fetchSerialConfigCmd(m.serverURL, m.token),
+		fetchSerialStatusCmd(m.serverURL, m.token),
+	)
+}
+
+func (m model) refreshAllCmd() tea.Cmd {
+	return tea.Batch(
+		fetchHealthCmd(m.serverURL, m.token),
+		fetchPrinterConfigCmd(m.serverURL, m.token),
+		fetchSerialConfigCmd(m.serverURL, m.token),
+		fetchSerialStatusCmd(m.serverURL, m.token),
+	)
 }
 
 func tickCmd() tea.Cmd {
@@ -169,70 +206,133 @@ func tickCmd() tea.Cmd {
 	})
 }
 
-func fetchHealthCmd(url string) tea.Cmd {
+func fetchHealthCmd(url, token string) tea.Cmd {
 	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
+		defer cancel()
 		h := &healthResp{}
-		err := fetchJSON(url+"/system/health", h)
-		if err != nil {
+		if err := fetchJSON(ctx, http.MethodGet, url+"/system/health", token, nil, h); err != nil {
 			return errMsg{err: err.Error()}
 		}
 		return healthMsg{health: h}
 	}
 }
 
-func fetchPrinterConfigCmd(url string) tea.Cmd {
+func fetchPrinterConfigCmd(url, token string) tea.Cmd {
 	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
+		defer cancel()
 		c := &printerConfig{}
-		err := fetchJSON(url+"/printer/mappings", c)
-		if err != nil {
+		if err := fetchJSON(ctx, http.MethodGet, url+"/printer/mappings", token, nil, c); err != nil {
 			return errMsg{err: err.Error()}
 		}
 		return printerConfigMsg{config: c}
 	}
 }
 
-func fetchSerialConfigCmd(url string) tea.Cmd {
+func fetchSerialConfigCmd(url, token string) tea.Cmd {
 	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
+		defer cancel()
 		c := &serialConfig{}
-		err := fetchJSON(url+"/serial/mappings", c)
-		if err != nil {
+		if err := fetchJSON(ctx, http.MethodGet, url+"/serial/mappings", token, nil, c); err != nil {
 			return errMsg{err: err.Error()}
 		}
 		return serialConfigMsg{config: c}
 	}
 }
 
-func fetchSerialStatusCmd(url string) tea.Cmd {
+func fetchSerialStatusCmd(url, token string) tea.Cmd {
 	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
+		defer cancel()
 		s := []serialStatus{}
-		err := fetchJSON(url+"/serial/status", &s)
-		if err != nil {
+		if err := fetchJSON(ctx, http.MethodGet, url+"/serial/status", token, nil, &s); err != nil {
 			return errMsg{err: err.Error()}
 		}
 		return serialStatusMsg{status: s}
 	}
 }
 
-func fetchJSON(url string, v interface{}) error {
-	client := &http.Client{Timeout: 5 * time.Second}
-	resp, err := client.Get(url)
+func togglePrinterCmd(url, token string, enabled bool) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
+		defer cancel()
+		body := bytes.NewReader([]byte(fmt.Sprintf(`{"enabled":%t}`, enabled)))
+		c := &printerConfig{}
+		if err := fetchJSON(ctx, http.MethodPut, url+"/printer/enabled", token, body, c); err != nil {
+			return errMsg{err: err.Error()}
+		}
+		return printerConfigMsg{config: c}
+	}
+}
+
+func toggleSerialCmd(url, token string, enabled bool) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
+		defer cancel()
+		body := bytes.NewReader([]byte(fmt.Sprintf(`{"enabled":%t}`, enabled)))
+		c := &serialConfig{}
+		if err := fetchJSON(ctx, http.MethodPut, url+"/serial/enabled", token, body, c); err != nil {
+			return errMsg{err: err.Error()}
+		}
+		return serialConfigMsg{config: c}
+	}
+}
+
+func restartCmd(url, token string) tea.Cmd {
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
+		defer cancel()
+		if err := fetchJSON(ctx, http.MethodPost, url+"/system/restart.json", token, bytes.NewReader([]byte("{}")), nil); err != nil {
+			return errMsg{err: err.Error()}
+		}
+		return actionMsg{msg: "Server restart requested"}
+	}
+}
+
+// fetchJSON issues an HTTP request with the shared client, attaching the bearer
+// token (if any) and a JSON content type for bodies. Non-2xx responses become
+// errors carrying the endpoint and a bounded snippet of the response body. When
+// v is nil the body is discarded.
+func fetchJSON(ctx context.Context, method, url, token string, body io.Reader, v interface{}) error {
+	req, err := http.NewRequestWithContext(ctx, method, url, body)
 	if err != nil {
-		return err
+		return fmt.Errorf("building request for %s: %w", url, err)
+	}
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("requesting %s: %w", url, err)
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
-		return fmt.Errorf("HTTP %d: %s", resp.StatusCode, string(body))
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		snippet, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		return fmt.Errorf("%s returned HTTP %d: %s", url, resp.StatusCode, strings.TrimSpace(string(snippet)))
 	}
 
-	return json.NewDecoder(resp.Body).Decode(v)
+	if v == nil {
+		return nil
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(v); err != nil {
+		return fmt.Errorf("decoding response from %s: %w", url, err)
+	}
+	return nil
 }
 
 type healthMsg struct{ health *healthResp }
 type printerConfigMsg struct{ config *printerConfig }
 type serialConfigMsg struct{ config *serialConfig }
 type serialStatusMsg struct{ status []serialStatus }
+type actionMsg struct{ msg string }
 type errMsg struct{ err string }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -242,23 +342,32 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 
 	case tickMsg:
-		return m, tea.Batch(tickCmd(), fetchHealthCmd(m.serverURL), fetchSerialStatusCmd(m.serverURL))
+		return m, tea.Batch(tickCmd(), m.refreshAllCmd())
 
 	case healthMsg:
 		m.health = msg.health
 		m.loaded = true
+		m.err = ""
 		return m, nil
 
 	case printerConfigMsg:
 		m.printerCfg = msg.config
+		m.err = ""
 		return m, nil
 
 	case serialConfigMsg:
 		m.serialCfg = msg.config
+		m.err = ""
 		return m, nil
 
 	case serialStatusMsg:
 		m.serialStatus = msg.status
+		m.err = ""
+		return m, nil
+
+	case actionMsg:
+		m.status = msg.msg
+		m.err = ""
 		return m, nil
 
 	case errMsg:
@@ -266,7 +375,23 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
-		switch msg.String() {
+		key := msg.String()
+
+		// Restart confirmation intercepts all keys.
+		if m.confirmRestart {
+			switch key {
+			case "y", "Y":
+				m.confirmRestart = false
+				m.status = "Restarting..."
+				return m, restartCmd(m.serverURL, m.token)
+			default:
+				m.confirmRestart = false
+				m.status = "Restart cancelled"
+				return m, nil
+			}
+		}
+
+		switch key {
 		case "ctrl+c", "q":
 			return m, tea.Quit
 		case "1":
@@ -277,8 +402,28 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.menuIndex = 2
 		case "4":
 			m.menuIndex = 3
+		case "right", "tab", "l":
+			m.menuIndex = (m.menuIndex + 1) % len(pages)
+		case "left", "shift+tab", "h":
+			m.menuIndex = (m.menuIndex - 1 + len(pages)) % len(pages)
 		case "r":
-			return m, tea.Batch(fetchHealthCmd(m.serverURL), fetchPrinterConfigCmd(m.serverURL), fetchSerialConfigCmd(m.serverURL), fetchSerialStatusCmd(m.serverURL))
+			m.status = "Refreshing..."
+			return m, m.refreshAllCmd()
+		case "e":
+			// Toggle the enabled state of the subsystem on the current page.
+			switch page(m.menuIndex) {
+			case pagePrinters:
+				if m.printerCfg != nil {
+					return m, togglePrinterCmd(m.serverURL, m.token, !m.printerCfg.Enabled)
+				}
+			case pageSerial:
+				if m.serialCfg != nil {
+					return m, toggleSerialCmd(m.serverURL, m.token, !m.serialCfg.Enabled)
+				}
+			}
+		case "R":
+			m.confirmRestart = true
+			return m, nil
 		}
 	}
 
@@ -305,13 +450,30 @@ func (m model) View() string {
 		content = m.renderConfig()
 	}
 
-	if m.err != "" {
-		content = styleDanger.Render("Error: "+m.err) + "\n" + content
+	var banner string
+	if m.confirmRestart {
+		banner = styleWarning.Render("Restart the server? Press y to confirm, any other key to cancel.") + "\n"
+	} else if m.err != "" {
+		banner = styleDanger.Render("Error: "+m.err) + "\n"
+	} else if m.status != "" {
+		banner = styleSuccess.Render(m.status) + "\n"
 	}
 
-	footer := styleDim.Render(fmt.Sprintf("[%s] Press 1-4 to navigate • r to refresh • q to quit", m.serverURL))
+	footer := m.renderFooter()
 
-	return fmt.Sprintf("%s\n%s\n%s\n%s", title, menu, content, footer)
+	out := fmt.Sprintf("%s\n%s\n%s%s\n%s", title, menu, banner, content, footer)
+
+	// Constrain to the terminal width so content does not overflow narrow
+	// terminals (truncates over-wide lines rather than wrapping them).
+	if m.width > 0 {
+		out = lipgloss.NewStyle().MaxWidth(m.width).Render(out)
+	}
+	return out
+}
+
+func (m model) renderFooter() string {
+	help := "1-4/←→/tab: switch • r: refresh • e: toggle enabled • R: restart • q: quit"
+	return styleDim.Render(fmt.Sprintf("[%s] %s", m.serverURL, help))
 }
 
 func (m model) renderMenu() string {
@@ -450,7 +612,7 @@ func (m model) renderSerial() string {
 		s += styleDim.Render("  No serial mappings configured\n")
 	} else {
 		for _, sm := range m.serialCfg.Mappings {
-			s += fmt.Sprintf("  %s → %s  (%d baud, %d-%d-%d, %s)\n",
+			s += fmt.Sprintf("  %s → %s  (%d baud, %d-%d-%s, %s)\n",
 				styleKey.Render(sm.Type),
 				styleValue.Render(sm.Name),
 				sm.BaudRate,
@@ -479,8 +641,10 @@ func (m model) renderConfig() string {
 	s += styleDim.Render("  GET  ") + styleValue.Render("/system/serials.json") + "\n"
 	s += styleDim.Render("  GET  ") + styleValue.Render("/printer/mappings") + "\n"
 	s += styleDim.Render("  POST ") + styleValue.Render("/printer/mappings") + "\n"
+	s += styleDim.Render("  PUT  ") + styleValue.Render("/printer/enabled") + "\n"
 	s += styleDim.Render("  GET  ") + styleValue.Render("/serial/mappings") + "\n"
 	s += styleDim.Render("  POST ") + styleValue.Render("/serial/mappings") + "\n"
+	s += styleDim.Render("  PUT  ") + styleValue.Render("/serial/enabled") + "\n"
 	s += styleDim.Render("  GET  ") + styleValue.Render("/serial/status") + "\n"
 	s += styleDim.Render("  POST ") + styleValue.Render("/system/restart.json") + "\n"
 
@@ -488,6 +652,11 @@ func (m model) renderConfig() string {
 	s += styleHeader.Render(" Server ")
 	s += "\n\n"
 	s += fmt.Sprintf("  URL: %s\n", styleValue.Render(m.serverURL))
+	if m.token != "" {
+		s += fmt.Sprintf("  Auth: %s\n", styleSuccess.Render("Bearer token set"))
+	} else {
+		s += fmt.Sprintf("  Auth: %s\n", styleDim.Render("none"))
+	}
 
 	return styleBox.Render(s)
 }

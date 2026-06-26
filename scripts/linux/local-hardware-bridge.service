@@ -4,7 +4,8 @@ After=network.target
 
 [Service]
 Type=simple
-User=%i
+# Runs as the service manager's user (root for the system instance). To run as a
+# specific unprivileged user, add a drop-in or uncomment and set: User=youruser
 ExecStart=/usr/bin/java -cp /opt/local-hardware-bridge/local-hardware-bridge.jar io.github.augustinlr17.localhardwarebridge.Server
 WorkingDirectory=/opt/local-hardware-bridge
 Restart=on-failure
