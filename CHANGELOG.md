@@ -1,6 +1,14 @@
 # Changelogs
 
-## Unreleased
+## 1.0.2
+
+### Restart fixes
+- The **Restart** action (Web UI `POST /system/restart.json` and the tray menu)
+  now works reliably. The HTTP endpoint no longer stops Jetty from its own worker
+  thread (which deadlocked); it responds first, then restarts on a dedicated
+  thread.
+- Desktop notifications now survive a restart: services that must outlive a
+  restart (the GUI notification listener) are re-attached automatically.
 
 ### Windows packaging fixes
 - The Windows release is now a **single self-contained `.exe`** installer (NSIS),
