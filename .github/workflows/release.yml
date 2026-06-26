@@ -164,13 +164,21 @@ jobs:
       # Sign the EXE and MSI with Authenticode (self-signed cert in CI).
       # This adds version metadata to the binary. For full SmartScreen trust,
       # replace the self-signed step with a real OV certificate stored in GitHub Secrets.
+      - name: Add signtool to PATH
+        shell: powershell
+        run: |
+          # Find signtool.exe in Windows SDK and add to GITHUB_PATH so it persists across steps
+          $signtool = Get-ChildItem -Path "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe" -ErrorAction SilentlyContinue | Sort-Object -Descending | Select-Object -First 1
+          if ($signtool) {
+            Add-Content -Path $env:GITHUB_PATH -Value $signtool.DirectoryName
+            Write-Host "Added signtool from: $($signtool.FullName)"
+          } else {
+            Write-Host "signtool.exe not found — skipping code signing"
+          }
+
       - name: Generate self-signed Authenticode certificate
         shell: powershell
         run: |
-          # Add signtool to PATH (Windows SDK is pre-installed on windows-latest)
-          $signtoolDir = (Get-ChildItem -Path "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe" -ErrorAction SilentlyContinue | Sort-Object -Descending | Select-Object -First 1).DirectoryName
-          if ($signtoolDir) { $env:PATH = "$signtoolDir;$env:PATH" }
-
           $cert = New-SelfSignedCertificate `
             -Type CodeSigningCert `
             -Subject "CN=AugustinLR17, O=AugustinLR17, C=FR" `
