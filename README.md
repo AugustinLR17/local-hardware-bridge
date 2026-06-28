@@ -30,6 +30,8 @@ Grab the latest release from [Releases](https://github.com/AugustinLR17/local-ha
 | Linux | `.AppImage` (requires JDK 21+) |
 | macOS | `.dmg` installer |
 
+> **Free code signing provided by [SignPath Foundation](https://signpath.org/)** — Windows binaries are Authenticode-signed at no cost courtesy of the SignPath open source program. Certificate issued by SignPath Foundation.
+
 ### Run
 
 ```bash
