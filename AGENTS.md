@@ -70,7 +70,7 @@ The app uses a **pub/sub channel model** with two interfaces:
 - If `config.json` is missing, it creates one with defaults from the `Config` DTO's field initializers
 - Config is exposed via HTTP `GET/PUT /config.json` — the Web UI edits it directly
 - `Config` DTO uses Lombok `@Data` with nested static classes for each section (`Server`, `Printer`, `Serial`, `Downloader`, `GUI`)
-- Version is hardcoded in `Constants.VERSION` (currently `"1.0.2"`) and must match `build.gradle` `version`
+- Version is hardcoded in `Constants.VERSION` (currently `"2.0.0"`) and must match `build.gradle` `version`
 
 ### Printing Pipeline
 1. Browser sends JSON `PrintDocument` to `/printer` WebSocket

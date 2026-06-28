@@ -45,9 +45,6 @@ java -cp local-hardware-bridge-*.jar io.github.augustinlr17.localhardwarebridge.
 
 The Web UI is available at `http://127.0.0.1:12212` (default).
 
-![Dashboard](docs/screenshot-dashboard.png)
-![Advanced Settings](docs/screenshot-advanced.png)
-
 ## Operating Modes
 
 Local Hardware Bridge runs on the **same machine as the browser**. The local web app (or a website that the user opens locally) talks to the bridge, and the bridge talks to the hardware.

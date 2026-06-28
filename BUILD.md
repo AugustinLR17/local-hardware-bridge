@@ -10,7 +10,7 @@
 ./gradlew build
 ```
 
-Output JAR: `build/libs/local-hardware-bridge-1.0.2.jar`
+Output JAR: `build/libs/local-hardware-bridge-2.0.0.jar`
 
 ## Run
 
@@ -54,7 +54,7 @@ Steps:
 2. Wrap it into the installer:
 
    ```bash
-   makensis /DPRODUCT_VERSION=1.0.2 install.nsi
+   makensis /DPRODUCT_VERSION=2.0.0 install.nsi
    ```
 
    This yields `lhb.exe`. (CI renames it to `Local-Hardware-Bridge-<version>.exe`.)
