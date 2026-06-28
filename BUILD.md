@@ -62,6 +62,73 @@ Steps:
 > The release workflow (`.github/workflows/release.yml`) runs exactly these two
 > steps on `windows-latest`, then Authenticode-signs the result.
 
+## Code signing (required to avoid antivirus / SmartScreen warnings)
+
+Microsoft Defender flags unsigned (or self-signed) binaries that register an
+auto-start entry (`HKCU\...\Run`) as a **persistence** threat ("Anomaly
+detected in ASEP registry"). A real, Microsoft-trusted Authenticode signature
+is required for the installer *and* the windowless launcher it embeds.
+
+The release workflow signs with **Azure Trusted Signing** (formerly Azure Code
+Signing): a managed cloud HSM, ~$10/month, recognised by SmartScreen/Defender.
+Signing is driven by [jsign](https://ebourg.github.io/jsign/) (cross-platform,
+no Windows-only toolchain needed in CI).
+
+### One-time Azure setup
+
+1. Create a **Trusted Signing account** + a **Certificate Profile** (type
+   *Public Trust*) in the Azure Portal. Complete the **identity validation**
+   (1–20 business days). You can start with a *Public Trust Test* profile to
+   validate the pipeline before validation completes.
+2. Create an **App registration** (service principal) and a client secret, then
+   grant it the **Trusted Signing Certificate Profile Signer** role on the
+   certificate profile.
+3. Add these **repository secrets** (Settings → Secrets and variables → Actions):
+
+   | Secret | Value |
+   |--------|-------|
+   | `AZURE_TENANT_ID` | Azure AD tenant ID |
+   | `AZURE_CLIENT_ID` | Service principal (app) client ID |
+   | `AZURE_CLIENT_SECRET` | Service principal secret |
+   | `AZURE_CODESIGNING_ENDPOINT` | Region endpoint, e.g. `weu.codesigning.azure.net` (no `https://`, no trailing `/`) |
+   | `AZURE_CODESIGNING_ACCOUNT` | Trusted Signing account name |
+   | `AZURE_CODESIGNING_PROFILE` | Certificate profile name |
+
+When the secrets are present, the release workflow signs **both** the jpackage
+launcher (`Local Hardware Bridge.exe`) and the final NSIS installer
+(`Local-Hardware-Bridge-<version>.exe`). When they are absent, signing is
+skipped and a workflow warning is emitted (the build still produces an unsigned
+EXE).
+
+> The Trusted Signing certificates are short-lived (3 days). The workflow always
+> timestamps against `http://timestamp.acs.microsoft.com/`, so the signature
+> stays valid long after the cert itself expires.
+
+### Signing locally
+
+From a machine with the Azure secrets, signing a single EXE manually:
+
+```bash
+# 1. Get an access token
+TOKEN=$(curl -fsS -X POST "https://login.microsoftonline.com/$AZURE_TENANT_ID/oauth2/v2.0/token" \
+  -d "client_id=$AZURE_CLIENT_ID" \
+  -d "scope=https://codesigning.azure.net/.default" \
+  -d "client_secret=$AZURE_CLIENT_SECRET" \
+  -d "grant_type=client_credentials" | jq -r .access_token)
+
+# 2. Sign (download jsign once: https://repo1.maven.org/maven2/net/jsign/jsign/7.4/jsign-7.4.jar)
+java -jar jsign.jar \
+  --storetype TRUSTEDSIGNING \
+  --keystore "https://$AZURE_CODESIGNING_ENDPOINT" \
+  --storepass "$TOKEN" \
+  --alias "$AZURE_CODESIGNING_ACCOUNT/$AZURE_CODESIGNING_PROFILE" \
+  --tsaurl http://timestamp.acs.microsoft.com/ \
+  --tsmode RFC3161 \
+  "build/dist/appimage/Local Hardware Bridge/Local Hardware Bridge.exe"
+```
+
+Verify with `Get-AuthenticodeSignature` (PowerShell) or `jsign --verify`.
+
 ## Linux Installation
 
 ### Manual

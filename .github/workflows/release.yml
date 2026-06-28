@@ -133,6 +133,74 @@ jobs:
             --icon icon.ico
         shell: powershell
 
+      # --------------------------------------------------------------------------
+      # Code signing (Azure Trusted Signing)
+      # --------------------------------------------------------------------------
+      # Signs BOTH the jpackage launcher (the windowless "Local Hardware Bridge.exe"
+      # that NSIS embeds and that the HKCU\...\Run auto-start key points at) and the
+      # final NSIS installer. A real, Microsoft-trusted certificate is required so
+      # that Microsoft Defender stops flagging the auto-start entry as persistence
+      # (ASEP). Self-signed certs are NOT trusted by Windows and are deliberately
+      # avoided here.
+      #
+      # Required GitHub repository secrets (Settings -> Secrets and variables -> Actions):
+      #   AZURE_TENANT_ID            Azure AD tenant ID
+      #   AZURE_CLIENT_ID            App registration (service principal) client ID
+      #   AZURE_CLIENT_SECRET        Service principal secret
+      #   AZURE_CODESIGNING_ENDPOINT e.g. weu.codesigning.azure.net (no https://, no trailing /)
+      #   AZURE_CODESIGNING_ACCOUNT  Trusted Signing account name
+      #   AZURE_CODESIGNING_PROFILE  Certificate profile name (Public Trust)
+      # The service principal needs the "Trusted Signing Certificate Profile Signer" role.
+      # If the secrets are absent, signing is skipped and a warning is emitted (the
+      # build still produces an unsigned EXE).
+      - name: Set up Azure Trusted Signing
+        id: codesign
+        shell: bash
+        env:
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+        run: |
+          if [ -z "$AZURE_TENANT_ID" ] || [ -z "$AZURE_CLIENT_ID" ] || [ -z "$AZURE_CLIENT_SECRET" ]; then
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::Azure Trusted Signing secrets are not configured. Windows binaries will be UNSIGNED and will trigger antivirus / SmartScreen warnings (e.g. Microsoft Defender ASEP persistence alerts). See BUILD.md -> Code signing."
+            exit 0
+          fi
+          echo "enabled=true" >> "$GITHUB_OUTPUT"
+          # Exchange the service principal credentials for a Trusted Signing access token.
+          TOKEN=$(curl -fsS -X POST "https://login.microsoftonline.com/${AZURE_TENANT_ID}/oauth2/v2.0/token" \
+            -d "client_id=${AZURE_CLIENT_ID}" \
+            -d "scope=https://codesigning.azure.net/.default" \
+            -d "client_secret=${AZURE_CLIENT_SECRET}" \
+            -d "grant_type=client_credentials" | jq -r '.access_token // empty')
+          if [ -z "$TOKEN" ]; then
+            echo "::error::Failed to obtain an Azure access token. Verify the AZURE_TENANT_ID / AZURE_CLIENT_ID / AZURE_CLIENT_SECRET secrets and that the service principal has the Trusted Signing Certificate Profile Signer role."
+            exit 1
+          fi
+          echo "::add-mask::$TOKEN"
+          echo "AZURE_ACCESS_TOKEN=$TOKEN" >> "$GITHUB_ENV"
+          # jsign is a cross-platform Authenticode signer; Trusted Signing support needs >= 7.0.
+          curl -fsSL -o "$RUNNER_TEMP/jsign.jar" https://repo1.maven.org/maven2/net/jsign/jsign/7.4/jsign-7.4.jar
+          echo "JSIGN_JAR=$RUNNER_TEMP/jsign.jar" >> "$GITHUB_ENV"
+
+      - name: Sign jpackage launcher (Azure Trusted Signing)
+        if: steps.codesign.outputs.enabled == 'true'
+        shell: bash
+        env:
+          AZURE_CODESIGNING_ENDPOINT: ${{ secrets.AZURE_CODESIGNING_ENDPOINT }}
+          AZURE_CODESIGNING_ACCOUNT: ${{ secrets.AZURE_CODESIGNING_ACCOUNT }}
+          AZURE_CODESIGNING_PROFILE: ${{ secrets.AZURE_CODESIGNING_PROFILE }}
+        run: |
+          java -jar "$JSIGN_JAR" \
+            --storetype TRUSTEDSIGNING \
+            --keystore "https://${AZURE_CODESIGNING_ENDPOINT}" \
+            --storepass "$AZURE_ACCESS_TOKEN" \
+            --alias "${AZURE_CODESIGNING_ACCOUNT}/${AZURE_CODESIGNING_PROFILE}" \
+            --tsaurl http://timestamp.acs.microsoft.com/ \
+            --tsmode RFC3161 \
+            "build/dist/appimage/Local Hardware Bridge/Local Hardware Bridge.exe"
+          echo "Signed jpackage launcher."
+
       - name: Install NSIS
         run: choco install nsis -y
         shell: powershell
@@ -146,41 +214,40 @@ jobs:
           Move-Item -Force lhb.exe "build/dist/windows-exe/Local-Hardware-Bridge-${{ steps.version.outputs.VERSION }}.exe"
         shell: powershell
 
-      # Sign the EXE with Authenticode (self-signed cert in CI).
-      # This adds version metadata to the binary. For full SmartScreen trust,
-      # replace the self-signed step with a real OV certificate stored in GitHub Secrets.
-      - name: Add signtool to PATH
-        shell: powershell
+      - name: Sign NSIS installer (Azure Trusted Signing)
+        if: steps.codesign.outputs.enabled == 'true'
+        shell: bash
+        env:
+          AZURE_CODESIGNING_ENDPOINT: ${{ secrets.AZURE_CODESIGNING_ENDPOINT }}
+          AZURE_CODESIGNING_ACCOUNT: ${{ secrets.AZURE_CODESIGNING_ACCOUNT }}
+          AZURE_CODESIGNING_PROFILE: ${{ secrets.AZURE_CODESIGNING_PROFILE }}
         run: |
-          # Find signtool.exe in Windows SDK and add to GITHUB_PATH so it persists across steps
-          $signtool = Get-ChildItem -Path "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe" -ErrorAction SilentlyContinue | Sort-Object -Descending | Select-Object -First 1
-          if ($signtool) {
-            Add-Content -Path $env:GITHUB_PATH -Value $signtool.DirectoryName
-            Write-Host "Added signtool from: $($signtool.FullName)"
-          } else {
-            Write-Host "signtool.exe not found, skipping code signing"
-          }
+          EXE="$(ls build/dist/windows-exe/*.exe | head -n1)"
+          if [ -z "$EXE" ]; then echo "::error::No installer EXE found to sign."; exit 1; fi
+          java -jar "$JSIGN_JAR" \
+            --storetype TRUSTEDSIGNING \
+            --keystore "https://${AZURE_CODESIGNING_ENDPOINT}" \
+            --storepass "$AZURE_ACCESS_TOKEN" \
+            --alias "${AZURE_CODESIGNING_ACCOUNT}/${AZURE_CODESIGNING_PROFILE}" \
+            --tsaurl http://timestamp.acs.microsoft.com/ \
+            --tsmode RFC3161 \
+            "$EXE"
+          echo "Signed installer: $EXE"
 
-      - name: Generate self-signed Authenticode certificate
+      - name: Verify Authenticode signatures
+        if: steps.codesign.outputs.enabled == 'true'
         shell: powershell
         run: |
-          $cert = New-SelfSignedCertificate `
-            -Type CodeSigningCert `
-            -Subject "CN=AugustinLR17, O=AugustinLR17, C=FR" `
-            -HashAlgorithm SHA256 `
-            -CertStoreLocation "Cert:\CurrentUser\My"
-          Export-Certificate -Cert $cert -FilePath build/dist/signing.cer | Out-Null
-          echo "CERT_THUMBPRINT=$($cert.Thumbprint)" >> $env:GITHUB_ENV
-
-      - name: Sign EXE installer with Authenticode
-        shell: powershell
-        run: |
-          $exe = Get-ChildItem -Path build/dist/windows-exe -Filter *.exe | Select-Object -First 1
-          if ($exe) {
-            & signtool sign /fd SHA256 /sha1 $env:CERT_THUMBPRINT /tr http://timestamp.digicert.com /td SHA256 $exe.FullName 2>$null
-            if ($LASTEXITCODE -ne 0) {
-              # Fallback: sign without timestamp (offline CI)
-              & signtool sign /fd SHA256 /sha1 $env:CERT_THUMBPRINT $exe.FullName
+          # Confirm both binaries carry a Trusted Signing signature before publishing.
+          foreach ($f in @(
+            "build\dist\appimage\Local Hardware Bridge\Local Hardware Bridge.exe",
+            (Get-ChildItem -Path build\dist\windows-exe\*.exe | Select-Object -First 1).FullName
+          )) {
+            $sig = Get-AuthenticodeSignature -FilePath $f
+            Write-Host "$f -> Status: $($sig.Status), Signer: $($sig.SignerCertificate.Subject)"
+            if ($sig.Status -ne 'Valid') {
+              Write-Host "::error::Signature on $f is $($sig.Status)."
+              exit 1
             }
           }
 

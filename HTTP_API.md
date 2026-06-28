@@ -125,7 +125,7 @@ Return application version info.
 **Response:**
 
 ```json
-{"appName": "Local Hardware Bridge", "appId": "io.github.augustinlr17.localhardwarebridge", "version": "1.0.3"}
+{"appName": "Local Hardware Bridge", "appId": "io.github.augustinlr17.localhardwarebridge", "version": "2.0.0"}
 ```
 
 ### POST /system/restart.json
