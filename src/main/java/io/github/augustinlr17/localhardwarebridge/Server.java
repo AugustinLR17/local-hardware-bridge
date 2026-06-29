@@ -243,6 +243,14 @@ public class Server implements WebSocketServerInterface {
                 rule = null; // ignore any disable/password rule
             }
 
+            // Block disabled endpoints with 403 — this must run before the global token
+            // check so that a valid token does NOT bypass an endpoint that has been
+            // explicitly disabled. (e.g. /printer disabled on a quality-control zone.)
+            if (rule != null && !rule.isEnabled()) {
+                ctx.res().sendError(403, "Endpoint disabled");
+                return;
+            }
+
             // Check global token if enabled
             if (serverConfig.getAuthentication().isEnabled()) {
                 String expectedToken = serverConfig.getAuthentication().getToken();
@@ -269,13 +277,9 @@ public class Server implements WebSocketServerInterface {
                 return;
             }
 
-            // Block disabled endpoints with 403
-            if (rule != null && !rule.isEnabled()) {
-                ctx.res().sendError(403, "Endpoint disabled");
-                return;
-            }
-
-            // Check endpoint-specific password if set
+            // Check endpoint-specific password if set (only reached when global auth is
+            // disabled OR no global token is configured — a valid global token returns
+            // above before reaching this point).
             if (rule != null && rule.getPassword() != null && !rule.getPassword().isEmpty()) {
                 String expectedPassword = rule.getPassword();
                 try {

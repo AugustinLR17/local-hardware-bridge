@@ -225,7 +225,7 @@ docs/                           — Code signing policy
 ### Auth & Endpoint Security
 - **Global token auth** (`config.server.authentication`): when enabled, all HTTP requests require a Bearer token (`Authorization: Bearer <token>`) or Basic auth (password = token, username ignored). Comparison is **constant-time** via `MessageDigest.isEqual` — not suffix-based.
 - **WebSocket auth**: when global auth is enabled, WS connections must pass `?token=<token>` as a query param (constant-time comparison). Invalid tokens get closed with code 1003.
-- **Per-endpoint security rules** (`config.security.endpoints`): a map of path → `{enabled, password}`. Disabled endpoints return 403. Endpoints with a password require Bearer/Basic auth with that specific password (in addition to or instead of the global token). Dynamic paths like `/serial/SCALE` match the `/serial/{type}` rule.
+- **Per-endpoint security rules** (`config.security.endpoints`): a map of path → `{enabled, password}`. Disabled endpoints return 403 — this check runs **before** the global token check, so a valid token does NOT bypass a disabled endpoint. Endpoints with a password require Bearer/Basic auth with that specific password (in addition to or instead of the global token). Dynamic paths like `/serial/SCALE` match the `/serial/{type}` rule.
 - **Always-exempt endpoints**: `/system/health` bypasses all auth (global token, endpoint rules) so Docker/K8s/load-balancer health probes always work. `/config.json` ignores endpoint security rules (disable/password) so the Web UI loads, but still requires the global token when auth is enabled.
 - CORS: configurable per-origin allow-list (`config.server.cors`), defaults to allow-all.
 
