@@ -45,8 +45,16 @@ done
 python3 /app/test.py
 TEST_EXIT=$?
 
+# Run cross-bridge multi-tenant tests (3 bridge instances on ports 12212-12214)
+python3 /app/test-cross-bridge.py
+CROSS_EXIT=$?
+
 # Cleanup
 kill $BRIDGE_PID 2>/dev/null || true
 wait $BRIDGE_PID 2>/dev/null || true
 
-exit $TEST_EXIT
+# Exit with failure if either test suite failed
+if [ $TEST_EXIT -ne 0 ]; then
+    exit $TEST_EXIT
+fi
+exit $CROSS_EXIT
