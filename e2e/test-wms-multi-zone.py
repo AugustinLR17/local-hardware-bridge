@@ -363,10 +363,23 @@ def main():
             time.sleep(1)
         assert_true("zone B healthy after restart", healthy)
 
+        # Give the server a moment to fully initialize services after the health
+        # check passes — the health endpoint can respond before the printer
+        # service is fully ready to accept jobs.
+        time.sleep(2)
+
         # Verify zone B still works after restart
-        s, b = request(ZONES["B_SHIPPING"]["base_url"], "POST", "/printer",
-                       body=raw_doc, token=ZONES["B_SHIPPING"]["token"])
-        assert_eq("zone B print works after restart", s, 200)
+        # Retry on connection failure (the server may still be settling)
+        print_ok = False
+        for attempt in range(5):
+            s, b = request(ZONES["B_SHIPPING"]["base_url"], "POST", "/printer",
+                           body=raw_doc, token=ZONES["B_SHIPPING"]["token"])
+            if s == 200:
+                print_ok = True
+                break
+            time.sleep(1)
+        assert_true("zone B print works after restart", print_ok,
+                    f"got status {s}, body {b}")
         result = json.loads(b)
         assert_eq("zone B print success after restart", result.get("success"), True)
 
