@@ -24,11 +24,12 @@ WORKDIR /app
 COPY build/libs/local-hardware-bridge-*.jar /app/local-hardware-bridge.jar
 COPY e2e/test.py /app/test.py
 COPY e2e/test-cross-bridge.py /app/test-cross-bridge.py
+COPY e2e/test-wms-multi-zone.py /app/test-wms-multi-zone.py
 COPY e2e/print-test.pdf /app/print-test.pdf
 COPY e2e/entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
-# Expose bridge ports (12212 = default, 12213/12214 = cross-bridge test instances)
-EXPOSE 12212 12213 12214
+# Expose bridge ports (12212-12214 = cross-bridge, 12215-12217 = WMS multi-zone)
+EXPOSE 12212 12213 12214 12215 12216 12217
 
 ENTRYPOINT ["/app/entrypoint.sh"]

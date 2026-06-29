@@ -45,16 +45,27 @@ done
 python3 /app/test.py
 TEST_EXIT=$?
 
+# Kill the first bridge so the cross-bridge test can start its own instances
+kill $BRIDGE_PID 2>/dev/null || true
+wait $BRIDGE_PID 2>/dev/null || true
+
 # Run cross-bridge multi-tenant tests (3 bridge instances on ports 12212-12214)
 python3 /app/test-cross-bridge.py
 CROSS_EXIT=$?
 
-# Cleanup
-kill $BRIDGE_PID 2>/dev/null || true
-wait $BRIDGE_PID 2>/dev/null || true
+# Kill any remaining bridge processes before starting WMS tests
+pkill -f "local-hardware-bridge.jar" 2>/dev/null || true
+sleep 2
 
-# Exit with failure if either test suite failed
+# Run WMS multi-zone tests (3 zone bridges on ports 12215-12217)
+python3 /app/test-wms-multi-zone.py
+WMS_EXIT=$?
+
+# Exit with failure if any test suite failed
 if [ $TEST_EXIT -ne 0 ]; then
     exit $TEST_EXIT
 fi
-exit $CROSS_EXIT
+if [ $CROSS_EXIT -ne 0 ]; then
+    exit $CROSS_EXIT
+fi
+exit $WMS_EXIT
