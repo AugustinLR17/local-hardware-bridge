@@ -1,5 +1,6 @@
 package io.github.augustinlr17.localhardwarebridge;
 
+import io.github.augustinlr17.localhardwarebridge.dtos.Config;
 import io.github.augustinlr17.localhardwarebridge.services.ConfigService;
 import io.github.augustinlr17.localhardwarebridge.services.UpdateService;
 
