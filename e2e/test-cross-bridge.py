@@ -161,15 +161,18 @@ def write_config_json(workdir, port, token=None, auth_enabled=False):
     return config_path
 
 
-def wait_for_port_free(port, timeout=30):
+def wait_for_port_free(port, timeout=60):
     """Wait until no process is listening on the given port."""
+    import socket
     deadline = time.time() + timeout
     while time.time() < deadline:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(1)
         try:
-            s, b = request(f"http://127.0.0.1:{port}", "GET", "/system/health")
-            if s == -1:
-                return True  # connection refused = port is free
-        except Exception:
+            sock.connect(("127.0.0.1", port))
+            sock.close()
+            # Port is still in use, wait
+        except (ConnectionRefusedError, OSError):
             return True
         time.sleep(1)
     return False
