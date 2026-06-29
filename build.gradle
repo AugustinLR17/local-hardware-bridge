@@ -7,8 +7,10 @@ plugins {
 group 'io.github.augustinlr17'
 version '2.0.0'
 
-sourceCompatibility = '21'
-targetCompatibility = '21'
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
 
 repositories {
     mavenCentral()
@@ -29,11 +31,11 @@ dependencies {
     implementation group: 'io.javalin', name: 'javalin', version: '6.2.0'
     implementation group: 'io.javalin.community.ssl', name: 'ssl-plugin', version: '6.2.0'
 
-    compileOnly 'org.projectlombok:lombok:1.18.34'
-    annotationProcessor 'org.projectlombok:lombok:1.18.34'
+    compileOnly 'org.projectlombok:lombok:1.18.38'
+    annotationProcessor 'org.projectlombok:lombok:1.18.38'
 
-    testCompileOnly 'org.projectlombok:lombok:1.18.34'
-    testAnnotationProcessor 'org.projectlombok:lombok:1.18.34'
+    testCompileOnly 'org.projectlombok:lombok:1.18.38'
+    testAnnotationProcessor 'org.projectlombok:lombok:1.18.38'
 
     testImplementation group: 'junit', name: 'junit', version: '4.13.2'
 }

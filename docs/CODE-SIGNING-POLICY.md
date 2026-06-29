@@ -41,7 +41,7 @@ release:
 
 The signing configuration is defined in:
 - `.github/workflows/release.yml` (CI signing steps)
-- `BUILD.md` (local signing instructions)
+- [Development Guide](https://github.com/AugustinLR17/local-hardware-bridge/wiki/Development-Guide) (local signing instructions)
 
 ## Access Control
 

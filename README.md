@@ -100,7 +100,7 @@ graph LR
 
 ## REST API
 
-Full API documentation: [HTTP_API.md](HTTP_API.md)
+Full API documentation: [HTTP API Reference](https://github.com/AugustinLR17/local-hardware-bridge/wiki/HTTP-API-Reference)
 
 ### Quick Reference
 
@@ -248,15 +248,22 @@ You can also enable global Bearer/Basic auth under **Advanced → Server → Aut
 
 ## Documentation
 
-| Document | Description |
-|----------|-------------|
-| [HTTP API Reference](HTTP_API.md) | Complete REST & WebSocket API docs |
-| [Configuration](CONFIGURATION.md) | All config options explained |
-| [Advanced](ADVANCED.md) | Auth, TLS/WSS, advanced settings |
-| [Build Instructions](BUILD.md) | Build from source, create installers |
-| [Troubleshooting](TROUBLESHOOT.md) | Common issues and fixes |
-| [Architecture](ARCHITECTURE.md) | Internal architecture and design |
-| [Changelog](CHANGELOG.md) | Version history |
+Full documentation lives in the [GitHub Wiki](https://github.com/AugustinLR17/local-hardware-bridge/wiki).
+
+| Wiki Page | Description |
+|-----------|-------------|
+| [Getting Started](https://github.com/AugustinLR17/local-hardware-bridge/wiki/Getting-Started) | Install and print in 5 minutes |
+| [Installation](https://github.com/AugustinLR17/local-hardware-bridge/wiki/Installation) | Per-platform setup |
+| [Configuration Reference](https://github.com/AugustinLR17/local-hardware-bridge/wiki/Configuration-Reference) | All config options explained |
+| [HTTP API Reference](https://github.com/AugustinLR17/local-hardware-bridge/wiki/HTTP-API-Reference) | Complete REST API docs |
+| [WebSocket Protocol](https://github.com/AugustinLR17/local-hardware-bridge/wiki/WebSocket-Protocol) | Real-time channels |
+| [Browser Integration](https://github.com/AugustinLR17/local-hardware-bridge/wiki/Browser-Integration) | JS SDK & framework examples |
+| [Security and Hardening](https://github.com/AugustinLR17/local-hardware-bridge/wiki/Security-and-Hardening) | Auth, TLS, SSRF, CORS |
+| [Deployment Guides](https://github.com/AugustinLR17/local-hardware-bridge/wiki/Deployment-Guides) | systemd, launchd, auto-start |
+| [Architecture](https://github.com/AugustinLR17/local-hardware-bridge/wiki/Architecture) | Internal design |
+| [Development Guide](https://github.com/AugustinLR17/local-hardware-bridge/wiki/Development-Guide) | Build, test, contribute |
+| [Troubleshooting](https://github.com/AugustinLR17/local-hardware-bridge/wiki/Troubleshooting) | Common issues and fixes |
+| [FAQ](https://github.com/AugustinLR17/local-hardware-bridge/wiki/FAQ) | Frequently asked questions |
 
 ## Browser Integration
 

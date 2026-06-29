@@ -163,7 +163,7 @@ jobs:
         run: |
           if [ -z "$AZURE_TENANT_ID" ] || [ -z "$AZURE_CLIENT_ID" ] || [ -z "$AZURE_CLIENT_SECRET" ]; then
             echo "enabled=false" >> "$GITHUB_OUTPUT"
-            echo "::warning::Azure Trusted Signing secrets are not configured. Windows binaries will be UNSIGNED and will trigger antivirus / SmartScreen warnings (e.g. Microsoft Defender ASEP persistence alerts). See BUILD.md -> Code signing."
+            echo "::warning::Azure Trusted Signing secrets are not configured. Windows binaries will be UNSIGNED and will trigger antivirus / SmartScreen warnings (e.g. Microsoft Defender ASEP persistence alerts). See the Development Guide wiki -> Code signing."
             exit 0
           fi
           echo "enabled=true" >> "$GITHUB_OUTPUT"
