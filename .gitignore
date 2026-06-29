@@ -16,3 +16,6 @@ config.json
 # Python caches
 __pycache__/
 *.pyc
+
+# SonarQube analysis working directory
+.scannerwork/
