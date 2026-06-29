@@ -19,15 +19,15 @@ public class SystemDTOTest {
     @Test
     public void printServiceDtoNoArgsLeavesNulls() {
         PrintServiceDTO dto = new PrintServiceDTO();
-        assertNull(dto.name);
-        assertNull(dto.description);
+        assertNull(dto.getName());
+        assertNull(dto.getDescription());
     }
 
     @Test
     public void printServiceDtoAllArgsSetsFields() {
         PrintServiceDTO dto = new PrintServiceDTO("HP LaserJet", "Office printer");
-        assertEquals("HP LaserJet", dto.name);
-        assertEquals("Office printer", dto.description);
+        assertEquals("HP LaserJet", dto.getName());
+        assertEquals("Office printer", dto.getDescription());
     }
 
     @Test
@@ -36,8 +36,8 @@ public class SystemDTOTest {
         String json = mapper.writeValueAsString(original);
         PrintServiceDTO restored = mapper.readValue(json, PrintServiceDTO.class);
 
-        assertEquals(original.name, restored.name);
-        assertEquals(original.description, restored.description);
+        assertEquals(original.getName(), restored.getName());
+        assertEquals(original.getDescription(), restored.getDescription());
     }
 
     // --- SerialPortDTO ---
@@ -45,17 +45,17 @@ public class SystemDTOTest {
     @Test
     public void serialPortDtoNoArgsLeavesNulls() {
         SerialPortDTO dto = new SerialPortDTO();
-        assertNull(dto.name);
-        assertNull(dto.description);
-        assertNull(dto.manufacturer);
+        assertNull(dto.getName());
+        assertNull(dto.getDescription());
+        assertNull(dto.getManufacturer());
     }
 
     @Test
     public void serialPortDtoAllArgsSetsFields() {
         SerialPortDTO dto = new SerialPortDTO("COM3", "USB Serial", "FTDI");
-        assertEquals("COM3", dto.name);
-        assertEquals("USB Serial", dto.description);
-        assertEquals("FTDI", dto.manufacturer);
+        assertEquals("COM3", dto.getName());
+        assertEquals("USB Serial", dto.getDescription());
+        assertEquals("FTDI", dto.getManufacturer());
     }
 
     @Test
@@ -64,8 +64,8 @@ public class SystemDTOTest {
         String json = mapper.writeValueAsString(original);
         SerialPortDTO restored = mapper.readValue(json, SerialPortDTO.class);
 
-        assertEquals(original.name, restored.name);
-        assertEquals(original.description, restored.description);
-        assertEquals(original.manufacturer, restored.manufacturer);
+        assertEquals(original.getName(), restored.getName());
+        assertEquals(original.getDescription(), restored.getDescription());
+        assertEquals(original.getManufacturer(), restored.getManufacturer());
     }
 }

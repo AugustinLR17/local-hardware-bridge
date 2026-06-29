@@ -1,8 +1,5 @@
 package io.github.augustinlr17.localhardwarebridge.utils;
 
-import java.util.ArrayList;
-import java.util.List;
-
 /**
  * Compares semantic version strings.
  *

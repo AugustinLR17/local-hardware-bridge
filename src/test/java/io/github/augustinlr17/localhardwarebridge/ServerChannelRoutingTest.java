@@ -50,9 +50,9 @@ public class ServerChannelRoutingTest {
         }
 
         @Override
-        public void start() {}
+        public void start() { /* no-op */ }
         @Override
-        public void stop() {}
+        public void stop() { /* no-op */ }
         @Override
         public void messageToService(String message) {
             receivedMessages.add(message);
@@ -62,9 +62,9 @@ public class ServerChannelRoutingTest {
             receivedBinary.add(message);
         }
         @Override
-        public void onRegister(WebSocketServerInterface server) {}
+        public void onRegister(WebSocketServerInterface server) { /* no-op */ }
         @Override
-        public void onUnregister() {}
+        public void onUnregister() { /* no-op */ }
         @Override
         public String getChannel() {
             return channel;

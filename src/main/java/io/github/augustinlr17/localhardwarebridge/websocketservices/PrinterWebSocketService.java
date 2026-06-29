@@ -47,14 +47,10 @@ public class PrinterWebSocketService implements WebSocketServiceInterface {
     }
 
     @Override
-    public void start() {
-
-    }
+    public void start() { /* no-op: initialization done in constructor */ }
 
     @Override
-    public void stop() {
-
-    }
+    public void stop() { /* no-op: no resources to clean up */ }
 
     @Override
     public void messageToService(String message) {
@@ -146,7 +142,7 @@ public class PrinterWebSocketService implements WebSocketServiceInterface {
     /**
      * Return if PrintDocument is raw
      */
-    private Boolean isRaw(PrintDocument printDocument) {
+    private boolean isRaw(PrintDocument printDocument) {
         return printDocument.getRawContent() != null && !printDocument.getRawContent().isEmpty();
     }
 
@@ -169,7 +165,7 @@ public class PrinterWebSocketService implements WebSocketServiceInterface {
     /**
      * Return if PrintDocument is image
      */
-    private Boolean isImage(PrintDocument printDocument) {
+    private boolean isImage(PrintDocument printDocument) {
         String filename = urlFilename(printDocument);
 
         return filename.toLowerCase().matches("^.*\\.(jpg|jpeg|png|gif)$");
@@ -178,7 +174,7 @@ public class PrinterWebSocketService implements WebSocketServiceInterface {
     /**
      * Return if PrintDocument is PDF
      */
-    private Boolean isPDF(PrintDocument printDocument) {
+    private boolean isPDF(PrintDocument printDocument) {
         String filename = urlFilename(printDocument);
 
         return filename.toLowerCase().matches("^.*\\.(pdf)$");

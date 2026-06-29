@@ -192,17 +192,11 @@ public class SerialWebSocketServiceWriteTest {
 
     /** Minimal mock server for onRegister/onUnregister tests. */
     private static class MockServer implements WebSocketServerInterface {
-        @Override
-        public void messageToServer(String channel, String message) {}
-        @Override
-        public void messageToServer(String channel, byte[] message) {}
-        @Override
-        public void messageToService(String channel, String message) {}
-        @Override
-        public void messageToService(String channel, byte[] message) {}
-        @Override
-        public void registerService(WebSocketServiceInterface service) {}
-        @Override
-        public void unregisterService(WebSocketServiceInterface service) {}
+        @Override public void messageToServer(String channel, String message) { /* no-op */ }
+        @Override public void messageToServer(String channel, byte[] message) { /* no-op */ }
+        @Override public void messageToService(String channel, String message) { /* no-op */ }
+        @Override public void messageToService(String channel, byte[] message) { /* no-op */ }
+        @Override public void registerService(WebSocketServiceInterface service) { /* no-op */ }
+        @Override public void unregisterService(WebSocketServiceInterface service) { /* no-op */ }
     }
 }

@@ -27,6 +27,13 @@ import java.util.Objects;
 public class GUI implements WebSocketServiceInterface {
     private static final ConfigService configService = ConfigService.getInstance();
 
+    // System property keys (avoid duplicated literals — java:S1192)
+    private static final String OS_NAME_PROP = "os.name";
+    private static final String JAVA_HOME_PROP = "java.home";
+    private static final String USER_DIR_PROP = "user.dir";
+    private static final String PKEXEC = "pkexec";
+    private static final String SYSTEMCTL = "systemctl";
+
     private final Server server = new Server();
     private Config config = configService.getConfig();
 
@@ -40,7 +47,7 @@ public class GUI implements WebSocketServiceInterface {
         // -cp). Anchoring is idempotent and a no-op outside a packaged JAR.
         AppHome.anchor();
 
-        String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
+        String os = System.getProperty(OS_NAME_PROP, "").toLowerCase(Locale.ROOT);
         boolean forceServer = Boolean.getBoolean("lhb.server");
         boolean forceHeadless = Boolean.getBoolean("lhb.headless");
 
@@ -56,10 +63,10 @@ public class GUI implements WebSocketServiceInterface {
             // System.console() returns null when running under javaw.exe (no console window)
             // If it returns non-null, we have a console attached → re-spawn under javaw
             if (System.console() != null) {
-                String javawExe = System.getProperty("java.home") + "\\bin\\javaw.exe";
+                String javawExe = System.getProperty(JAVA_HOME_PROP) + "\\bin\\javaw.exe";
                 if (new File(javawExe).exists()) {
                     String classpath = System.getProperty("java.class.path");
-                    String workingDir = System.getProperty("user.dir");
+                    String workingDir = System.getProperty(USER_DIR_PROP);
                     ProcessBuilder pb = new ProcessBuilder(
                         javawExe,
                         "-cp", classpath,
@@ -84,7 +91,7 @@ public class GUI implements WebSocketServiceInterface {
     public void launch() throws Exception {
         server.start();
 
-        String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
+        String os = System.getProperty(OS_NAME_PROP, "").toLowerCase(Locale.ROOT);
 
         // On Linux, offer to install systemd service for auto-start
         if (os.contains("linux")) {
@@ -325,10 +332,10 @@ public class GUI implements WebSocketServiceInterface {
                 );
                 if (choice == JOptionPane.YES_OPTION) {
                     // Stop and remove legacy service first
-                    new ProcessBuilder("pkexec", "systemctl", "disable", "--now", "webapp-hardware-bridge.service")
+                    new ProcessBuilder(PKEXEC, SYSTEMCTL, "disable", "--now", "webapp-hardware-bridge.service")
                         .redirectErrorStream(true).start().waitFor();
                     Files.deleteIfExists(legacyServiceFile);
-                    new ProcessBuilder("pkexec", "systemctl", "daemon-reload")
+                    new ProcessBuilder(PKEXEC, SYSTEMCTL, "daemon-reload")
                         .redirectErrorStream(true).start().waitFor();
                     // Then install new service
                     installLinuxService();
@@ -388,8 +395,8 @@ public class GUI implements WebSocketServiceInterface {
 
             if (choice == JOptionPane.YES_OPTION) {
                 String classpath = System.getProperty("java.class.path");
-                String javaHome = System.getProperty("java.home");
-                String workingDir = System.getProperty("user.dir");
+                String javaHome = System.getProperty(JAVA_HOME_PROP);
+                String workingDir = System.getProperty(USER_DIR_PROP);
                 String javaExec = javaHome + "/bin/java";
 
                 String plistContent = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
@@ -423,8 +430,8 @@ public class GUI implements WebSocketServiceInterface {
     private void installLinuxService() {
         try {
             String jarPath = Paths.get(GUI.class.getProtectionDomain().getCodeSource().getLocation().toURI()).toAbsolutePath().toString();
-            String workingDir = System.getProperty("user.dir");
-            String javaExec = System.getProperty("java.home") + "/bin/java";
+            String workingDir = System.getProperty(USER_DIR_PROP);
+            String javaExec = System.getProperty(JAVA_HOME_PROP) + "/bin/java";
 
             String serviceContent = "[Unit]\n"
                 + "# LHB_VERSION=" + Constants.VERSION + "\n"
@@ -444,13 +451,13 @@ public class GUI implements WebSocketServiceInterface {
             restrictTempFilePermissions(tempFile);
             Files.writeString(tempFile, serviceContent, StandardOpenOption.TRUNCATE_EXISTING);
 
-            ProcessBuilder copy = new ProcessBuilder("pkexec", "cp", tempFile.toString(), "/etc/systemd/system/local-hardware-bridge.service");
+            ProcessBuilder copy = new ProcessBuilder(PKEXEC, "cp", tempFile.toString(), "/etc/systemd/system/local-hardware-bridge.service");
             copy.inheritIO().start().waitFor();
 
-            ProcessBuilder daemonReload = new ProcessBuilder("pkexec", "systemctl", "daemon-reload");
+            ProcessBuilder daemonReload = new ProcessBuilder(PKEXEC, SYSTEMCTL, "daemon-reload");
             daemonReload.inheritIO().start().waitFor();
 
-            ProcessBuilder enable = new ProcessBuilder("pkexec", "systemctl", "enable", "--now", "local-hardware-bridge.service");
+            ProcessBuilder enable = new ProcessBuilder(PKEXEC, SYSTEMCTL, "enable", "--now", "local-hardware-bridge.service");
             enable.inheritIO().start().waitFor();
 
             Files.deleteIfExists(tempFile);
@@ -481,7 +488,7 @@ public class GUI implements WebSocketServiceInterface {
 
     public void notify(String title, String message, TrayIcon.MessageType messageType) {
         try {
-            String os = System.getProperty("os.name", "").toLowerCase(Locale.ROOT);
+            String os = System.getProperty(OS_NAME_PROP, "").toLowerCase(Locale.ROOT);
             if (os.contains("linux")) {
                 // Use notify-send (libnotify) on Linux
                 String urgency = switch (messageType) {
@@ -527,12 +534,10 @@ public class GUI implements WebSocketServiceInterface {
     }
 
     @Override
-    public void start() {
-    }
+    public void start() { /* no-op: GUI has no startup beyond launch() */ }
 
     @Override
-    public void stop() {
-    }
+    public void stop() { /* no-op: GUI has no shutdown beyond System.exit */ }
 
     @Override
     public void messageToService(String message) {
@@ -546,16 +551,13 @@ public class GUI implements WebSocketServiceInterface {
     }
 
     @Override
-    public void messageToService(byte[] message) {
-    }
+    public void messageToService(byte[] message) { /* no-op: GUI only handles text notifications */ }
 
     @Override
-    public void onRegister(WebSocketServerInterface server) {
-    }
+    public void onRegister(WebSocketServerInterface server) { /* no-op */ }
 
     @Override
-    public void onUnregister() {
-    }
+    public void onUnregister() { /* no-op */ }
 
     @Override
     public String getChannel() {

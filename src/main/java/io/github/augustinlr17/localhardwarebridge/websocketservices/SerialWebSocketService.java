@@ -76,7 +76,7 @@ public class SerialWebSocketService implements WebSocketServiceInterface {
                         continue;
                     }
 
-                    int bytesToRead = mapping.getReadMultipleBytes() ? bytesAvailable : 1;
+                    int bytesToRead = Boolean.TRUE.equals(mapping.getReadMultipleBytes()) ? bytesAvailable : 1;
 
                     byte[] receivedData = new byte[bytesToRead];
                     serialPort.readBytes(receivedData, bytesToRead);

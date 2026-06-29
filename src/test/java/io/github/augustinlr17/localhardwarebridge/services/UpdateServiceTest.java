@@ -621,7 +621,6 @@ public class UpdateServiceTest {
 
     @Test
     public void downloadAssetOverwritesExistingFile() throws Exception {
-        byte[] payload1 = "version 1".getBytes();
         byte[] payload2 = "version 2".getBytes();
 
         startMockServer(exchange -> {

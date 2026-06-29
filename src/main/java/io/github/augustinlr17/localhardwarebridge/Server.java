@@ -48,6 +48,23 @@ public class Server implements WebSocketServerInterface {
     private static final ObjectMapper objectMapper = new ObjectMapper();
     private static final ConfigService configService = ConfigService.getInstance();
 
+    // Channel and path constants (avoid duplicated literals — java:S1192)
+    private static final String NOTIFICATION_CHANNEL = "/notification";
+    private static final String CONFIG_PATH = "/config.json";
+    private static final String SERIAL_PREFIX = "/serial/";
+    private static final String ERROR_JSON_PREFIX = "{\"error\": \"";
+    private static final String ALREADY_RESTARTING = "{\"status\": \"already restarting\"}";
+    private static final String SYSTEMD_PATH = "/etc/systemd/system/";
+    private static final String SYSTEMCTL = "systemctl";
+    private static final String NOW_FLAG = "--now";
+
+    // Service name constants for health/logging
+    private static final String PRINTER_SERVICE = "Printer";
+    private static final String SERIAL_SERVICE = "Serial";
+    private static final String UPDATE_SERVICE = "Update";
+    private static final String WARNING_LEVEL = "WARNING";
+    private static final String ENABLED_FIELD = "enabled";
+
     private final ConcurrentHashMap<String, ConcurrentLinkedQueue<WsContext>> socketChannelSubscriptions = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, ConcurrentLinkedQueue<WebSocketServiceInterface>> serviceChannelSubscriptions = new ConcurrentHashMap<>();
     private final ConcurrentLinkedQueue<WebSocketServiceInterface> services = new ConcurrentLinkedQueue<>();
@@ -210,7 +227,7 @@ public class Server implements WebSocketServerInterface {
                     log.error(message);
 
                     try {
-                        messageToService("/notification", objectMapper.writeValueAsString(new NotificationDTO("ERROR", "Serial", message)));
+                        messageToService(NOTIFICATION_CHANNEL, objectMapper.writeValueAsString(new NotificationDTO("ERROR", SERIAL_SERVICE, message)));
                     } catch (JsonProcessingException ex) {
                         log.error("Failed to send notification: {}", ex.getMessage());
                     }
@@ -227,7 +244,7 @@ public class Server implements WebSocketServerInterface {
             Config.EndpointRule rule = security.getEndpoints().get(path);
             if (rule == null) {
                 // Try prefix match for dynamic paths like /serial/SCALE → /serial/{type}
-                if (path.startsWith("/serial/")) {
+                if (path.startsWith(SERIAL_PREFIX)) {
                     rule = security.getEndpoints().get("/serial/{type}");
                 }
             }
@@ -240,7 +257,7 @@ public class Server implements WebSocketServerInterface {
             }
 
             // Critical endpoints required for the Web UI must always stay enabled
-            if ("/config.json".equals(path)) {
+            if (CONFIG_PATH.equals(path)) {
                 rule = null; // ignore any disable/password rule
             }
 
@@ -448,10 +465,6 @@ public class Server implements WebSocketServerInterface {
     /*
      * Socket to Channel operations
      */
-    private ConcurrentLinkedQueue<WsContext> getSocketsForChannel(String channel) {
-        return socketChannelSubscriptions.getOrDefault(channel, new ConcurrentLinkedQueue<>());
-    }
-
     void addSocketToChannel(String channel, WsContext socket) {
         socketChannelSubscriptions.computeIfAbsent(channel, k -> new ConcurrentLinkedQueue<>()).add(socket);
     }
@@ -496,15 +509,15 @@ public class Server implements WebSocketServerInterface {
      * HTTP API - Config endpoints
      */
     private void registerConfigEndpoints() {
-        javalinServer.get("/config.json", ctx -> {
+        javalinServer.get(CONFIG_PATH, ctx -> {
             ctx.contentType(ContentType.APPLICATION_JSON).result(configService.getConfig().toJson());
         });
 
-        javalinServer.put("/config.json", ctx -> {
+        javalinServer.put(CONFIG_PATH, ctx -> {
             configService.loadFromJson(ctx.body());
             configService.save();
 
-            messageToService("/notification", objectMapper.writeValueAsString(new NotificationDTO("INFO", "Setting", "Setting saved successfully")));
+            messageToService(NOTIFICATION_CHANNEL, objectMapper.writeValueAsString(new NotificationDTO("INFO", "Setting", "Setting saved successfully")));
 
             ctx.contentType(ContentType.APPLICATION_JSON).result(configService.getConfig().toJson());
         });
@@ -539,7 +552,7 @@ public class Server implements WebSocketServerInterface {
                 ctx.contentType(ContentType.APPLICATION_JSON).result(objectMapper.writeValueAsString(result));
             } catch (Exception e) {
                 log.error("HTTP print error: {}", e.getMessage());
-                ctx.status(500).json("{\"error\": \"" + String.valueOf(e.getMessage()).replace("\"", "'") + "\"}");
+                ctx.status(500).json(ERROR_JSON_PREFIX + String.valueOf(e.getMessage()).replace("\"", "'") + "\"}");
             }
         });
 
@@ -555,7 +568,7 @@ public class Server implements WebSocketServerInterface {
             configService.getConfig().getPrinter().getMappings().add(mapping);
             configService.save();
 
-            messageToService("/notification", objectMapper.writeValueAsString(new NotificationDTO("INFO", "Printer", "Printer mapping added: " + mapping.getType())));
+            messageToService(NOTIFICATION_CHANNEL, objectMapper.writeValueAsString(new NotificationDTO("INFO", PRINTER_SERVICE, "Printer mapping added: " + mapping.getType())));
 
             ctx.contentType(ContentType.APPLICATION_JSON).result(objectMapper.writeValueAsString(configService.getConfig().getPrinter()));
         });
@@ -582,7 +595,7 @@ public class Server implements WebSocketServerInterface {
 
             configService.save();
 
-            messageToService("/notification", objectMapper.writeValueAsString(new NotificationDTO("INFO", "Printer", "Printer mapping updated: " + type)));
+            messageToService(NOTIFICATION_CHANNEL, objectMapper.writeValueAsString(new NotificationDTO("INFO", PRINTER_SERVICE, "Printer mapping updated: " + type)));
 
             ctx.contentType(ContentType.APPLICATION_JSON).result(objectMapper.writeValueAsString(configService.getConfig().getPrinter()));
         });
@@ -600,7 +613,7 @@ public class Server implements WebSocketServerInterface {
 
             configService.save();
 
-            messageToService("/notification", objectMapper.writeValueAsString(new NotificationDTO("INFO", "Printer", "Printer mapping deleted: " + type)));
+            messageToService(NOTIFICATION_CHANNEL, objectMapper.writeValueAsString(new NotificationDTO("INFO", PRINTER_SERVICE, "Printer mapping deleted: " + type)));
 
             ctx.contentType(ContentType.APPLICATION_JSON).result(objectMapper.writeValueAsString(configService.getConfig().getPrinter()));
         });
@@ -608,10 +621,10 @@ public class Server implements WebSocketServerInterface {
         // Enable/disable printer service
         javalinServer.put("/printer/enabled", ctx -> {
             JsonNode node = objectMapper.readTree(ctx.body());
-            configService.getConfig().getPrinter().setEnabled(node.get("enabled").asBoolean());
+            configService.getConfig().getPrinter().setEnabled(node.get(ENABLED_FIELD).asBoolean());
             configService.save();
 
-            messageToService("/notification", objectMapper.writeValueAsString(new NotificationDTO("INFO", "Printer", "Printer service " + (node.get("enabled").asBoolean() ? "enabled" : "disabled"))));
+            messageToService(NOTIFICATION_CHANNEL, objectMapper.writeValueAsString(new NotificationDTO("INFO", PRINTER_SERVICE, "Printer service " + (node.get(ENABLED_FIELD).asBoolean() ? ENABLED_FIELD : "disabled"))));
 
             ctx.contentType(ContentType.APPLICATION_JSON).result(objectMapper.writeValueAsString(configService.getConfig().getPrinter()));
         });
@@ -642,7 +655,7 @@ public class Server implements WebSocketServerInterface {
             configService.getConfig().getSerial().getMappings().add(mapping);
             configService.save();
 
-            messageToService("/notification", objectMapper.writeValueAsString(new NotificationDTO("INFO", "Serial", "Serial mapping added: " + mapping.getType())));
+            messageToService(NOTIFICATION_CHANNEL, objectMapper.writeValueAsString(new NotificationDTO("INFO", SERIAL_SERVICE, "Serial mapping added: " + mapping.getType())));
 
             ctx.contentType(ContentType.APPLICATION_JSON).result(objectMapper.writeValueAsString(configService.getConfig().getSerial()));
         });
@@ -669,7 +682,7 @@ public class Server implements WebSocketServerInterface {
 
             configService.save();
 
-            messageToService("/notification", objectMapper.writeValueAsString(new NotificationDTO("INFO", "Serial", "Serial mapping updated: " + type)));
+            messageToService(NOTIFICATION_CHANNEL, objectMapper.writeValueAsString(new NotificationDTO("INFO", SERIAL_SERVICE, "Serial mapping updated: " + type)));
 
             ctx.contentType(ContentType.APPLICATION_JSON).result(objectMapper.writeValueAsString(configService.getConfig().getSerial()));
         });
@@ -687,7 +700,7 @@ public class Server implements WebSocketServerInterface {
 
             configService.save();
 
-            messageToService("/notification", objectMapper.writeValueAsString(new NotificationDTO("INFO", "Serial", "Serial mapping deleted: " + type)));
+            messageToService(NOTIFICATION_CHANNEL, objectMapper.writeValueAsString(new NotificationDTO("INFO", SERIAL_SERVICE, "Serial mapping deleted: " + type)));
 
             ctx.contentType(ContentType.APPLICATION_JSON).result(objectMapper.writeValueAsString(configService.getConfig().getSerial()));
         });
@@ -695,10 +708,10 @@ public class Server implements WebSocketServerInterface {
         // Enable/disable serial service
         javalinServer.put("/serial/enabled", ctx -> {
             JsonNode node = objectMapper.readTree(ctx.body());
-            configService.getConfig().getSerial().setEnabled(node.get("enabled").asBoolean());
+            configService.getConfig().getSerial().setEnabled(node.get(ENABLED_FIELD).asBoolean());
             configService.save();
 
-            messageToService("/notification", objectMapper.writeValueAsString(new NotificationDTO("INFO", "Serial", "Serial service " + (node.get("enabled").asBoolean() ? "enabled" : "disabled"))));
+            messageToService(NOTIFICATION_CHANNEL, objectMapper.writeValueAsString(new NotificationDTO("INFO", SERIAL_SERVICE, "Serial service " + (node.get(ENABLED_FIELD).asBoolean() ? ENABLED_FIELD : "disabled"))));
 
             ctx.contentType(ContentType.APPLICATION_JSON).result(objectMapper.writeValueAsString(configService.getConfig().getSerial()));
         });
@@ -714,15 +727,15 @@ public class Server implements WebSocketServerInterface {
             ArrayList<JsonNode> statuses = new ArrayList<>();
             for (SerialPortDTO dto : dtos) {
                 ObjectNode statusNode = objectMapper.createObjectNode();
-                statusNode.put("port", dto.name);
-                statusNode.put("description", dto.description);
-                statusNode.put("manufacturer", dto.manufacturer);
+                statusNode.put("port", dto.getName());
+                statusNode.put("description", dto.getDescription());
+                statusNode.put("manufacturer", dto.getManufacturer());
 
-                SerialPort port = SerialPort.getCommPort(dto.name);
+                SerialPort port = SerialPort.getCommPort(dto.getName());
                 statusNode.put("open", port.isOpen());
 
                 Config.SerialMapping mapping = configService.getConfig().getSerial().getMappings().stream()
-                    .filter(m -> dto.name.equals(m.getName()))
+                    .filter(m -> dto.getName().equals(m.getName()))
                     .findFirst().orElse(null);
                 statusNode.put("mapped", mapping != null);
                 if (mapping != null) {
@@ -739,7 +752,7 @@ public class Server implements WebSocketServerInterface {
         javalinServer.get("/serial/connections", ctx -> {
             ObjectNode connections = objectMapper.createObjectNode();
             for (Map.Entry<String, ConcurrentLinkedQueue<WsContext>> entry : socketChannelSubscriptions.entrySet()) {
-                if (entry.getKey().startsWith("/serial/")) {
+                if (entry.getKey().startsWith(SERIAL_PREFIX)) {
                     connections.put(entry.getKey(), entry.getValue().size());
                 }
             }
@@ -752,7 +765,7 @@ public class Server implements WebSocketServerInterface {
             String body = ctx.body();
             log.info("HTTP serial write request received for type {}: {}", type, body);
 
-            messageToService("/serial/" + type, body);
+            messageToService(SERIAL_PREFIX + type, body);
 
             ctx.contentType(ContentType.APPLICATION_JSON).result("{\"status\": \"submitted\"}");
         });
@@ -782,11 +795,11 @@ public class Server implements WebSocketServerInterface {
         javalinServer.post("/system/restart.json", ctx -> {
             // No-op if a restart is already in progress.
             if (!restarting.compareAndSet(false, true)) {
-                ctx.status(409).contentType(ContentType.APPLICATION_JSON).result("{\"status\": \"already restarting\"}");
+                ctx.status(409).contentType(ContentType.APPLICATION_JSON).result(ALREADY_RESTARTING);
                 return;
             }
 
-            messageToService("/notification", objectMapper.writeValueAsString(new NotificationDTO("WARNING", "Restart", "Server is restarting...")));
+            messageToService(NOTIFICATION_CHANNEL, objectMapper.writeValueAsString(new NotificationDTO(WARNING_LEVEL, "Restart", "Server is restarting...")));
 
             // Respond before restarting: stop()/start() must NOT run on this Jetty
             // worker thread, otherwise javalinServer.stop() deadlocks shutting down the
@@ -798,7 +811,7 @@ public class Server implements WebSocketServerInterface {
                     stop();
                     ThreadUtil.silentSleep(500);
                     start();
-                    messageToService("/notification", objectMapper.writeValueAsString(new NotificationDTO("INFO", "Restart", "Server restarted successfully")));
+                    messageToService(NOTIFICATION_CHANNEL, objectMapper.writeValueAsString(new NotificationDTO("INFO", "Restart", "Server restarted successfully")));
                 } catch (Exception e) {
                     log.error("Failed to restart server", e);
                 } finally {
@@ -842,7 +855,7 @@ public class Server implements WebSocketServerInterface {
         // Send notification
         javalinServer.post("/system/notification", ctx -> {
             NotificationDTO notification = objectMapper.readValue(ctx.body(), NotificationDTO.class);
-            messageToService("/notification", objectMapper.writeValueAsString(notification));
+            messageToService(NOTIFICATION_CHANNEL, objectMapper.writeValueAsString(notification));
 
             ctx.contentType(ContentType.APPLICATION_JSON).result("{\"status\": \"sent\"}");
         });
@@ -867,7 +880,7 @@ public class Server implements WebSocketServerInterface {
             configService.getConfig().setServer(updated);
             configService.save();
 
-            messageToService("/notification", objectMapper.writeValueAsString(new NotificationDTO("INFO", "Server", "Server configuration updated. Restart required.")));
+            messageToService(NOTIFICATION_CHANNEL, objectMapper.writeValueAsString(new NotificationDTO("INFO", "Server", "Server configuration updated. Restart required.")));
 
             ctx.contentType(ContentType.APPLICATION_JSON).result(objectMapper.writeValueAsString(configService.getConfig().getServer()));
         });
@@ -928,32 +941,32 @@ public class Server implements WebSocketServerInterface {
 
             String serviceName = "local-hardware-bridge.service";
             String legacyServiceName = Constants.LEGACY_SERVICE_NAME + ".service";
-            Path serviceFile = Path.of("/etc/systemd/system/" + serviceName);
+            Path serviceFile = Path.of(SYSTEMD_PATH + serviceName);
 
             try {
                 // Migrate from legacy service name if it exists
-                Path legacyServiceFile = Path.of("/etc/systemd/system/" + legacyServiceName);
+                Path legacyServiceFile = Path.of(SYSTEMD_PATH + legacyServiceName);
                 if (Files.exists(legacyServiceFile)) {
                     log.info("Migrating legacy service {} to {}", legacyServiceName, serviceName);
-                    ProcessBuilder disableLegacy = new ProcessBuilder("systemctl", "disable", "--now", legacyServiceName);
+                    ProcessBuilder disableLegacy = new ProcessBuilder(SYSTEMCTL, "disable", NOW_FLAG, legacyServiceName);
                     disableLegacy.redirectErrorStream(true).start().waitFor();
                     Files.deleteIfExists(legacyServiceFile);
                 }
 
                 Files.writeString(serviceFile, serviceContent, StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
 
-                ProcessBuilder daemonReload = new ProcessBuilder("systemctl", "daemon-reload");
+                ProcessBuilder daemonReload = new ProcessBuilder(SYSTEMCTL, "daemon-reload");
                 daemonReload.redirectErrorStream(true).start().waitFor();
 
-                ProcessBuilder enable = new ProcessBuilder("systemctl", "enable", "--now", serviceName);
+                ProcessBuilder enable = new ProcessBuilder(SYSTEMCTL, "enable", NOW_FLAG, serviceName);
                 enable.redirectErrorStream(true).start().waitFor();
 
-                messageToService("/notification", objectMapper.writeValueAsString(new NotificationDTO("INFO", "Service", "Systemd service installed and started")));
+                messageToService(NOTIFICATION_CHANNEL, objectMapper.writeValueAsString(new NotificationDTO("INFO", "Service", "Systemd service installed and started")));
 
                 ctx.contentType(ContentType.APPLICATION_JSON).result("{\"status\": \"installed\", \"service\": \"" + serviceName + "\"}");
             } catch (Exception e) {
                 log.error("Failed to install systemd service", e);
-                ctx.status(500).result("{\"error\": \"" + String.valueOf(e.getMessage()).replace("\"", "'") + "\"}");
+                ctx.status(500).result(ERROR_JSON_PREFIX + String.valueOf(e.getMessage()).replace("\"", "'") + "\"}");
             }
         });
 
@@ -970,24 +983,24 @@ public class Server implements WebSocketServerInterface {
 
             try {
                 // Uninstall current service
-                ProcessBuilder disable = new ProcessBuilder("systemctl", "disable", "--now", serviceName);
+                ProcessBuilder disable = new ProcessBuilder(SYSTEMCTL, "disable", NOW_FLAG, serviceName);
                 disable.redirectErrorStream(true).start().waitFor();
-                Files.deleteIfExists(Path.of("/etc/systemd/system/" + serviceName));
+                Files.deleteIfExists(Path.of(SYSTEMD_PATH + serviceName));
 
                 // Also clean up legacy service if it exists
-                ProcessBuilder disableLegacy = new ProcessBuilder("systemctl", "disable", "--now", legacyServiceName);
+                ProcessBuilder disableLegacy = new ProcessBuilder(SYSTEMCTL, "disable", NOW_FLAG, legacyServiceName);
                 disableLegacy.redirectErrorStream(true).start().waitFor();
-                Files.deleteIfExists(Path.of("/etc/systemd/system/" + legacyServiceName));
+                Files.deleteIfExists(Path.of(SYSTEMD_PATH + legacyServiceName));
 
-                ProcessBuilder daemonReload = new ProcessBuilder("systemctl", "daemon-reload");
+                ProcessBuilder daemonReload = new ProcessBuilder(SYSTEMCTL, "daemon-reload");
                 daemonReload.redirectErrorStream(true).start().waitFor();
 
-                messageToService("/notification", objectMapper.writeValueAsString(new NotificationDTO("INFO", "Service", "Systemd service uninstalled")));
+                messageToService(NOTIFICATION_CHANNEL, objectMapper.writeValueAsString(new NotificationDTO("INFO", "Service", "Systemd service uninstalled")));
 
                 ctx.contentType(ContentType.APPLICATION_JSON).result("{\"status\": \"uninstalled\"}");
             } catch (Exception e) {
                 log.error("Failed to uninstall systemd service", e);
-                ctx.status(500).result("{\"error\": \"" + String.valueOf(e.getMessage()).replace("\"", "'") + "\"}");
+                ctx.status(500).result(ERROR_JSON_PREFIX + String.valueOf(e.getMessage()).replace("\"", "'") + "\"}");
             }
         });
     }
@@ -1008,16 +1021,16 @@ public class Server implements WebSocketServerInterface {
         javalinServer.get("/system/update/check", ctx -> {
             try {
                 UpdateStatusDTO status = updateService.checkNow();
-                messageToService("/notification", objectMapper.writeValueAsString(new NotificationDTO(
+                messageToService(NOTIFICATION_CHANNEL, objectMapper.writeValueAsString(new NotificationDTO(
                         "INFO",
-                        "Update",
+                        UPDATE_SERVICE,
                         status.isUpdateAvailable()
                                 ? "Update " + status.getLatestVersion() + " is available"
                                 : "Already up to date (" + Constants.VERSION + ")")));
                 ctx.contentType(ContentType.APPLICATION_JSON).result(objectMapper.writeValueAsString(status));
             } catch (Exception e) {
                 log.error("Update check failed", e);
-                ctx.status(500).json("{\"error\": \"" + String.valueOf(e.getMessage()).replace("\"", "'") + "\"}");
+                ctx.status(500).json(ERROR_JSON_PREFIX + String.valueOf(e.getMessage()).replace("\"", "'") + "\"}");
             }
         });
 
@@ -1033,12 +1046,12 @@ public class Server implements WebSocketServerInterface {
                     ctx.status(500).json("{\"error\": \"Download did not produce a file\"}");
                     return;
                 }
-                messageToService("/notification", objectMapper.writeValueAsString(new NotificationDTO(
-                        "INFO", "Update", "Update downloaded: " + downloaded.getFileName() + ". Restart to apply.")));
+                messageToService(NOTIFICATION_CHANNEL, objectMapper.writeValueAsString(new NotificationDTO(
+                        "INFO", UPDATE_SERVICE, "Update downloaded: " + downloaded.getFileName() + ". Restart to apply.")));
                 ctx.contentType(ContentType.APPLICATION_JSON).result("{\"status\": \"downloaded\", \"path\": \"" + downloaded + "\"}");
             } catch (Exception e) {
                 log.error("Update download failed", e);
-                ctx.status(500).json("{\"error\": \"" + String.valueOf(e.getMessage()).replace("\"", "'") + "\"}");
+                ctx.status(500).json(ERROR_JSON_PREFIX + String.valueOf(e.getMessage()).replace("\"", "'") + "\"}");
             }
         });
 
@@ -1053,12 +1066,12 @@ public class Server implements WebSocketServerInterface {
 
                 // Guard against overlapping restarts
                 if (!restarting.compareAndSet(false, true)) {
-                    ctx.status(409).contentType(ContentType.APPLICATION_JSON).result("{\"status\": \"already restarting\"}");
+                    ctx.status(409).contentType(ContentType.APPLICATION_JSON).result(ALREADY_RESTARTING);
                     return;
                 }
 
-                messageToService("/notification", objectMapper.writeValueAsString(new NotificationDTO(
-                        "WARNING", "Update", "Applying update and restarting...")));
+                messageToService(NOTIFICATION_CHANNEL, objectMapper.writeValueAsString(new NotificationDTO(
+                        WARNING_LEVEL, UPDATE_SERVICE, "Applying update and restarting...")));
 
                 ctx.contentType(ContentType.APPLICATION_JSON).result("{\"status\": \"applying\", \"pending\": \"" + pending + "\"}");
 
@@ -1069,8 +1082,8 @@ public class Server implements WebSocketServerInterface {
                         updateService.cleanupOldUpdates();
                         ThreadUtil.silentSleep(500);
                         start();
-                        messageToService("/notification", objectMapper.writeValueAsString(new NotificationDTO(
-                                "INFO", "Update", "Update applied and server restarted successfully")));
+                        messageToService(NOTIFICATION_CHANNEL, objectMapper.writeValueAsString(new NotificationDTO(
+                                "INFO", UPDATE_SERVICE, "Update applied and server restarted successfully")));
                     } catch (Exception e) {
                         log.error("Failed to apply update", e);
                         try {
@@ -1091,7 +1104,7 @@ public class Server implements WebSocketServerInterface {
                 updateThread.start();
             } catch (Exception e) {
                 log.error("Failed to apply update", e);
-                ctx.status(500).json("{\"error\": \"" + String.valueOf(e.getMessage()).replace("\"", "'") + "\"}");
+                ctx.status(500).json(ERROR_JSON_PREFIX + String.valueOf(e.getMessage()).replace("\"", "'") + "\"}");
             }
         });
 
@@ -1099,12 +1112,12 @@ public class Server implements WebSocketServerInterface {
         javalinServer.post("/system/update/rollback", ctx -> {
             try {
                 if (!restarting.compareAndSet(false, true)) {
-                    ctx.status(409).contentType(ContentType.APPLICATION_JSON).result("{\"status\": \"already restarting\"}");
+                    ctx.status(409).contentType(ContentType.APPLICATION_JSON).result(ALREADY_RESTARTING);
                     return;
                 }
 
-                messageToService("/notification", objectMapper.writeValueAsString(new NotificationDTO(
-                        "WARNING", "Update", "Rolling back to previous version...")));
+                messageToService(NOTIFICATION_CHANNEL, objectMapper.writeValueAsString(new NotificationDTO(
+                        WARNING_LEVEL, UPDATE_SERVICE, "Rolling back to previous version...")));
 
                 ctx.contentType(ContentType.APPLICATION_JSON).result("{\"status\": \"rolling-back\"}");
 
@@ -1114,8 +1127,8 @@ public class Server implements WebSocketServerInterface {
                         updateService.rollback();
                         ThreadUtil.silentSleep(500);
                         start();
-                        messageToService("/notification", objectMapper.writeValueAsString(new NotificationDTO(
-                                "INFO", "Update", "Rollback complete and server restarted")));
+                        messageToService(NOTIFICATION_CHANNEL, objectMapper.writeValueAsString(new NotificationDTO(
+                                "INFO", UPDATE_SERVICE, "Rollback complete and server restarted")));
                     } catch (Exception e) {
                         log.error("Rollback failed", e);
                         try {
@@ -1131,7 +1144,7 @@ public class Server implements WebSocketServerInterface {
                 rollbackThread.start();
             } catch (Exception e) {
                 log.error("Rollback failed", e);
-                ctx.status(500).json("{\"error\": \"" + String.valueOf(e.getMessage()).replace("\"", "'") + "\"}");
+                ctx.status(500).json(ERROR_JSON_PREFIX + String.valueOf(e.getMessage()).replace("\"", "'") + "\"}");
             }
         });
 
@@ -1149,7 +1162,7 @@ public class Server implements WebSocketServerInterface {
             updateService.stopScheduledChecks();
             updateService.startScheduledChecks();
 
-            messageToService("/notification", objectMapper.writeValueAsString(new NotificationDTO("INFO", "Update", "Update settings saved")));
+            messageToService(NOTIFICATION_CHANNEL, objectMapper.writeValueAsString(new NotificationDTO("INFO", UPDATE_SERVICE, "Update settings saved")));
 
             ctx.contentType(ContentType.APPLICATION_JSON).result(objectMapper.writeValueAsString(configService.getConfig().getUpdate()));
         });

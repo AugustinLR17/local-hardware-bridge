@@ -16,20 +16,20 @@ public class PrintResultTest {
     @Test
     public void noArgsConstructorProducesNulls() {
         PrintResult result = new PrintResult();
-        assertNull(result.success);
-        assertNull(result.message);
-        assertNull(result.id);
-        assertNull(result.printerName);
+        assertNull(result.getSuccess());
+        assertNull(result.getMessage());
+        assertNull(result.getId());
+        assertNull(result.getPrinterName());
     }
 
     @Test
     public void allArgsConstructorSetsAllFields() {
         PrintResult result = new PrintResult(true, "Success", "job-1", "POS-80");
 
-        assertTrue(result.success);
-        assertEquals("Success", result.message);
-        assertEquals("job-1", result.id);
-        assertEquals("POS-80", result.printerName);
+        assertTrue(result.getSuccess());
+        assertEquals("Success", result.getMessage());
+        assertEquals("job-1", result.getId());
+        assertEquals("POS-80", result.getPrinterName());
     }
 
     @Test
@@ -60,9 +60,9 @@ public class PrintResultTest {
         String json = mapper.writeValueAsString(original);
         PrintResult restored = mapper.readValue(json, PrintResult.class);
 
-        assertEquals(original.success, restored.success);
-        assertEquals(original.message, restored.message);
-        assertEquals(original.id, restored.id);
-        assertEquals(original.printerName, restored.printerName);
+        assertEquals(original.getSuccess(), restored.getSuccess());
+        assertEquals(original.getMessage(), restored.getMessage());
+        assertEquals(original.getId(), restored.getId());
+        assertEquals(original.getPrinterName(), restored.getPrinterName());
     }
 }

@@ -129,7 +129,7 @@ public class PrinterWebSocketServiceSearchTest {
 
         // The print should fail (either no printer mapping or unknown file type)
         assertNotNull(result);
-        assertFalse("print should fail for unknown type/printer", result.success);
+        assertFalse("print should fail for unknown type/printer", result.getSuccess());
     }
 
     @Test
@@ -151,7 +151,7 @@ public class PrinterWebSocketServiceSearchTest {
 
         // Should fail (no mapping for null type) but not throw NPE
         assertNotNull(result);
-        assertFalse(result.success);
+        assertFalse(result.getSuccess());
     }
 
     @Test
@@ -171,9 +171,9 @@ public class PrinterWebSocketServiceSearchTest {
         PrintResult result = service.printDocument(doc);
 
         assertNotNull(result);
-        assertFalse(result.success);
+        assertFalse(result.getSuccess());
         // The error should mention no printer mapping
-        assertNotNull(result.message);
+        assertNotNull(result.getMessage());
     }
 
     @Test
@@ -242,7 +242,7 @@ public class PrinterWebSocketServiceSearchTest {
         }
 
         @Override
-        public void messageToServer(String channel, byte[] message) {}
+        public void messageToServer(String channel, byte[] message) { /* no-op */ }
 
         @Override
         public void messageToService(String channel, String message) {
@@ -251,12 +251,12 @@ public class PrinterWebSocketServiceSearchTest {
         }
 
         @Override
-        public void messageToService(String channel, byte[] message) {}
+        public void messageToService(String channel, byte[] message) { /* no-op */ }
 
         @Override
-        public void registerService(WebSocketServiceInterface service) {}
+        public void registerService(WebSocketServiceInterface service) { /* no-op */ }
 
         @Override
-        public void unregisterService(WebSocketServiceInterface service) {}
+        public void unregisterService(WebSocketServiceInterface service) { /* no-op */ }
     }
 }

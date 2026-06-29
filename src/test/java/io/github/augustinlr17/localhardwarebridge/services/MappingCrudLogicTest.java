@@ -302,12 +302,12 @@ public class MappingCrudLogicTest {
         security.getEndpoints().put("/config.json", blockAll);
         security.getEndpoints().put("/system/health", blockAll);
 
-        // The Server sets rule = null for these paths, ignoring any configured rule
+        // The Server sets rule = null for these paths, ignoring any configured rule.
+        // The exemption means the rule exists in config but is never applied.
         for (String exemptPath : new String[]{"/config.json", "/system/health"}) {
             Config.EndpointRule rule = security.getEndpoints().get(exemptPath);
-            // Simulate the exemption: rule = null
-            rule = null;
-            assertNull("exempt endpoint must have its rule cleared", rule);
+            assertNotNull("rule exists in config but is exempted by Server", rule);
+            // Server would set rule = null before checking, so the blockAll is ignored
         }
     }
 }

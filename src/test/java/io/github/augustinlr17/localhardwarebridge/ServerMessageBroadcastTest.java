@@ -34,10 +34,10 @@ public class ServerMessageBroadcastTest {
         }
 
         @Override
-        public void start() {}
+        public void start() { /* no-op */ }
 
         @Override
-        public void stop() {}
+        public void stop() { /* no-op */ }
 
         @Override
         public void messageToService(String message) {
@@ -50,10 +50,10 @@ public class ServerMessageBroadcastTest {
         }
 
         @Override
-        public void onRegister(WebSocketServerInterface server) {}
+        public void onRegister(WebSocketServerInterface server) { /* no-op */ }
 
         @Override
-        public void onUnregister() {}
+        public void onUnregister() { /* no-op */ }
 
         @Override
         public String getChannel() {

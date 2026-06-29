@@ -60,6 +60,8 @@ public class UpdateService {
     @Getter
     private static final UpdateService instance = new UpdateService();
 
+    private static final String JAR_NAME_PREFIX = "local-hardware-bridge-";
+
     private static final ObjectMapper mapper = new ObjectMapper()
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
@@ -440,7 +442,7 @@ public class UpdateService {
     private Path downloadAsset(ReleaseInfo.Asset asset, String newVersion) throws Exception {
         Files.createDirectories(Path.of(UPDATES_DIR));
 
-        String fileName = "local-hardware-bridge-" + newVersion + ".jar";
+        String fileName = JAR_NAME_PREFIX + newVersion + ".jar";
         Path target = Path.of(UPDATES_DIR, fileName);
         Path partFile = Path.of(UPDATES_DIR, fileName + ".part");
 
@@ -498,7 +500,7 @@ public class UpdateService {
                 return;
             }
             File[] jars = updatesDir.toFile().listFiles((dir, name) ->
-                    name.startsWith("local-hardware-bridge-") && name.endsWith(".jar"));
+                    name.startsWith(JAR_NAME_PREFIX) && name.endsWith(".jar"));
             if (jars == null || jars.length == 0) {
                 return;
             }
@@ -509,7 +511,7 @@ public class UpdateService {
                 // Extract version from filename: local-hardware-bridge-2.1.0.jar
                 String name = jar.getName();
                 String version = name
-                        .replace("local-hardware-bridge-", "")
+                        .replace(JAR_NAME_PREFIX, "")
                         .replace(".jar", "");
                 if (bestVersion == null || VersionComparator.isNewer(bestVersion, version)) {
                     bestVersion = version;

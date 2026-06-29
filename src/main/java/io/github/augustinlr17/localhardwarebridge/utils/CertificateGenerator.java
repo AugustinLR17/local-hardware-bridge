@@ -37,6 +37,7 @@ public class CertificateGenerator {
 
     private static final String CERTIFICATE_ALGORITHM = "RSA";
     private static final int CERTIFICATE_BITS = 2048;
+    private static final String LOCALHOST_IP = "127.0.0.1";
 
     private static final String IPV4_REGEX = "(([0-1]?[0-9]{1,2}\\.)|(2[0-4][0-9]\\.)|(25[0-5]\\.)){3}(([0-1]?[0-9]{1,2})|(2[0-4][0-9])|(25[0-5]))";
     private static final Pattern IPV4_PATTERN = Pattern.compile(IPV4_REGEX);
@@ -96,13 +97,13 @@ public class CertificateGenerator {
                 List<GeneralName> sanList = new ArrayList<>();
                 if (IPV4_PATTERN.matcher(address).matches()) {
                     sanList.add(new GeneralName(GeneralName.iPAddress, address));
-                    if (!address.equals("127.0.0.1")) {
-                        sanList.add(new GeneralName(GeneralName.iPAddress, "127.0.0.1"));
+                    if (!address.equals(LOCALHOST_IP)) {
+                        sanList.add(new GeneralName(GeneralName.iPAddress, LOCALHOST_IP));
                     }
                 } else {
                     sanList.add(new GeneralName(GeneralName.dNSName, address));
                     sanList.add(new GeneralName(GeneralName.dNSName, "localhost"));
-                    sanList.add(new GeneralName(GeneralName.iPAddress, "127.0.0.1"));
+                    sanList.add(new GeneralName(GeneralName.iPAddress, LOCALHOST_IP));
                 }
                 final GeneralNames subjectAltNames = new GeneralNames(sanList.toArray(new GeneralName[0]));
                 certificateBuilder.addExtension(Extension.subjectAlternativeName, false, subjectAltNames);

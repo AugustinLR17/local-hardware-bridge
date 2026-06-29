@@ -110,11 +110,9 @@ public class DocumentService {
                             return null;
                         }
 
-                        public void checkClientTrusted(X509Certificate[] certs, String authType) {
-                        }
+                        public void checkClientTrusted(X509Certificate[] certs, String authType) { /* trust-all: no verification */ }
 
-                        public void checkServerTrusted(X509Certificate[] certs, String authType) {
-                        }
+                        public void checkServerTrusted(X509Certificate[] certs, String authType) { /* trust-all: no verification */ }
                     }
             };
 

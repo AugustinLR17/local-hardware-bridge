@@ -23,7 +23,6 @@ public class PrinterWebSocketServiceLockTest {
 
     private PrinterWebSocketService service;
     private Method searchPrinterForType;
-    private Method printDocument;
 
     @Before
     public void setUp() throws Exception {
@@ -78,8 +77,8 @@ public class PrinterWebSocketServiceLockTest {
 
     @Test
     public void searchAutoAddsUnknownTypeWhenEnabled() throws Throwable {
-        ConfigService service = ConfigService.getInstance();
-        Config config = service.getConfig();
+        ConfigService configService = ConfigService.getInstance();
+        Config config = configService.getConfig();
         config.getPrinter().setAutoAddUnknownType(true);
         config.getPrinter().setFallbackToDefault(false);
         config.getPrinter().getMappings().removeIf(m -> "AUTOADD_TEST".equals(m.getType()));

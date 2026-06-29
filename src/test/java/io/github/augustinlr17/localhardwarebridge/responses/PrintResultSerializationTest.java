@@ -8,7 +8,6 @@ import java.io.IOException;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 
 public class PrintResultSerializationTest {
@@ -49,20 +48,20 @@ public class PrintResultSerializationTest {
     public void deserializeFromJsonWithAllFields() throws IOException {
         String json = "{\"success\":true,\"message\":\"Done\",\"id\":\"job-789\",\"printerName\":\"Epson\"}";
         PrintResult result = mapper.readValue(json, PrintResult.class);
-        assertEquals(Boolean.TRUE, result.success);
-        assertEquals("Done", result.message);
-        assertEquals("job-789", result.id);
-        assertEquals("Epson", result.printerName);
+        assertEquals(Boolean.TRUE, result.getSuccess());
+        assertEquals("Done", result.getMessage());
+        assertEquals("job-789", result.getId());
+        assertEquals("Epson", result.getPrinterName());
     }
 
     @Test
     public void deserializeFromEmptyJsonProducesNulls() throws IOException {
         String json = "{}";
         PrintResult result = mapper.readValue(json, PrintResult.class);
-        assertNull(result.success);
-        assertNull(result.message);
-        assertNull(result.id);
-        assertNull(result.printerName);
+        assertNull(result.getSuccess());
+        assertNull(result.getMessage());
+        assertNull(result.getId());
+        assertNull(result.getPrinterName());
     }
 
     @Test
@@ -70,17 +69,17 @@ public class PrintResultSerializationTest {
         PrintResult original = new PrintResult(true, "Round trip", "job-999", "Brother HL");
         String json = mapper.writeValueAsString(original);
         PrintResult deserialized = mapper.readValue(json, PrintResult.class);
-        assertEquals(original.success, deserialized.success);
-        assertEquals(original.message, deserialized.message);
-        assertEquals(original.id, deserialized.id);
-        assertEquals(original.printerName, deserialized.printerName);
+        assertEquals(original.getSuccess(), deserialized.getSuccess());
+        assertEquals(original.getMessage(), deserialized.getMessage());
+        assertEquals(original.getId(), deserialized.getId());
+        assertEquals(original.getPrinterName(), deserialized.getPrinterName());
     }
 
     @Test
     public void successFieldIsBoxedBooleanAndCanBeNull() {
         PrintResult result = new PrintResult();
-        result.success = null;
-        assertNull(result.success);
+        result.setSuccess(null);
+        assertNull(result.getSuccess());
     }
 
     @Test

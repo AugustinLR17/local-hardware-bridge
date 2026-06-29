@@ -80,9 +80,8 @@ public class PrintDocumentSerializationTest {
 
     @Test
     public void serializationIncludesSnakeCaseFields() throws Exception {
-        PrintDocument doc = new PrintDocument();
         // Can't set fields directly (no setters, package-private), so use Jackson
-        doc = mapper.readValue("{\"file_content\":\"ABC\",\"raw_content\":\"XYZ\"}", PrintDocument.class);
+        PrintDocument doc = mapper.readValue("{\"file_content\":\"ABC\",\"raw_content\":\"XYZ\"}", PrintDocument.class);
 
         String json = mapper.writeValueAsString(doc);
         // Jackson must use @JsonProperty snake_case names on output too

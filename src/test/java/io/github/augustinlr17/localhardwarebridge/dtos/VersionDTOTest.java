@@ -19,33 +19,33 @@ public class VersionDTOTest {
     public void threeArgConstructorSetsLegacyFields() {
         VersionDTO dto = new VersionDTO("App", "com.app", "1.0");
 
-        assertEquals("App", dto.appName);
-        assertEquals("com.app", dto.appId);
-        assertEquals("1.0", dto.version);
-        assertEquals(Constants.LEGACY_APP_NAME, dto.legacyAppName);
-        assertEquals(Constants.LEGACY_APP_ID, dto.legacyAppId);
+        assertEquals("App", dto.getAppName());
+        assertEquals("com.app", dto.getAppId());
+        assertEquals("1.0", dto.getVersion());
+        assertEquals(Constants.LEGACY_APP_NAME, dto.getLegacyAppName());
+        assertEquals(Constants.LEGACY_APP_ID, dto.getLegacyAppId());
     }
 
     @Test
     public void allArgsConstructorSetsAllFields() {
         VersionDTO dto = new VersionDTO("App", "com.app", "1.0", "Legacy", "com.legacy");
 
-        assertEquals("App", dto.appName);
-        assertEquals("com.app", dto.appId);
-        assertEquals("1.0", dto.version);
-        assertEquals("Legacy", dto.legacyAppName);
-        assertEquals("com.legacy", dto.legacyAppId);
+        assertEquals("App", dto.getAppName());
+        assertEquals("com.app", dto.getAppId());
+        assertEquals("1.0", dto.getVersion());
+        assertEquals("Legacy", dto.getLegacyAppName());
+        assertEquals("com.legacy", dto.getLegacyAppId());
     }
 
     @Test
     public void noArgsConstructorLeavesNulls() {
         VersionDTO dto = new VersionDTO();
 
-        assertNull(dto.appName);
-        assertNull(dto.appId);
-        assertNull(dto.version);
-        assertNull(dto.legacyAppName);
-        assertNull(dto.legacyAppId);
+        assertNull(dto.getAppName());
+        assertNull(dto.getAppId());
+        assertNull(dto.getVersion());
+        assertNull(dto.getLegacyAppName());
+        assertNull(dto.getLegacyAppId());
     }
 
     @Test
@@ -66,10 +66,10 @@ public class VersionDTOTest {
         String json = mapper.writeValueAsString(original);
         VersionDTO restored = mapper.readValue(json, VersionDTO.class);
 
-        assertEquals(original.appName, restored.appName);
-        assertEquals(original.appId, restored.appId);
-        assertEquals(original.version, restored.version);
-        assertEquals(original.legacyAppName, restored.legacyAppName);
-        assertEquals(original.legacyAppId, restored.legacyAppId);
+        assertEquals(original.getAppName(), restored.getAppName());
+        assertEquals(original.getAppId(), restored.getAppId());
+        assertEquals(original.getVersion(), restored.getVersion());
+        assertEquals(original.getLegacyAppName(), restored.getLegacyAppName());
+        assertEquals(original.getLegacyAppId(), restored.getLegacyAppId());
     }
 }

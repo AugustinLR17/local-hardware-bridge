@@ -2,16 +2,20 @@ package io.github.augustinlr17.localhardwarebridge.dtos;
 
 import io.github.augustinlr17.localhardwarebridge.Constants;
 import lombok.AllArgsConstructor;
+import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 public class VersionDTO {
-    public String appName;
-    public String appId;
-    public String version;
-    public String legacyAppName;
-    public String legacyAppId;
+    private String appName;
+    private String appId;
+    private String version;
+    private String legacyAppName;
+    private String legacyAppId;
 
     public VersionDTO(String appName, String appId, String version) {
         this.appName = appName;

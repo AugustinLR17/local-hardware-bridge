@@ -16,18 +16,18 @@ public class NotificationDTOTest {
     @Test
     public void noArgsConstructorLeavesNulls() {
         NotificationDTO dto = new NotificationDTO();
-        assertNull(dto.type);
-        assertNull(dto.title);
-        assertNull(dto.message);
+        assertNull(dto.getType());
+        assertNull(dto.getTitle());
+        assertNull(dto.getMessage());
     }
 
     @Test
     public void allArgsConstructorSetsAllFields() {
         NotificationDTO dto = new NotificationDTO("INFO", "Title", "Message body");
 
-        assertEquals("INFO", dto.type);
-        assertEquals("Title", dto.title);
-        assertEquals("Message body", dto.message);
+        assertEquals("INFO", dto.getType());
+        assertEquals("Title", dto.getTitle());
+        assertEquals("Message body", dto.getMessage());
     }
 
     @Test
@@ -46,8 +46,8 @@ public class NotificationDTOTest {
         String json = mapper.writeValueAsString(original);
         NotificationDTO restored = mapper.readValue(json, NotificationDTO.class);
 
-        assertEquals(original.type, restored.type);
-        assertEquals(original.title, restored.title);
-        assertEquals(original.message, restored.message);
+        assertEquals(original.getType(), restored.getType());
+        assertEquals(original.getTitle(), restored.getTitle());
+        assertEquals(original.getMessage(), restored.getMessage());
     }
 }
