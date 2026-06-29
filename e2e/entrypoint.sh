@@ -78,6 +78,19 @@ wait_port_free 12214
 python3 /app/test-wms-multi-zone.py
 WMS_EXIT=$?
 
+# Kill any remaining bridge processes before starting update tests
+pkill -f "local-hardware-bridge.jar" 2>/dev/null || true
+pkill -f "bridge.jar" 2>/dev/null || true
+# Wait for all ports to be released
+wait_port_free 12212
+wait_port_free 12215
+wait_port_free 12216
+wait_port_free 12217
+
+# Run auto-update API tests (single bridge on port 12212)
+python3 /app/test-auto-update.py
+UPDATE_EXIT=$?
+
 # Exit with failure if any test suite failed
 if [ $TEST_EXIT -ne 0 ]; then
     exit $TEST_EXIT
@@ -85,4 +98,7 @@ fi
 if [ $CROSS_EXIT -ne 0 ]; then
     exit $CROSS_EXIT
 fi
-exit $WMS_EXIT
+if [ $WMS_EXIT -ne 0 ]; then
+    exit $WMS_EXIT
+fi
+exit $UPDATE_EXIT

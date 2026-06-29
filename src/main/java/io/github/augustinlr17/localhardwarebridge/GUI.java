@@ -4,9 +4,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.log4j.Log4j2;
 import io.github.augustinlr17.localhardwarebridge.dtos.Config;
 import io.github.augustinlr17.localhardwarebridge.dtos.NotificationDTO;
+import io.github.augustinlr17.localhardwarebridge.dtos.UpdateStatusDTO;
 import io.github.augustinlr17.localhardwarebridge.interfaces.WebSocketServerInterface;
 import io.github.augustinlr17.localhardwarebridge.interfaces.WebSocketServiceInterface;
 import io.github.augustinlr17.localhardwarebridge.services.ConfigService;
+import io.github.augustinlr17.localhardwarebridge.services.UpdateService;
+import io.github.augustinlr17.localhardwarebridge.utils.ThreadUtil;
 
 import javax.imageio.ImageIO;
 import javax.swing.JOptionPane;
@@ -152,6 +155,9 @@ public class GUI implements WebSocketServiceInterface {
         MenuItem restartItem = new MenuItem("Restart");
         restartItem.addActionListener(e -> restart());
 
+        MenuItem checkUpdateItem = new MenuItem("Check for Updates");
+        checkUpdateItem.addActionListener(e -> checkForUpdatesInteractive());
+
         MenuItem exitItem = new MenuItem("Exit");
         exitItem.addActionListener(e -> System.exit(0));
 
@@ -161,6 +167,7 @@ public class GUI implements WebSocketServiceInterface {
         popupMenu.add(appDirectoryItem);
         popupMenu.add(logDirectoryItem);
         popupMenu.addSeparator();
+        popupMenu.add(checkUpdateItem);
         popupMenu.add(restartItem);
         popupMenu.add(exitItem);
 
@@ -177,6 +184,114 @@ public class GUI implements WebSocketServiceInterface {
         tray.add(trayIcon);
 
         notify(Constants.APP_NAME, " is running in background!", TrayIcon.MessageType.INFO);
+
+        // Perform a silent background update check after a short delay.
+        // The result is shown as a tray notification only if an update is available.
+        scheduleSilentUpdateCheck();
+    }
+
+    /**
+     * Checks for updates in a background thread. If an update is available,
+     * displays a tray notification. This is silent (no notification) when
+     * the app is already up to date.
+     */
+    private void scheduleSilentUpdateCheck() {
+        Config.Update updateConfig = configService.getConfig().getUpdate();
+        if (!updateConfig.isEnabled()) {
+            return;
+        }
+        Thread t = new Thread(() -> {
+            try {
+                Thread.sleep(8000); // Wait 8s after startup before checking
+                UpdateStatusDTO status = UpdateService.getInstance().checkNow();
+                if (status.isUpdateAvailable()) {
+                    notify(Constants.APP_NAME,
+                            "Update " + status.getLatestVersion() + " is available! Click \"Check for Updates\" to install.",
+                            TrayIcon.MessageType.INFO);
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            } catch (Exception e) {
+                log.debug("Silent update check failed: {}", e.getMessage());
+            }
+        }, "gui-update-check");
+        t.setDaemon(true);
+        t.start();
+    }
+
+    /**
+     * Interactive update check: shows a dialog with the result and, if an
+     * update is available, offers to download and install it.
+     */
+    private void checkForUpdatesInteractive() {
+        Thread t = new Thread(() -> {
+            try {
+                notify(Constants.APP_NAME, "Checking for updates...", TrayIcon.MessageType.INFO);
+
+                UpdateStatusDTO status = UpdateService.getInstance().checkNow();
+
+                if (status.getError() != null) {
+                    notify(Constants.APP_NAME, "Update check failed: " + status.getError(), TrayIcon.MessageType.ERROR);
+                    return;
+                }
+
+                if (!status.isUpdateAvailable()) {
+                    notify(Constants.APP_NAME, "Already up to date (v" + Constants.VERSION + ")", TrayIcon.MessageType.INFO);
+                    return;
+                }
+
+                // An update is available
+                String message = "A new version is available!\n"
+                        + "Current: v" + Constants.VERSION + "\n"
+                        + "Latest:  v" + status.getLatestVersion()
+                        + (status.isPrerelease() ? " (pre-release)" : "") + "\n\n"
+                        + "Download and install now?\n"
+                        + "The app will restart automatically after installation.";
+
+                int choice = JOptionPane.showConfirmDialog(
+                        null,
+                        message,
+                        Constants.APP_NAME + " - Update Available",
+                        JOptionPane.YES_NO_OPTION,
+                        JOptionPane.QUESTION_MESSAGE
+                );
+
+                if (choice == JOptionPane.YES_OPTION) {
+                    notify(Constants.APP_NAME, "Downloading update...", TrayIcon.MessageType.INFO);
+                    UpdateService.getInstance().downloadUpdate();
+                    notify(Constants.APP_NAME, "Update downloaded. Applying and restarting...", TrayIcon.MessageType.WARNING);
+
+                    // Apply via the server's update endpoint (triggers async restart)
+                    java.nio.file.Path pending = UpdateService.getInstance().consumePendingUpdate();
+                    if (pending != null) {
+                        try {
+                            server.stop();
+                            UpdateService.getInstance().applyUpdate(pending);
+                            UpdateService.getInstance().cleanupOldUpdates();
+                            ThreadUtil.silentSleep(500);
+                            server.start();
+                            notify(Constants.APP_NAME, "Update applied successfully! Now running v" + Constants.VERSION, TrayIcon.MessageType.INFO);
+                        } catch (Exception e) {
+                            log.error("Failed to apply update", e);
+                            notify(Constants.APP_NAME, "Update failed: " + e.getMessage() + ". Attempting rollback...", TrayIcon.MessageType.ERROR);
+                            try {
+                                UpdateService.getInstance().rollback();
+                                server.start();
+                                notify(Constants.APP_NAME, "Rollback complete. Still running v" + Constants.VERSION, TrayIcon.MessageType.WARNING);
+                            } catch (Exception rollbackEx) {
+                                log.error("Rollback failed", rollbackEx);
+                                notify(Constants.APP_NAME, "Rollback also failed! Manual intervention required.", TrayIcon.MessageType.ERROR);
+                            }
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                log.error("Interactive update check failed", e);
+                notify(Constants.APP_NAME, "Update check failed: " + e.getMessage(), TrayIcon.MessageType.ERROR);
+            }
+        }, "gui-update-interactive");
+        t.setDaemon(true);
+        t.start();
     }
 
     private void offerLinuxServiceInstall() {

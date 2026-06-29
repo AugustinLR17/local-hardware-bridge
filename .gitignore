@@ -1,4 +1,5 @@
 downloads/
+updates/
 .gradle/
 !gradle/wrapper/
 log/

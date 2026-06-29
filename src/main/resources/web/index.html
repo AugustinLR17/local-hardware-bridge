@@ -916,6 +916,79 @@
                         <div v-for="line in monitor.log">{{ line }}</div>
                     </div>
                 </div>
+
+                <!-- Auto-update -->
+                <div class="lhb-card">
+                    <div class="lhb-card-header">
+                        <h5 class="lhb-card-title">
+                            <span aria-hidden="true">&#128260;</span> Auto-Update
+                            <span class="lhb-badge" v-if="updateStatus && updateStatus.updateAvailable" style="background:var(--lhb-warning-bg);color:var(--lhb-warning)">update available</span>
+                            <span class="lhb-badge" v-else-if="updateStatus && updateStatus.checked" style="background:var(--lhb-success-bg);color:var(--lhb-success)">up to date</span>
+                        </h5>
+                        <button @click="checkUpdate" class="lhb-btn lhb-btn-outline lhb-btn-sm" :disabled="updateChecking">
+                            {{ updateChecking ? 'Checking...' : 'Check now' }}
+                        </button>
+                    </div>
+                    <div v-if="updateStatus && updateStatus.checked">
+                        <div class="lhb-row" style="font-size:0.82rem;color:var(--lhb-text-dim)">
+                            <div>
+                                Current: <strong style="color:var(--lhb-text)">v{{ updateStatus.currentVersion }}</strong><br>
+                                Latest: <strong style="color:var(--lhb-text)" v-if="updateStatus.latestVersion">v{{ updateStatus.latestVersion }}{{ updateStatus.prerelease ? ' (pre-release)' : '' }}</strong>
+                                        <span v-else>&mdash;</span>
+                            </div>
+                        </div>
+                        <div v-if="updateStatus.error" class="lhb-row" style="font-size:0.82rem;color:var(--lhb-danger)">
+                            Error: {{ updateStatus.error }}
+                        </div>
+                        <div v-if="updateStatus.updateAvailable && updateStatus.releaseUrl" class="lhb-row">
+                            <a :href="updateStatus.releaseUrl" target="_blank" rel="noopener" class="lhb-btn lhb-btn-outline lhb-btn-sm" style="text-decoration:none">
+                                Release notes
+                            </a>
+                            <button @click="downloadUpdate" class="lhb-btn lhb-btn-accent lhb-btn-sm" :disabled="updateDownloading">
+                                {{ updateDownloading ? 'Downloading...' : (updateStatus.pendingRestart ? 'Pending restart' : 'Download &amp; Install') }}
+                            </button>
+                        </div>
+                        <div v-if="updateStatus.pendingRestart" class="lhb-row" style="font-size:0.82rem;color:var(--lhb-warning)">
+                            Update downloaded. Click to apply (server will restart).
+                        </div>
+                        <hr style="border:none;border-top:1px solid var(--lhb-border);margin:1rem 0">
+                        <div class="lhb-row">
+                            <label class="lhb-row-label lhb-form-label" for="upd-enabled">Enable checks</label>
+                            <label class="lhb-toggle">
+                                <input id="upd-enabled" type="checkbox" v-model="config.update.enabled" aria-label="Enable update checks"/>
+                                <span class="lhb-toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="lhb-row">
+                            <label class="lhb-row-label lhb-form-label" for="upd-auto">Auto-download</label>
+                            <label class="lhb-toggle">
+                                <input id="upd-auto" type="checkbox" v-model="config.update.autoDownload" aria-label="Automatically download updates"/>
+                                <span class="lhb-toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="lhb-row">
+                            <label class="lhb-row-label lhb-form-label" for="upd-install">Auto-install on restart</label>
+                            <label class="lhb-toggle">
+                                <input id="upd-install" type="checkbox" v-model="config.update.autoInstall" aria-label="Automatically install on restart"/>
+                                <span class="lhb-toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="lhb-row">
+                            <label class="lhb-row-label lhb-form-label" for="upd-prerelease">Include pre-releases</label>
+                            <label class="lhb-toggle">
+                                <input id="upd-prerelease" type="checkbox" v-model="config.update.includePrereleases" aria-label="Include pre-release versions"/>
+                                <span class="lhb-toggle-slider"></span>
+                            </label>
+                        </div>
+                        <div class="lhb-row">
+                            <label class="lhb-row-label lhb-form-label" for="upd-interval">Check interval (hours)</label>
+                            <div class="lhb-row-value"><input id="upd-interval" class="lhb-form-control" type="number" min="0" v-model.number="config.update.checkIntervalHours"/></div>
+                        </div>
+                    </div>
+                    <div v-else class="lhb-row" style="font-size:0.82rem;color:var(--lhb-text-dim)">
+                        No update check performed yet. Click "Check now".
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -1034,6 +1107,10 @@ createApp({
     // Feedback
     toasts: [],
     toastId: 0,
+    // Update
+    updateStatus: null,
+    updateChecking: false,
+    updateDownloading: false,
     // Secrets are stripped from the editable config and held here so they are
     // never rendered as readable prefilled values.
     secrets: { authToken: '', endpoints: {} },
@@ -1270,6 +1347,56 @@ createApp({
             .finally(() => { setTimeout(() => { this.restarting = false }, 1500) })
     },
 
+    /* ---------------- Auto-update ---------------- */
+    loadUpdateStatus() {
+        return axios.get('/system/update/status').then(response => this.updateStatus = response.data)
+    },
+    checkUpdate() {
+        if (this.updateChecking) return
+        this.updateChecking = true
+        axios.get('/system/update/check')
+            .then(response => {
+                this.updateStatus = response.data
+                if (response.data.updateAvailable) {
+                    this.toast('Update v' + response.data.latestVersion + ' is available!', 'info')
+                } else {
+                    this.toast('Already up to date (v' + response.data.currentVersion + ')', 'success')
+                }
+            })
+            .catch(err => this.handleError(err, 'Update check failed'))
+            .finally(() => { this.updateChecking = false })
+    },
+    downloadUpdate() {
+        if (this.updateDownloading) return
+        if (!this.updateStatus || !this.updateStatus.updateAvailable) {
+            this.toast('No update available. Check for updates first.', 'error')
+            return
+        }
+        this.updateDownloading = true
+        this.toast('Downloading update...', 'info')
+        axios.post('/system/update/download')
+            .then(() => {
+                this.toast('Downloaded. Applying update and restarting...', 'info')
+                this.updateDownloading = false
+                // Trigger the apply endpoint (async restart)
+                axios.post('/system/update/apply')
+                    .then(() => {
+                        this.toast('Update applying - server restarting...', 'info')
+                        this.restarting = true
+                        // Poll health after a delay
+                        setTimeout(() => {
+                            this.loadHealth().catch(() => {})
+                                .then(() => { this.restarting = false })
+                        }, 5000)
+                    })
+                    .catch(err => this.handleError(err, 'Apply update failed'))
+            })
+            .catch(err => {
+                this.handleError(err, 'Download failed')
+                this.updateDownloading = false
+            })
+    },
+
     /* ---------------- Mappings ---------------- */
     addPrinter() {
         this.config.printer.mappings.push({type: '', name: '', autoRotate: false, resetImageableArea: true, forceDPI: 0})
@@ -1304,6 +1431,7 @@ createApp({
         this.loadConfig().catch(err => this.handleError(err, 'Load configuration'))
         this.loadHealth().catch(err => this.handleError(err, 'Load health'))
         this.loadSerialStatus().catch(() => {})
+        this.loadUpdateStatus().catch(() => {})
     },
 
     /* ---------------- Serial status indicators ---------------- */

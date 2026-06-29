@@ -18,6 +18,7 @@ import io.github.augustinlr17.localhardwarebridge.interfaces.WebSocketServiceInt
 import io.github.augustinlr17.localhardwarebridge.responses.PrintDocument;
 import io.github.augustinlr17.localhardwarebridge.responses.PrintResult;
 import io.github.augustinlr17.localhardwarebridge.services.ConfigService;
+import io.github.augustinlr17.localhardwarebridge.services.UpdateService;
 import io.github.augustinlr17.localhardwarebridge.utils.CertificateGenerator;
 import io.github.augustinlr17.localhardwarebridge.utils.ThreadUtil;
 import io.github.augustinlr17.localhardwarebridge.websocketservices.PrinterWebSocketService;
@@ -303,6 +304,7 @@ public class Server implements WebSocketServerInterface {
         registerPrinterEndpoints();
         registerSerialEndpoints();
         registerSystemEndpoints();
+        registerUpdateEndpoints();
 
         // Re-attach services that must survive a restart (stop() removed them).
         for (WebSocketServiceInterface service : persistentServices) {
@@ -318,9 +320,15 @@ public class Server implements WebSocketServerInterface {
             log.error("Unable to bind port {}, another instance is already running?", serverConfig.getPort());
             throw e;
         }
+
+        // Start the update checker scheduler (if enabled in config)
+        UpdateService.getInstance().startScheduledChecks();
     }
 
     synchronized public void stop() throws Exception {
+        // Stop the update scheduler before the server shuts down
+        UpdateService.getInstance().stopScheduledChecks();
+
         for (Iterator<WebSocketServiceInterface> it = services.iterator(); it.hasNext(); ) {
             WebSocketServiceInterface service = it.next();
             unregisterService(service);
@@ -981,6 +989,169 @@ public class Server implements WebSocketServerInterface {
                 log.error("Failed to uninstall systemd service", e);
                 ctx.status(500).result("{\"error\": \"" + String.valueOf(e.getMessage()).replace("\"", "'") + "\"}");
             }
+        });
+    }
+
+    /*
+     * HTTP API - Update endpoints
+     */
+    private void registerUpdateEndpoints() {
+        UpdateService updateService = UpdateService.getInstance();
+
+        // Get update status
+        javalinServer.get("/system/update/status", ctx -> {
+            UpdateStatusDTO status = updateService.getStatus();
+            ctx.contentType(ContentType.APPLICATION_JSON).result(objectMapper.writeValueAsString(status));
+        });
+
+        // Trigger an update check (synchronous)
+        javalinServer.get("/system/update/check", ctx -> {
+            try {
+                UpdateStatusDTO status = updateService.checkNow();
+                messageToService("/notification", objectMapper.writeValueAsString(new NotificationDTO(
+                        "INFO",
+                        "Update",
+                        status.isUpdateAvailable()
+                                ? "Update " + status.getLatestVersion() + " is available"
+                                : "Already up to date (" + Constants.VERSION + ")")));
+                ctx.contentType(ContentType.APPLICATION_JSON).result(objectMapper.writeValueAsString(status));
+            } catch (Exception e) {
+                log.error("Update check failed", e);
+                ctx.status(500).json("{\"error\": \"" + String.valueOf(e.getMessage()).replace("\"", "'") + "\"}");
+            }
+        });
+
+        // Download the update JAR (if available)
+        javalinServer.post("/system/update/download", ctx -> {
+            try {
+                if (!updateService.getStatus().isUpdateAvailable()) {
+                    ctx.status(409).json("{\"error\": \"No update available. Call /system/update/check first.\"}");
+                    return;
+                }
+                java.nio.file.Path downloaded = updateService.downloadUpdate();
+                if (downloaded == null) {
+                    ctx.status(500).json("{\"error\": \"Download did not produce a file\"}");
+                    return;
+                }
+                messageToService("/notification", objectMapper.writeValueAsString(new NotificationDTO(
+                        "INFO", "Update", "Update downloaded: " + downloaded.getFileName() + ". Restart to apply.")));
+                ctx.contentType(ContentType.APPLICATION_JSON).result("{\"status\": \"downloaded\", \"path\": \"" + downloaded + "\"}");
+            } catch (Exception e) {
+                log.error("Update download failed", e);
+                ctx.status(500).json("{\"error\": \"" + String.valueOf(e.getMessage()).replace("\"", "'") + "\"}");
+            }
+        });
+
+        // Apply the update: replaces the JAR and triggers a restart
+        javalinServer.post("/system/update/apply", ctx -> {
+            try {
+                java.nio.file.Path pending = updateService.consumePendingUpdate();
+                if (pending == null) {
+                    ctx.status(409).json("{\"error\": \"No pending update to apply. Download first.\"}");
+                    return;
+                }
+
+                // Guard against overlapping restarts
+                if (!restarting.compareAndSet(false, true)) {
+                    ctx.status(409).contentType(ContentType.APPLICATION_JSON).result("{\"status\": \"already restarting\"}");
+                    return;
+                }
+
+                messageToService("/notification", objectMapper.writeValueAsString(new NotificationDTO(
+                        "WARNING", "Update", "Applying update and restarting...")));
+
+                ctx.contentType(ContentType.APPLICATION_JSON).result("{\"status\": \"applying\", \"pending\": \"" + pending + "\"}");
+
+                Thread updateThread = new Thread(() -> {
+                    try {
+                        stop();
+                        updateService.applyUpdate(pending);
+                        updateService.cleanupOldUpdates();
+                        ThreadUtil.silentSleep(500);
+                        start();
+                        messageToService("/notification", objectMapper.writeValueAsString(new NotificationDTO(
+                                "INFO", "Update", "Update applied and server restarted successfully")));
+                    } catch (Exception e) {
+                        log.error("Failed to apply update", e);
+                        try {
+                            updateService.rollback();
+                        } catch (Exception rollbackEx) {
+                            log.error("Rollback also failed", rollbackEx);
+                        }
+                        try {
+                            start();
+                        } catch (Exception startEx) {
+                            log.error("Restart after failed update also failed", startEx);
+                        }
+                    } finally {
+                        restarting.set(false);
+                    }
+                }, "update-apply");
+                updateThread.setDaemon(false);
+                updateThread.start();
+            } catch (Exception e) {
+                log.error("Failed to apply update", e);
+                ctx.status(500).json("{\"error\": \"" + String.valueOf(e.getMessage()).replace("\"", "'") + "\"}");
+            }
+        });
+
+        // Rollback to the previous version (if a .bak exists)
+        javalinServer.post("/system/update/rollback", ctx -> {
+            try {
+                if (!restarting.compareAndSet(false, true)) {
+                    ctx.status(409).contentType(ContentType.APPLICATION_JSON).result("{\"status\": \"already restarting\"}");
+                    return;
+                }
+
+                messageToService("/notification", objectMapper.writeValueAsString(new NotificationDTO(
+                        "WARNING", "Update", "Rolling back to previous version...")));
+
+                ctx.contentType(ContentType.APPLICATION_JSON).result("{\"status\": \"rolling-back\"}");
+
+                Thread rollbackThread = new Thread(() -> {
+                    try {
+                        stop();
+                        updateService.rollback();
+                        ThreadUtil.silentSleep(500);
+                        start();
+                        messageToService("/notification", objectMapper.writeValueAsString(new NotificationDTO(
+                                "INFO", "Update", "Rollback complete and server restarted")));
+                    } catch (Exception e) {
+                        log.error("Rollback failed", e);
+                        try {
+                            start();
+                        } catch (Exception startEx) {
+                            log.error("Restart after failed rollback also failed", startEx);
+                        }
+                    } finally {
+                        restarting.set(false);
+                    }
+                }, "update-rollback");
+                rollbackThread.setDaemon(false);
+                rollbackThread.start();
+            } catch (Exception e) {
+                log.error("Rollback failed", e);
+                ctx.status(500).json("{\"error\": \"" + String.valueOf(e.getMessage()).replace("\"", "'") + "\"}");
+            }
+        });
+
+        // Get/update update config section
+        javalinServer.get("/system/update.json", ctx -> {
+            ctx.contentType(ContentType.APPLICATION_JSON).result(objectMapper.writeValueAsString(configService.getConfig().getUpdate()));
+        });
+
+        javalinServer.put("/system/update.json", ctx -> {
+            Config.Update updated = objectMapper.readValue(ctx.body(), Config.Update.class);
+            configService.getConfig().setUpdate(updated);
+            configService.save();
+
+            // Restart the scheduler if settings changed
+            updateService.stopScheduledChecks();
+            updateService.startScheduledChecks();
+
+            messageToService("/notification", objectMapper.writeValueAsString(new NotificationDTO("INFO", "Update", "Update settings saved")));
+
+            ctx.contentType(ContentType.APPLICATION_JSON).result(objectMapper.writeValueAsString(configService.getConfig().getUpdate()));
         });
     }
 }

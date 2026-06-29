@@ -25,6 +25,7 @@ COPY build/libs/local-hardware-bridge-*.jar /app/local-hardware-bridge.jar
 COPY e2e/test.py /app/test.py
 COPY e2e/test-cross-bridge.py /app/test-cross-bridge.py
 COPY e2e/test-wms-multi-zone.py /app/test-wms-multi-zone.py
+COPY e2e/test-auto-update.py /app/test-auto-update.py
 COPY e2e/print-test.pdf /app/print-test.pdf
 COPY e2e/entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh

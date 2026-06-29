@@ -141,6 +141,13 @@ Full API documentation: [HTTP API Reference](https://github.com/AugustinLR17/loc
 | POST | `/system/restart.json` | Restart server |
 | POST | `/system/install-service` | Install systemd service (Linux) |
 | POST | `/system/uninstall-service` | Uninstall systemd service (Linux) |
+| GET | `/system/update/status` | Get update check status |
+| GET | `/system/update/check` | Check for updates (synchronous) |
+| POST | `/system/update/download` | Download the update JAR |
+| POST | `/system/update/apply` | Apply pending update and restart |
+| POST | `/system/update/rollback` | Rollback to previous version |
+| GET | `/system/update.json` | Get update config section |
+| PUT | `/system/update.json` | Update update config section |
 
 ### Example: Print from command line
 
@@ -246,6 +253,68 @@ Configure endpoint security in the Web UI under **Advanced → Endpoint Security
 
 You can also enable global Bearer/Basic auth under **Advanced → Server → Authentication**.
 
+## Auto-Update
+
+The bridge can check for new versions on GitHub Releases and optionally download and install them automatically. This is an **opt-in hybrid approach** (detection + notification + manual install by default) designed for B2B/POS environments where operators want control over when updates happen.
+
+### How it works
+
+1. **Check** — polls the GitHub Releases API for the latest version, comparing it with `Constants.VERSION` using semver rules
+2. **Download** — if a newer version is found, downloads the new fat JAR to `updates/` (atomic: writes to `.part`, moves when complete)
+3. **Apply** — replaces the current JAR (backs up the old one to `.bak`), then restarts the server
+4. **Rollback** — if the new version fails, `POST /system/update/rollback` restores the `.bak`
+
+### Config
+
+```json
+{
+  "update": {
+    "enabled": true,
+    "autoDownload": false,
+    "autoInstall": false,
+    "includePrereleases": false,
+    "checkIntervalHours": 24,
+    "repository": "AugustinLR17/local-hardware-bridge",
+    "channel": "stable"
+  }
+}
+```
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `enabled` | `true` | Master switch for update checks |
+| `autoDownload` | `false` | Download the JAR automatically when an update is detected (no install) |
+| `autoInstall` | `false` | Apply the downloaded update on the next restart (implies autoDownload) |
+| `includePrereleases` | `false` | Include alpha/beta/RC versions in checks |
+| `checkIntervalHours` | `24` | Check interval in hours. `0` = startup-only |
+| `repository` | `"AugustinLR17/local-hardware-bridge"` | GitHub repo to check |
+| `channel` | `"stable"` | `"stable"` or `"prerelease"` |
+
+### Manual update via REST API
+
+```bash
+# Check for updates
+curl http://127.0.0.1:12212/system/update/check
+
+# Download the update JAR
+curl -X POST http://127.0.0.1:12212/system/update/download
+
+# Apply and restart
+curl -X POST http://127.0.0.1:12212/system/update/apply
+
+# Rollback if something goes wrong
+curl -X POST http://127.0.0.1:12212/system/update/rollback
+```
+
+### Emergency bypass
+
+If a bad auto-update prevents startup, pass `-Dlhb.no-update=true` to skip the auto-apply logic:
+```bash
+java -Dlhb.no-update=true -jar local-hardware-bridge.jar
+```
+
+The Web UI has an **Auto-Update** card under the Advanced tab, and the system tray menu has a **Check for Updates** item.
+
 ## Documentation
 
 Full documentation lives in the [GitHub Wiki](https://github.com/AugustinLR17/local-hardware-bridge/wiki).
@@ -260,6 +329,7 @@ Full documentation lives in the [GitHub Wiki](https://github.com/AugustinLR17/lo
 | [Browser Integration](https://github.com/AugustinLR17/local-hardware-bridge/wiki/Browser-Integration) | JS SDK & framework examples |
 | [Security and Hardening](https://github.com/AugustinLR17/local-hardware-bridge/wiki/Security-and-Hardening) | Auth, TLS, SSRF, CORS |
 | [Deployment Guides](https://github.com/AugustinLR17/local-hardware-bridge/wiki/Deployment-Guides) | systemd, launchd, auto-start |
+| [Auto-Update](https://github.com/AugustinLR17/local-hardware-bridge/wiki/Auto-Update) | Automatic update checking, downloading, and rollback |
 | [Architecture](https://github.com/AugustinLR17/local-hardware-bridge/wiki/Architecture) | Internal design |
 | [Development Guide](https://github.com/AugustinLR17/local-hardware-bridge/wiki/Development-Guide) | Build, test, contribute |
 | [Troubleshooting](https://github.com/AugustinLR17/local-hardware-bridge/wiki/Troubleshooting) | Common issues and fixes |

@@ -21,6 +21,7 @@ public class Config {
     private Downloader downloader = new Downloader();
     private Printer printer = new Printer();
     private Serial serial = new Serial();
+    private Update update = new Update();
 
     public String toJson() throws JsonProcessingException {
         return new ObjectMapper().writeValueAsString(this);
@@ -142,5 +143,51 @@ public class Config {
 
         private Boolean readMultipleBytes = false;
         private String readCharset = StandardCharsets.ISO_8859_1.toString();
+    }
+
+    /**
+     * Auto-update configuration.
+     *
+     * <p>The update checker polls the GitHub Releases API and, if a newer
+     * version is found, can optionally download and apply the new JAR.
+     * Pre-release versions are ignored unless {@code includePrereleases} is true.
+     */
+    @Data
+    @NoArgsConstructor
+    public static class Update {
+        /** Master switch: if false, no update checks are performed. */
+        private boolean enabled = true;
+
+        /**
+         * If true, the new JAR is downloaded automatically when an update is
+         * detected. If false (default, recommended for B2B/POS), the user is
+         * only notified and must trigger the install manually.
+         */
+        private boolean autoDownload = false;
+
+        /**
+         * If true, apply the downloaded update on the next restart without
+         * asking. Implies {@code autoDownload}.
+         */
+        private boolean autoInstall = false;
+
+        /** Include pre-release versions (alpha, beta, RC) in checks. */
+        private boolean includePrereleases = false;
+
+        /**
+         * Check interval in hours. 0 = only check on startup / manual trigger.
+         * Default: 24 (once a day).
+         */
+        private int checkIntervalHours = 24;
+
+        /** GitHub repository in {@code owner/repo} format. */
+        private String repository = "AugustinLR17/local-hardware-bridge";
+
+        /**
+         * Optional channel filter: {@code "stable"} (default) or
+         * {@code "prerelease"}. When {@code "prerelease"}, sets
+         * {@code includePrereleases = true} at check time.
+         */
+        private String channel = "stable";
     }
 }

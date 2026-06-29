@@ -32,13 +32,15 @@ Output: `build/libs/local-hardware-bridge-2.0.0.jar` (shadow JAR; `module-info.c
 ```bash
 ./gradlew test
 ```
-Four test classes exist in `src/test/`:
-- `dtos/ConfigTest` — Config defaults, Jackson round-trip, unknown-property tolerance
-- `services/ConfigServiceTest` — load/save round-trip with temp files
-- `services/DocumentServiceTest` — path-traversal hardening (invokes private `getOutputFile` via reflection)
-- `websocketservices/PrinterWebSocketServiceTest` — file-type detection (PDF/image) spoofing via query/fragment
+Over 30 test classes exist in `src/test/`, covering:
+- `dtos/` — Config defaults, Jackson round-trips, unknown-property tolerance, nested DTOs (CORS, Security, EndpointRule, mappings, Downloader, TLS), ReleaseInfo parsing, UpdateStatusDTO, VersionDTO, NotificationDTO, SystemDTOs
+- `services/` — ConfigService load/save round-trips (atomicity, temp file cleanup, complex config), DocumentService path-traversal/SSRF/prepare/delete, MappingCrudLogic, UpdateService (status, asset lookup, cleanup, scheduler, pending detection)
+- `websocketservices/` — PrinterWebSocketService file-type detection (PDF/image spoofing via query/fragment), dispatch, per-type locks, searchPrinterForType; SerialWebSocketService channel naming, BINARY charset
+- `utils/` — VersionComparator (semver parsing, pre-release precedence, edge cases), AnnotatedPrintable, AnnotatedPrintableAnnotation, CertificateGenerator, ImagePrintable, ThreadUtil
+- `responses/` — PrintDocument/PrintResult construction, serialization, snake_case deserialization, round-trips
+- Root package — Constants, AppHome, CrossBridgeAuth (token isolation, constant-time comparison), ServerChannelRouting (pub/sub, wildcard, binary), ServerRestartGuard (AtomicBoolean CAS), ServerMessageBroadcast
 
-Tests are hermetic: no network, no server bind, no real printing. `DocumentServiceTest` and `PrinterWebSocketServiceTest` use reflection to test private methods. `ConfigServiceTest.saveProducesValidJsonReadableBack` writes `config.json` into the CWD (harmless — it's git-ignored).
+Tests are hermetic: no network, no server bind, no real printing. Many tests use reflection to test private methods (`constantTimeEquals`, `extractBearerToken`, `searchPrinterForType`, `getOutputFile`, `download`, `verifyPublicHost`, `findJarAsset`, etc.). Some tests that call `save()` create `config.json` in the CWD (harmless — it's git-ignored).
 
 **E2E tests** (Docker-based, Python harness against a running bridge + CUPS-PDF):
 ```bash
@@ -110,7 +112,7 @@ The app uses a **pub/sub channel model** with two interfaces:
 - Jackson is configured with `FAIL_ON_UNKNOWN_PROPERTIES = false` — unknown/future fields are tolerated on load
 - `save()` is **atomic**: writes to a temp file in the same dir, then `ATOMIC_MOVE` into place (falls back to non-atomic move if the FS doesn't support it). A crash mid-write cannot corrupt the existing config.
 - Config is exposed via HTTP `GET/PUT /config.json` — the Web UI edits it directly. Individual sections also have dedicated endpoints (server, downloader, gui, printer mappings, serial mappings).
-- `Config` DTO uses Lombok `@Data` with nested static classes. Key sections: `Server` (address, bind, port, authentication, tls, cors), `Security` (per-endpoint rules), `Downloader`, `Printer`, `Serial`, `GUI`.
+- `Config` DTO uses Lombok `@Data` with nested static classes. Key sections: `Server` (address, bind, port, authentication, tls, cors), `Security` (per-endpoint rules), `Downloader`, `Printer`, `Serial`, `GUI`, `Update` (auto-update settings).
 - Version is hardcoded in `Constants.VERSION` (currently `"2.0.0"`) and must match `build.gradle` `version`. The release workflow **enforces** this: it fails the build if the git tag version doesn't match `build.gradle`.
 
 ### Printing Pipeline
@@ -133,6 +135,20 @@ The app uses a **pub/sub channel model** with two interfaces:
 ### Restart Mechanism
 `POST /system/restart.json` triggers an **async restart** on a separate daemon thread (`"server-restart"`), guarded by an `AtomicBoolean` to prevent overlapping restarts. The HTTP response is sent **before** `stop()`/`start()` run — they must NOT execute on the Jetty worker thread, or `javalinServer.stop()` deadlocks shutting down the very thread pool serving the request. The E2E suite polls `/system/health` until the server is back up.
 
+### Auto-Update System
+- `UpdateService` is a **singleton** (`UpdateService.getInstance()`) that checks GitHub Releases for new versions
+- **Hybrid approach**: detects + notifies by default; `autoDownload`/`autoInstall` are opt-in (off by default, recommended for B2B/POS)
+- **Check flow**: polls `https://api.github.com/repos/{owner}/{repo}/releases/latest` (or `/releases` if pre-releases are included), parses `ReleaseInfo` DTO, compares versions with `VersionComparator` (semver with pre-release precedence)
+- **Download**: downloads the new fat JAR to `updates/` via an atomic `.part` → move pattern; verifies file size against the GitHub-reported size
+- **Apply**: `POST /system/update/apply` stops the server, replaces the current JAR (backs up old one to `.bak`), restarts. The apply runs on a background thread (same `restarting` AtomicBoolean guard as `/system/restart.json`) to avoid Jetty deadlock
+- **Rollback**: `POST /system/update/rollback` restores the `.bak` JAR
+- **Launcher auto-install**: if `autoInstall` is enabled, `Launcher.main()` applies a pending update before starting the app. `-Dlhb.no-update=true` is an emergency bypass
+- **Scheduler**: `Server.start()` calls `UpdateService.startScheduledChecks()` which uses a single-thread `ScheduledExecutorService` (daemon thread `"update-checker"`). `Server.stop()` calls `stopScheduledChecks()`. Interval is `config.update.checkIntervalHours` (default 24, 0 = startup-only)
+- **Pending update detection**: on startup, `UpdateService` scans `updates/` for a previously-downloaded JAR from a prior run and sets it as pending if its version is newer than `Constants.VERSION`
+- **GUI integration**: the system tray menu has a "Check for Updates" item; a silent background check runs 8s after startup; an interactive dialog offers download+install if an update is found
+- **Web UI**: the Advanced tab has an Auto-Update card with check/download buttons and config toggles
+- **GitHub API**: every request sends a `User-Agent: Local-Hardware-Bridge/{version}` header (required by GitHub fair-use policy)
+
 ## Code Organization
 
 ```
@@ -143,10 +159,12 @@ src/main/java/io/github/augustinlr17/localhardwarebridge/
 ├── Launcher.java               — Packaged Main-Class; anchors CWD then dispatches to GUI/Server
 ├── Server.java                 — Javalin HTTP/WS server, channel router, service registry, all REST endpoints
 ├── dtos/
-│   ├── Config.java             — Full config structure with nested static classes
+│   ├── Config.java             — Full config structure with nested static classes (incl. Update)
 │   ├── NotificationDTO.java    — type/title/message for desktop notifications
 │   ├── PrintServiceDTO.java    — printer name/description for API responses
+│   ├── ReleaseInfo.java        — GitHub Releases API response DTO (tag, assets, pre-release)
 │   ├── SerialPortDTO.java      — port name/description/manufacturer for API responses
+│   ├── UpdateStatusDTO.java    — Update check status for API responses
 │   └── VersionDTO.java         — app name/id/version for API response
 ├── interfaces/
 │   ├── WebSocketServerInterface.java  — Server→Service routing contract
@@ -156,12 +174,14 @@ src/main/java/io/github/augustinlr17/localhardwarebridge/
 │   └── PrintResult.java        — Outgoing print result (success, message, id, printerName)
 ├── services/
 │   ├── ConfigService.java      — Singleton config loader/saver (atomic save)
-│   └── DocumentService.java    — File download + Base64 decode (SSRF/path-traversal hardened)
+│   ├── DocumentService.java    — File download + Base64 decode (SSRF/path-traversal hardened)
+│   └── UpdateService.java      — Singleton: checks GitHub Releases, downloads/applies JAR updates, rollback
 ├── utils/
 │   ├── AnnotatedPrintable.java — Printable wrapper that overlays text annotations on PDF/images
 │   ├── CertificateGenerator.java — Self-signed TLS cert generation (BouncyCastle)
 │   ├── ImagePrintable.java     — AWT Printable for image files
-│   └── ThreadUtil.java         — silentSleep() helper
+│   ├── ThreadUtil.java         — silentSleep() helper
+│   └── VersionComparator.java  — Semver comparison (MAJOR.MINOR.PATCH + pre-release precedence)
 └── websocketservices/
     ├── PrinterWebSocketService.java  — Handles /printer channel, per-type locks, type detection, auto-add/fallback
     └── SerialWebSocketService.java   — Handles /serial/{type} channels, 3-thread model, BlockingQueue writes
@@ -220,6 +240,13 @@ docs/                           — Code signing policy
 | PUT | `/system/gui.json` | Update GUI config section |
 | POST | `/system/install-service` | Install systemd service (Linux only, migrates legacy service name) |
 | POST | `/system/uninstall-service` | Uninstall systemd service (Linux only) |
+| GET | `/system/update/status` | Get update check status (current version, latest, pending) |
+| GET | `/system/update/check` | Check for updates synchronously (polls GitHub Releases API) |
+| POST | `/system/update/download` | Download the update JAR to `updates/` |
+| POST | `/system/update/apply` | Apply pending update (replace JAR + async restart) |
+| POST | `/system/update/rollback` | Rollback to the `.bak` JAR + async restart |
+| GET | `/system/update.json` | Get update config section |
+| PUT | `/system/update.json` | Update update config section (restarts scheduler) |
 | GET | `/icon.png` | Serve app icon |
 
 ### Auth & Endpoint Security
@@ -263,7 +290,7 @@ Receive `PrintResult`:
 - **Logging**: Use `@Log4j2` (Lombok) then `log.info(...)` / `log.error(...)`. Do not create loggers by hand. Log4j2 config is in `src/main/resources/log4j2.xml`. The build uses `log4j-slf4j2-impl` (SLF4J 2.x binding).
 - **Config file is runtime-created**: `config.json` is in `.gitignore` and created on first run. Don't look for it in the repo. Unit tests that call `save()` will create it in the CWD (harmless).
 - **Version must be kept in sync**: `Constants.VERSION`, `build.gradle` `version`, and the `PRODUCT_VERSION` default in `install.nsi` must match. CI release workflow enforces the tag ↔ build.gradle match and fails on mismatch.
-- **Working directory anchoring**: relative paths (`config.json`, `log/`, `tls/`, `downloads/`) resolve against `user.dir`, which `AppHome.anchor()` (called first from `Launcher`) repoints to the install dir. If you add a new entry point, call `AppHome.anchor()` before touching files or loggers. It's idempotent and a no-op outside a JAR.
+- **Working directory anchoring**: relative paths (`config.json`, `log/`, `tls/`, `downloads/`, `updates/`) resolve against `user.dir`, which `AppHome.anchor()` (called first from `Launcher`) repoints to the install dir. If you add a new entry point, call `AppHome.anchor()` before touching files or loggers. It's idempotent and a no-op outside a JAR.
 - **AnnotatedPrintable platform quirk**: `getDefaultTransform()` works on Windows but throws `NullPointerException` on macOS — the catch block falls back to a blank `AffineTransform`. Don't remove this try/catch.
 - **Serial write is a queue**: `writeQueue` is a `LinkedBlockingQueue<byte[]>`, drained fully each write cycle. All queued writes are delivered (no last-write-wins loss).
 - **HTTP Print API**: `POST /printer` calls `PrinterWebSocketService.printDocument()` synchronously and returns `PrintResult` JSON. This allows remote servers to submit print jobs without WebSocket. Returns 503 if the printer service is disabled.
