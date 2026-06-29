@@ -13,6 +13,7 @@ import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.concurrent.atomic.AtomicReference;
 
 @Log4j2
 public class ConfigService {
@@ -26,7 +27,11 @@ public class ConfigService {
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
     @Getter
-    private volatile Config config = new Config();
+    private final AtomicReference<Config> config = new AtomicReference<>(new Config());
+
+    public Config getConfig() {
+        return config.get();
+    }
 
     private ConfigService() {
         try {
@@ -39,12 +44,12 @@ public class ConfigService {
 
     public synchronized void loadFromJson(String json) throws JsonProcessingException {
         log.info("Loading config from JSON: {}", json);
-        config = objectMapper.readValue(json, Config.class);
+        config.set(objectMapper.readValue(json, Config.class));
     }
 
     public synchronized void loadFromFile(String filename) throws IOException {
         log.info("Loading config from file: {}", filename);
-        config = objectMapper.readValue(new File(filename), Config.class);
+        config.set(objectMapper.readValue(new File(filename), Config.class));
     }
 
     public synchronized void save() {
@@ -65,8 +70,10 @@ public class ConfigService {
                 }
             } finally {
                 // Best-effort cleanup if the move did not consume the temp file.
-                if (temp.exists()) {
-                    temp.delete();
+                try {
+                    Files.deleteIfExists(temp.toPath());
+                } catch (IOException deleteEx) {
+                    log.warn("Could not delete temp config file: {}", temp, deleteEx);
                 }
             }
         } catch (Exception e) {
@@ -80,7 +87,7 @@ public class ConfigService {
     }
 
     public synchronized void addPrintTypeToList(String printType) {
-        config.getPrinter().getMappings().add(new Config.PrinterMapping(printType, PRINTER_PLACEHOLDER, false, true, 0));
+        config.get().getPrinter().getMappings().add(new Config.PrinterMapping(printType, PRINTER_PLACEHOLDER, false, true, 0));
         save();
     }
 }

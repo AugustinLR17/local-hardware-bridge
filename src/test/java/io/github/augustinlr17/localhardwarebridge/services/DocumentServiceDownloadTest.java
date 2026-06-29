@@ -143,4 +143,80 @@ public class DocumentServiceDownloadTest {
             ConfigService.getInstance().getConfig().getDownloader().setIgnoreTLSCertificateError(false);
         }
     }
+
+    @Test
+    public void ignoreTLSCertificateErrorAllowsSelfSignedHttps() throws Throwable {
+        // Generates a self-signed cert and starts an HTTPS server, then downloads
+        // with ignoreTLSCertificateError=true. The trust-all + hostname verifier
+        // relaxation must allow the download to succeed.
+        ConfigService.getInstance().getConfig().getDownloader().setIgnoreTLSCertificateError(true);
+
+        java.nio.file.Path certDir = Files.createTempDirectory("lhb-tls-test");
+        String certPath = certDir.resolve("cert.pem").toString();
+        String keyPath = certDir.resolve("key.pem").toString();
+        String originalDir = System.getProperty("user.dir");
+        System.setProperty("user.dir", certDir.toString());
+
+        try {
+            io.github.augustinlr17.localhardwarebridge.utils.CertificateGenerator
+                    .generateSelfSignedCertificate("127.0.0.1", certPath, keyPath);
+
+            // Load the generated cert and key into a keystore for the HTTPS server
+            java.security.KeyStore ks = java.security.KeyStore.getInstance("PKCS12");
+            ks.load(null, "pass".toCharArray());
+
+            java.security.cert.CertificateFactory cf = java.security.cert.CertificateFactory.getInstance("X.509");
+            java.security.cert.X509Certificate cert;
+            try (java.io.FileInputStream fis = new java.io.FileInputStream(certPath)) {
+                cert = (java.security.cert.X509Certificate) cf.generateCertificate(fis);
+            }
+
+            // Read the private key PEM
+            java.security.PrivateKey privKey = readPrivateKeyFromPem(keyPath);
+
+            ks.setKeyEntry("alias", privKey, "pass".toCharArray(), new java.security.cert.Certificate[]{cert});
+
+            javax.net.ssl.KeyManagerFactory kmf = javax.net.ssl.KeyManagerFactory.getInstance(
+                    javax.net.ssl.KeyManagerFactory.getDefaultAlgorithm());
+            kmf.init(ks, "pass".toCharArray());
+            javax.net.ssl.SSLContext sslCtx = javax.net.ssl.SSLContext.getInstance("TLS");
+            sslCtx.init(kmf.getKeyManagers(), null, null);
+
+            com.sun.net.httpserver.HttpsServer server = com.sun.net.httpserver.HttpsServer.create(
+                    new java.net.InetSocketAddress("127.0.0.1", 0), 0);
+            server.setHttpsConfigurator(new com.sun.net.httpserver.HttpsConfigurator(sslCtx));
+
+            byte[] payload = "https self-signed content".getBytes();
+            server.createContext("/", exchange -> {
+                exchange.sendResponseHeaders(200, payload.length);
+                try (OutputStream os = exchange.getResponseBody()) {
+                    os.write(payload);
+                }
+            });
+            server.start();
+            int port = server.getAddress().getPort();
+
+            try {
+                File outFile = new File(baseDir, "https.bin");
+                invokeDownload(new java.net.URL("https://127.0.0.1:" + port + "/file.bin"), outFile);
+                assertTrue("output file must exist after HTTPS download", outFile.exists());
+                assertArrayEquals(payload, Files.readAllBytes(outFile.toPath()));
+            } finally {
+                server.stop(0);
+            }
+        } finally {
+            System.setProperty("user.dir", originalDir);
+            ConfigService.getInstance().getConfig().getDownloader().setIgnoreTLSCertificateError(false);
+        }
+    }
+
+    private java.security.PrivateKey readPrivateKeyFromPem(String keyPath) throws Exception {
+        String content = Files.readString(java.nio.file.Paths.get(keyPath));
+        String pem = content.replaceAll("-----BEGIN.*-----", "")
+                .replaceAll("-----END.*-----", "")
+                .replaceAll("\\s", "");
+        byte[] der = java.util.Base64.getDecoder().decode(pem);
+        java.security.spec.PKCS8EncodedKeySpec spec = new java.security.spec.PKCS8EncodedKeySpec(der);
+        return java.security.KeyFactory.getInstance("RSA").generatePrivate(spec);
+    }
 }

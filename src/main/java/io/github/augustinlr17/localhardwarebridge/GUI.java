@@ -362,6 +362,8 @@ public class GUI implements WebSocketServiceInterface {
             if (choice == JOptionPane.YES_OPTION) {
                 installLinuxService();
             }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         } catch (Exception e) {
             log.error("Failed to check/install Linux service", e);
         }
@@ -438,6 +440,8 @@ public class GUI implements WebSocketServiceInterface {
                 + "WantedBy=multi-user.target\n";
 
             Path tempFile = Files.createTempFile("local-hardware-bridge", ".service");
+            // Restrict temp file to owner-only before writing the systemd unit.
+            restrictTempFilePermissions(tempFile);
             Files.writeString(tempFile, serviceContent, StandardOpenOption.TRUNCATE_EXISTING);
 
             ProcessBuilder copy = new ProcessBuilder("pkexec", "cp", tempFile.toString(), "/etc/systemd/system/local-hardware-bridge.service");
@@ -451,6 +455,9 @@ public class GUI implements WebSocketServiceInterface {
 
             Files.deleteIfExists(tempFile);
             notify(Constants.APP_NAME, "Service installed and started", TrayIcon.MessageType.INFO);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            notify(Constants.APP_NAME, "Service installation interrupted", TrayIcon.MessageType.WARNING);
         } catch (Exception e) {
             log.error("Failed to install Linux service", e);
             notify(Constants.APP_NAME, "Service installation failed: " + e.getMessage(), TrayIcon.MessageType.ERROR);
@@ -501,6 +508,8 @@ public class GUI implements WebSocketServiceInterface {
             } else {
                 log.info("Notification: {} - {}", title, message);
             }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         } catch (Exception e) {
             log.warn("Notification fallback (display failed): {} - {}", title, message);
         }
@@ -551,5 +560,19 @@ public class GUI implements WebSocketServiceInterface {
     @Override
     public String getChannel() {
         return "/notification";
+    }
+
+    private void restrictTempFilePermissions(Path tempFile) {
+        try {
+            java.nio.file.attribute.PosixFilePermissions.fromString("rw-------");
+            Files.setPosixFilePermissions(tempFile,
+                    java.nio.file.attribute.PosixFilePermissions.fromString("rw-------"));
+        } catch (Exception e) {
+            File f = tempFile.toFile();
+            f.setReadable(false, false);
+            f.setReadable(true, true);
+            f.setWritable(false, false);
+            f.setWritable(true, true);
+        }
     }
 }

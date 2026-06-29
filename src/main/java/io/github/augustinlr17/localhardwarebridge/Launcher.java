@@ -41,7 +41,7 @@ public final class Launcher {
             try {
                 applyPendingAutoUpdate();
             } catch (Exception e) {
-                // Log to stderr — log4j isn't initialized yet
+                // Log to stderr — log4j isn't initialized yet (intentional, see javadoc)
                 System.err.println("[Launcher] Auto-update apply failed: " + e.getMessage());
             }
         }
@@ -79,6 +79,7 @@ public final class Launcher {
             return;
         }
 
+        // Log4j isn't initialized yet — stderr is the only channel available.
         System.err.println("[Launcher] Applying pending auto-update: " + pending);
         UpdateService.getInstance().applyUpdate(pending);
         UpdateService.getInstance().cleanupOldUpdates();

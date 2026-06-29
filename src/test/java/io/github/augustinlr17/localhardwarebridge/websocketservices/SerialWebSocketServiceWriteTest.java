@@ -172,6 +172,24 @@ public class SerialWebSocketServiceWriteTest {
         assertTrue((boolean) f.get(service));
     }
 
+    @Test
+    public void messageToServiceBytesWithBoundedQueueDoesNotThrow() throws Exception {
+        SerialWebSocketService service = createService();
+        // Replace the write queue with a bounded one that is already full.
+        Field qf = SerialWebSocketService.class.getDeclaredField("writeQueue");
+        qf.setAccessible(true);
+        java.util.concurrent.LinkedBlockingQueue<byte[]> bounded =
+                new java.util.concurrent.LinkedBlockingQueue<>(1);
+        bounded.offer(new byte[]{0x00});
+        qf.set(service, bounded);
+
+        // This should not throw even though the queue is full.
+        service.messageToService(new byte[]{0x01});
+
+        // The queue should still contain only the first element.
+        assertEquals(1, bounded.size());
+    }
+
     /** Minimal mock server for onRegister/onUnregister tests. */
     private static class MockServer implements WebSocketServerInterface {
         @Override

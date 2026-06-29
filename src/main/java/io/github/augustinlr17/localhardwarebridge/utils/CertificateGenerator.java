@@ -32,6 +32,9 @@ import java.util.regex.Pattern;
 
 @Log4j2
 public class CertificateGenerator {
+    private CertificateGenerator() {
+    }
+
     private static final String CERTIFICATE_ALGORITHM = "RSA";
     private static final int CERTIFICATE_BITS = 2048;
 
@@ -57,14 +60,18 @@ public class CertificateGenerator {
                 if (!existingCN.equals(subjectName)) {
                     log.info("Certificate CN ({}) does not match configured address ({}), regenerating.", existingCN, subjectName);
                     needGenerate = true;
-                    new File(certificatePath).delete();
-                    new File(keyPath).delete();
+                    Files.deleteIfExists(new File(certificatePath).toPath());
+                    Files.deleteIfExists(new File(keyPath).toPath());
                 }
             } catch (Exception e) {
                 log.warn("Failed to read existing certificate, regenerating: {}", e.getMessage());
                 needGenerate = true;
-                new File(certificatePath).delete();
-                new File(keyPath).delete();
+                try {
+                    Files.deleteIfExists(new File(certificatePath).toPath());
+                    Files.deleteIfExists(new File(keyPath).toPath());
+                } catch (IOException ioEx) {
+                    log.warn("Could not delete old certificate/key files", ioEx);
+                }
             }
         }
 
@@ -162,13 +169,14 @@ public class CertificateGenerator {
         } catch (IOException | RuntimeException e) {
             try {
                 // Remove access for everyone, then re-grant to the owner only.
-                file.setReadable(false, false);
-                file.setReadable(true, true);
-                file.setWritable(false, false);
-                file.setWritable(true, true);
+                if (!file.setReadable(false, false) || !file.setReadable(true, true)
+                        || !file.setWritable(false, false) || !file.setWritable(true, true)) {
+                    log.warn("Could not fully restrict permissions on {}", file);
+                }
                 if (file.isDirectory()) {
-                    file.setExecutable(false, false);
-                    file.setExecutable(true, true);
+                    if (!file.setExecutable(false, false) || !file.setExecutable(true, true)) {
+                        log.warn("Could not fully restrict executable permission on {}", file);
+                    }
                 }
             } catch (Exception fallbackError) {
                 log.warn("Unable to restrict permissions on {}: {}", file, String.valueOf(fallbackError.getMessage()));

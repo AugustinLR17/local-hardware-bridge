@@ -164,7 +164,9 @@ public class SerialWebSocketService implements WebSocketServiceInterface {
     @Override
     public void messageToService(byte[] message) {
         if (message != null) {
-            writeQueue.offer(message);
+            if (!writeQueue.offer(message)) {
+                log.warn("Serial write queue full, message dropped for channel {}", getChannel());
+            }
         }
     }
 

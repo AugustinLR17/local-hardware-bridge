@@ -100,7 +100,10 @@ public class DocumentService {
         URLConnection urlConnection = url.openConnection();
 
         // Trust-all is scoped to THIS connection only; never mutate the JVM-wide default.
+        // This is an opt-in feature (config.downloader.ignoreTLSCertificateError) for POS/WMS
+        // environments that use self-signed certificates. It is off by default.
         if (downloaderConfig.isIgnoreTLSCertificateError() && urlConnection instanceof HttpsURLConnection) {
+            @SuppressWarnings("java:S4830")
             TrustManager[] trustAllCerts = new TrustManager[]{
                     new X509TrustManager() {
                         public X509Certificate[] getAcceptedIssuers() {
@@ -120,7 +123,11 @@ public class DocumentService {
 
             HttpsURLConnection httpsConnection = (HttpsURLConnection) urlConnection;
             httpsConnection.setSSLSocketFactory(sc.getSocketFactory());
-            httpsConnection.setHostnameVerifier((hostname, session) -> true);
+            // Hostname verification is intentionally relaxed when the user opts in to
+            // ignoreTLSertificateError (e.g. self-signed certs with mismatched CNs).
+            @SuppressWarnings("java:S5527")
+            var hostnameVerifier = (javax.net.ssl.HostnameVerifier) (hostname, session) -> true;
+            httpsConnection.setHostnameVerifier(hostnameVerifier);
         }
 
         urlConnection.setConnectTimeout((int) downloaderConfig.getTimeout() * 1000);
