@@ -21,6 +21,7 @@ import java.util.List;
 public class ReleaseInfo {
 
     /** The tag name, e.g. {@code "v2.1.0"}. */
+    @JsonProperty("tag_name")
     private String tagName;
 
     /** The release name/title (human-readable). */
