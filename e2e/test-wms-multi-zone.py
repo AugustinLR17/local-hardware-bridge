@@ -138,11 +138,16 @@ procs = []
 
 def start_zone_bridges():
     """Start one bridge per zone."""
+    import shutil
     for name, cfg in ZONES.items():
         os.makedirs(cfg["workdir"], exist_ok=True)
+        # Copy the JAR into each workdir so AppHome.anchor() sets user.dir
+        # to the workdir (not /app), allowing each bridge to read its own config.json
+        local_jar = os.path.join(cfg["workdir"], "bridge.jar")
+        shutil.copy2(JAR_PATH, local_jar)
         write_config_json(cfg["workdir"], cfg["port"], cfg["token"],
                           printer_type=cfg["printer_type"])
-        cmd = ["java", "-Dlhb.server=true", "-cp", JAR_PATH,
+        cmd = ["java", "-Dlhb.server=true", "-cp", local_jar,
                "io.github.augustinlr17.localhardwarebridge.Server"]
         proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL,
                                 stderr=subprocess.DEVNULL, cwd=cfg["workdir"])

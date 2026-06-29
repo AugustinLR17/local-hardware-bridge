@@ -215,12 +215,17 @@ def main():
         # --- Start 3 bridges, each with its own token ---
         for name, cfg in bridges.items():
             os.makedirs(cfg["workdir"], exist_ok=True)
+            # Copy the JAR into each workdir so AppHome.anchor() sets user.dir
+            # to the workdir (not /app), allowing each bridge to read its own config.json
+            local_jar = os.path.join(cfg["workdir"], "bridge.jar")
+            import shutil
+            shutil.copy2(jar_path, local_jar)
             write_config_json(cfg["workdir"], cfg["port"],
                               token=cfg["token"], auth_enabled=True)
 
             cmd = [
                 "java", "-Dlhb.server=true",
-                "-cp", jar_path,
+                "-cp", local_jar,
                 "io.github.augustinlr17.localhardwarebridge.Server",
             ]
             proc = subprocess.Popen(
