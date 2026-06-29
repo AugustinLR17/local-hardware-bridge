@@ -154,10 +154,30 @@ def start_zone_bridges():
         print(f"OK   zone {name} bridge started on port {cfg['port']}")
 
 
+def wait_for_port_free(port, timeout=30):
+    """Wait until no process is listening on the given port."""
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        try:
+            s, b = request(f"http://127.0.0.1:{port}", "GET", "/system/health")
+            if s == -1:
+                return True
+        except Exception:
+            return True
+        time.sleep(1)
+    return False
+
+
 def main():
     if not os.path.exists(JAR_PATH):
         print(f"FAIL: JAR not found at {JAR_PATH}")
         sys.exit(1)
+
+    # Wait for all required ports to be free before starting
+    for port in [12215, 12216, 12217]:
+        if not wait_for_port_free(port):
+            print(f"FAIL: port {port} is still in use")
+            sys.exit(1)
 
     try:
         start_zone_bridges()

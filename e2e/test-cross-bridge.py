@@ -161,11 +161,31 @@ def write_config_json(workdir, port, token=None, auth_enabled=False):
     return config_path
 
 
+def wait_for_port_free(port, timeout=30):
+    """Wait until no process is listening on the given port."""
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        try:
+            s, b = request(f"http://127.0.0.1:{port}", "GET", "/system/health")
+            if s == -1:
+                return True  # connection refused = port is free
+        except Exception:
+            return True
+        time.sleep(1)
+    return False
+
+
 def main():
     jar_path = "/app/local-hardware-bridge.jar"
     if not os.path.exists(jar_path):
         print(f"FAIL: JAR not found at {jar_path}")
         sys.exit(1)
+
+    # Wait for all required ports to be free before starting
+    for port in [12212, 12213, 12214]:
+        if not wait_for_port_free(port):
+            print(f"FAIL: port {port} is still in use")
+            sys.exit(1)
 
     # --- Bridge definitions ---
     bridges = {

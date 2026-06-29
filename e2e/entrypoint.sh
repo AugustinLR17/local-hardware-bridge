@@ -49,12 +49,30 @@ TEST_EXIT=$?
 kill $BRIDGE_PID 2>/dev/null || true
 wait $BRIDGE_PID 2>/dev/null || true
 
+# Wait for port 12212 to be released before starting cross-bridge tests
+for i in {1..30}; do
+    if ! curl -sf http://127.0.0.1:12212/system/health >/dev/null 2>&1; then
+        break
+    fi
+    sleep 1
+done
+sleep 2
+
 # Run cross-bridge multi-tenant tests (3 bridge instances on ports 12212-12214)
 python3 /app/test-cross-bridge.py
 CROSS_EXIT=$?
 
 # Kill any remaining bridge processes before starting WMS tests
 pkill -f "local-hardware-bridge.jar" 2>/dev/null || true
+# Wait for all ports to be released
+for port in 12212 12213 12214; do
+    for i in {1..30}; do
+        if ! curl -sf http://127.0.0.1:${port}/system/health >/dev/null 2>&1; then
+            break
+        fi
+        sleep 1
+    done
+done
 sleep 2
 
 # Run WMS multi-zone tests (3 zone bridges on ports 12215-12217)
