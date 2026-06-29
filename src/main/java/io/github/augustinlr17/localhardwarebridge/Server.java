@@ -231,8 +231,15 @@ public class Server implements WebSocketServerInterface {
                 }
             }
 
+            // The health endpoint must always be reachable without authentication so that
+            // Docker/Kubernetes/load-balancer health probes and monitoring work regardless of
+            // the global token or endpoint security configuration.
+            if ("/system/health".equals(path)) {
+                return;
+            }
+
             // Critical endpoints required for the Web UI must always stay enabled
-            if ("/config.json".equals(path) || "/system/health".equals(path)) {
+            if ("/config.json".equals(path)) {
                 rule = null; // ignore any disable/password rule
             }
 
