@@ -517,7 +517,7 @@ public class Server implements WebSocketServerInterface {
 
         // Submit print job
         javalinServer.post("/printer", ctx -> {
-            if (printerWebSocketService == null) {
+            if (printerWebSocketService == null || !configService.getConfig().getPrinter().isEnabled()) {
                 ctx.status(503).json("{\"error\": \"Printer service is disabled\"}");
                 return;
             }
