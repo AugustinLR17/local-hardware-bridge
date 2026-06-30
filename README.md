@@ -7,12 +7,6 @@
 [![JDK](https://img.shields.io/badge/JDK-21%2B-orange?logo=openjdk&logoColor=white)](build.gradle)
 [![Signed by SignPath](https://img.shields.io/badge/Signed%20by-SignPath%20Foundation-blue)](https://signpath.org/)
 
-<!-- SonarQube badges below point at a self-hosted instance (http://localhost:9001) and only
-     render where that server is reachable. For public rendering on GitHub, host the analysis
-     on SonarCloud and replace the URLs accordingly. -->
-[![Quality Gate](http://localhost:9001/api/project_badges/measure?project=local-hardware-bridge&metric=alert_status&token=sqb_5fe9eadab7194a7d26d16ba2440062db1d901e2a)](http://localhost:9001/dashboard?id=local-hardware-bridge)
-[![Coverage](http://localhost:9001/api/project_badges/measure?project=local-hardware-bridge&metric=coverage&token=sqb_5fe9eadab7194a7d26d16ba2440062db1d901e2a)](http://localhost:9001/dashboard?id=local-hardware-bridge)
-
 > **Fork of** [WebApp Hardware Bridge](https://github.com/imTigger/webapp-hardware-bridge) by imTigger — originally licensed under MIT.
 
 **Local Hardware Bridge** exposes local printers and serial ports to a web browser running on the same machine. Built for POS systems, WMS, IoT dashboards, and any web app that needs silent access to local hardware without installing browser plugins or extensions.
