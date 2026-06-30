@@ -25,6 +25,8 @@ import io.github.augustinlr17.localhardwarebridge.websocketservices.PrinterWebSo
 import io.github.augustinlr17.localhardwarebridge.websocketservices.SerialWebSocketService;
 
 import javax.print.PrintService;
+import javax.print.attribute.standard.Media;
+import javax.print.attribute.standard.MediaTray;
 import java.awt.print.PrinterJob;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -523,6 +525,24 @@ public class Server implements WebSocketServerInterface {
         });
     }
 
+    /**
+     * Converts a {@link MediaTray} to the string value expected by the
+     * {@code paper_tray} field in {@link io.github.augustinlr17.localhardwarebridge.responses.PrintDocument}.
+     * Returns null for trays that have no standard string mapping.
+     */
+    private static String mediaTrayToString(MediaTray tray) {
+        if (tray == null) return null;
+        if (tray == MediaTray.MAIN) return "MAIN";
+        if (tray == MediaTray.MANUAL) return "MANUAL";
+        if (tray == MediaTray.TOP) return "TOP";
+        if (tray == MediaTray.BOTTOM) return "BOTTOM";
+        if (tray == MediaTray.SIDE) return "SIDE";
+        if (tray == MediaTray.ENVELOPE) return "ENVELOPE";
+        if (tray == MediaTray.LARGE_CAPACITY) return "LARGE_CAPACITY";
+        // Non-standard tray — use its enum name as fallback
+        return tray.toString().toUpperCase().replace(' ', '_');
+    }
+
     /*
      * HTTP API - Printer endpoints
      */
@@ -534,6 +554,45 @@ public class Server implements WebSocketServerInterface {
                 dtos.add(new PrintServiceDTO(service.getName(), ""));
             }
             ctx.contentType(ContentType.APPLICATION_JSON).result(objectMapper.writeValueAsString(dtos));
+        });
+
+        // List available paper trays for a specific printer
+        javalinServer.get("/system/printers/{name}/trays.json", ctx -> {
+            String printerName = ctx.pathParam("name");
+            PrintService[] services = PrinterJob.lookupPrintServices();
+            PrintService target = null;
+            for (PrintService s : services) {
+                if (s.getName().equalsIgnoreCase(printerName)) {
+                    target = s;
+                    break;
+                }
+            }
+            if (target == null) {
+                ctx.status(404).json("{\"error\": \"Printer not found: " + printerName.replace("\"", "'") + "\"}");
+                return;
+            }
+
+            ArrayList<PrinterTrayDTO> trays = new ArrayList<>();
+            try {
+                Media[] media = (Media[]) target.getSupportedAttributeValues(Media.class, null, null);
+                if (media != null) {
+                    for (Media m : media) {
+                        if (m instanceof MediaTray) {
+                            MediaTray tray = (MediaTray) m;
+                            String value = mediaTrayToString(tray);
+                            if (value != null) {
+                                trays.add(new PrinterTrayDTO(value, tray.toString()));
+                            }
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                log.error("Failed to query trays for printer {}: {}", printerName, e.getMessage());
+                ctx.status(500).json("{\"error\": \"Failed to query trays: " + String.valueOf(e.getMessage()).replace("\"", "'") + "\"}");
+                return;
+            }
+
+            ctx.contentType(ContentType.APPLICATION_JSON).result(objectMapper.writeValueAsString(trays));
         });
 
         // Submit print job

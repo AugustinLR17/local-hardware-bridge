@@ -22,6 +22,8 @@ import io.github.augustinlr17.localhardwarebridge.utils.ImagePrintable;
 
 import javax.imageio.ImageIO;
 import javax.print.*;
+import javax.print.attribute.*;
+import javax.print.attribute.standard.*;
 import java.awt.*;
 import java.awt.print.*;
 import java.io.File;
@@ -191,7 +193,7 @@ public class PrinterWebSocketService implements WebSocketServiceInterface {
 
         DocPrintJob docPrintJob = printerSearchResult.getDocPrintJob();
         Doc doc = new SimpleDoc(bytes, DocFlavor.BYTE_ARRAY.AUTOSENSE, null);
-        docPrintJob.print(doc, null);
+        docPrintJob.print(doc, buildPrintAttributes(printDocument));
 
         long timeFinish = System.currentTimeMillis();
         log.info("printRaw finished in {} ms", timeFinish - timeStart);
@@ -228,7 +230,7 @@ public class PrinterWebSocketService implements WebSocketServiceInterface {
         job.setPageable(book);
         job.setJobName(filename);
         job.setCopies(printDocument.getQty());
-        job.print();
+        job.print(buildPrintAttributes(printDocument));
 
         long timeFinish = System.currentTimeMillis();
 
@@ -284,7 +286,7 @@ public class PrinterWebSocketService implements WebSocketServiceInterface {
             job.setPageable(book);
             job.setJobName(filename);
             job.setCopies(printDocument.getQty());
-            job.print();
+            job.print(buildPrintAttributes(printDocument));
 
             long timeFinish = System.currentTimeMillis();
 
@@ -312,6 +314,70 @@ public class PrinterWebSocketService implements WebSocketServiceInterface {
         log.debug("Final Paper Imageable Size: {} x {}, XY: {}, {}", pageFormat.getPaper().getImageableWidth(), pageFormat.getPaper().getImageableHeight(), pageFormat.getPaper().getImageableX(), pageFormat.getPaper().getImageableY());
 
         return pageFormat;
+    }
+
+    /**
+     * Builds a {@link PrintRequestAttributeSet} from the optional print options
+     * carried by a {@link PrintDocument}: duplex (recto-verso), color (couleur/NB),
+     * paper tray (bac), and copies.
+     *
+     * <p>All fields are optional (null = printer default). Unknown paper-tray
+     * names are silently ignored so a bad value never breaks a print job.
+     *
+     * @param printDocument the print job (may have null duplex/color/paperTray)
+     * @return a mutable attribute set (never null, possibly empty)
+     */
+    private PrintRequestAttributeSet buildPrintAttributes(PrintDocument printDocument) {
+        PrintRequestAttributeSet attrs = new HashPrintRequestAttributeSet();
+
+        if (printDocument.getDuplex() != null) {
+            attrs.add(printDocument.getDuplex() ? Sides.DUPLEX : Sides.ONE_SIDED);
+        }
+
+        if (printDocument.getColor() != null) {
+            attrs.add(printDocument.getColor() ? Chromaticity.COLOR : Chromaticity.MONOCHROME);
+        }
+
+        if (printDocument.getPaperTray() != null && !printDocument.getPaperTray().isEmpty()) {
+            MediaTray tray = mapPaperTray(printDocument.getPaperTray());
+            if (tray != null) {
+                attrs.add(tray);
+            } else {
+                log.warn("Unknown paper_tray '{}', ignoring", printDocument.getPaperTray());
+            }
+        }
+
+        if (printDocument.getQty() != null && printDocument.getQty() > 0) {
+            attrs.add(new Copies(printDocument.getQty()));
+        }
+
+        return attrs;
+    }
+
+    /**
+     * Maps a paper-tray string to a {@link MediaTray} constant.
+     *
+     * <p>Supports the standard Java {@link MediaTray} values (case-insensitive):
+     * MAIN, MANUAL, TOP, BOTTOM, SIDE, ENVELOPE, LARGE_CAPACITY.
+     * Returns {@code null} for unknown or null/empty values.
+     *
+     * @param trayName the tray name from the print request (case-insensitive)
+     * @return the matching MediaTray, or null if not recognised
+     */
+    private MediaTray mapPaperTray(String trayName) {
+        if (trayName == null || trayName.trim().isEmpty()) {
+            return null;
+        }
+        switch (trayName.trim().toUpperCase()) {
+            case "MAIN":           return MediaTray.MAIN;
+            case "MANUAL":         return MediaTray.MANUAL;
+            case "TOP":            return MediaTray.TOP;
+            case "BOTTOM":         return MediaTray.BOTTOM;
+            case "SIDE":           return MediaTray.SIDE;
+            case "ENVELOPE":       return MediaTray.ENVELOPE;
+            case "LARGE_CAPACITY": return MediaTray.LARGE_CAPACITY;
+            default:               return null;
+        }
     }
 
     /**

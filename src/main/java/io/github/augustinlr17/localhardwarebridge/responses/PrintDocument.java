@@ -18,5 +18,12 @@ public class PrintDocument {
     Integer qty = 1;
     @JsonProperty("file_content") String fileContent;
     @JsonProperty("raw_content") String rawContent;
+    @JsonProperty("paper_tray") String paperTray;
     ArrayList<AnnotatedPrintable.AnnotatedPrintableAnnotation> extras = new ArrayList<>();
+
+    /** Recto-verso (true) or recto seul (false). Null = printer default. */
+    Boolean duplex;
+
+    /** Couleur (true) or noir et blanc (false). Null = printer default. */
+    Boolean color;
 }
