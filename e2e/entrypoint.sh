@@ -44,6 +44,13 @@ done
 # Run tests
 python3 /app/test.py
 TEST_EXIT=$?
+TEST_EXT_EXIT=0
+
+if [ $TEST_EXIT -eq 0 ]; then
+    # Run extended endpoint tests (same bridge instance, no restart needed)
+    python3 /app/test-extended.py
+    TEST_EXT_EXIT=$?
+fi
 
 # Kill the first bridge so the cross-bridge test can start its own instances
 kill $BRIDGE_PID 2>/dev/null || true
@@ -94,6 +101,9 @@ UPDATE_EXIT=$?
 # Exit with failure if any test suite failed
 if [ $TEST_EXIT -ne 0 ]; then
     exit $TEST_EXIT
+fi
+if [ $TEST_EXT_EXIT -ne 0 ]; then
+    exit $TEST_EXT_EXIT
 fi
 if [ $CROSS_EXIT -ne 0 ]; then
     exit $CROSS_EXIT

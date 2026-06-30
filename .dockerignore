@@ -1,0 +1,11 @@
+.gradle
+.gradle-docker
+.gradle-lhb-cache
+build
+!build/libs
+.git
+*.md
+tui
+demo
+scripts
+docs

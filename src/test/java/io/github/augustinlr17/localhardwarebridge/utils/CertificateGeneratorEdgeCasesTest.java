@@ -163,9 +163,12 @@ public class CertificateGeneratorEdgeCasesTest {
         } finally {
             // Clean up the tls dir in the temp working directory
             File tlsDir = new File("tls");
-            if (tlsDir.exists()) {
-                for (File f : tlsDir.listFiles()) {
-                    f.delete();
+            if (tlsDir.exists() && tlsDir.isDirectory()) {
+                File[] files = tlsDir.listFiles();
+                if (files != null) {
+                    for (File f : files) {
+                        f.delete();
+                    }
                 }
                 tlsDir.delete();
             }
