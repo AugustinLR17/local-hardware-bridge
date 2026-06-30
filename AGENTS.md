@@ -58,7 +58,7 @@ cd tui && go build -o lhb-tui .
 CI enforces `gofmt` formatting and `go vet`. The `LHB_TOKEN` env var is an alternative to `--token`.
 
 ### Native Packaging
-- **Windows installer**: `./gradlew createWindowsApp` (jpackage app-image) then `makensis /DPRODUCT_VERSION=<ver> install.nsi` → `lhb.exe`. Bundles a JRE via jpackage; the launcher is windowless (GUI subsystem, no console). CI Authenticode-signs both the launcher and installer via Azure Trusted Signing (jsign).
+- **Windows installer**: `./gradlew createWindowsApp` (jpackage app-image) then `makensis /DPRODUCT_VERSION=<ver> install.nsi` → `lhb.exe`. Bundles a JRE via jpackage; the launcher is windowless (GUI subsystem, no console). Code signing of the launcher and installer is to be wired via SignPath (Azure Trusted Signing was removed); current CI builds are unsigned.
 - **Linux DEB**: `./gradlew createLinuxApp` (jpackage `--type deb`)
 - **Linux RPM**: `./gradlew createRpmApp` (jpackage `--type rpm`)
 - **Linux AppImage**: built in CI via linuxdeploy (release workflow)

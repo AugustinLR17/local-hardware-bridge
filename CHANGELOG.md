@@ -46,13 +46,13 @@ Major release: **Authenticode code signing** for the Windows installer and
 launcher, and the project is now **open source** (public repository).
 
 ### Code signing (Windows)
-- The Windows installer and the bundled launcher are now signed with a
-  Microsoft-trusted certificate (Azure Trusted Signing) in CI. This resolves
-  the Microsoft Defender "Anomaly detected in ASEP registry" persistence alert
-  that was triggered by the auto-start registry entry on unsigned binaries.
+- The Windows installer and the bundled launcher are to be signed with a
+  Microsoft-trusted certificate via SignPath in CI. This resolves the Microsoft
+  Defender "Anomaly detected in ASEP registry" persistence alert that is
+  triggered by the auto-start registry entry on unsigned binaries.
 - The release workflow signs **both** the jpackage launcher (the windowless
   `Local Hardware Bridge.exe` that the `HKCU\...\Run` key points at) and the
-  final NSIS installer, then verifies both signatures before publishing.
+  final NSIS installer.
 
 ### Other
 - Repository switched from private to public (MIT license, attribution to the
