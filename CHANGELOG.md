@@ -1,5 +1,45 @@
 # Changelogs
 
+## 2.1.0
+
+Feature release: **auto-update system** and a less-conflicting default port,
+plus a large batch of fixes, new tests, and tooling.
+
+### Features
+- **Auto-update** — the bridge can check GitHub Releases and optionally
+  download, apply, and roll back updates. Opt-in hybrid model (detection +
+  notification + manual install by default) suited to B2B/POS environments.
+  Adds the `/system/update/*` REST endpoints, an `update` config section, and a
+  Web UI panel.
+
+### Changes
+- **Default port `12212` → `57212`** — moved into the IANA dynamic/private range
+  (49152–65535) to avoid conflicts with other local apps. Existing installs keep
+  their configured port (`config.json` is persisted); only fresh installs use the
+  new default. The multi-bridge example range becomes `57212`–`57217`.
+
+### Fixes
+- Resolve ~120 SonarQube issues (bugs, vulnerabilities, code smells).
+- Disabled endpoints are checked before global token auth; `/system/health` is
+  exempt from global token auth; `PUT /printer/enabled` returns `503` when the
+  printer is disabled.
+- `ReleaseInfo.tagName` maps `tag_name`; missing `Config` import in `Launcher`.
+- WMS E2E: retry print after a bridge restart; raw-socket port-availability
+  checks; wait for ports to free between suites.
+
+### Build & quality
+- Enable the **JaCoCo** coverage plugin (XML report wired for SonarQube).
+- Bump the Shadow plugin (Gradle 9 compatibility); update build tooling for
+  JDK 25; revert an earlier Gradle 9 / Lombok bump that broke CI.
+- Add unit/edge-case tests (incl. `PrintServiceDTO`/`SerialPortDTO` JSON
+  contracts, auto-update, cross-bridge auth/routing, WMS multi-zone).
+
+### Docs & tooling
+- README status badges; embedded auto-generated Web UI and TUI demos.
+- Automated, fully-Dockerised media capture pipeline (`scripts/capture/`,
+  Playwright + VHS + ffmpeg) and a `media.yml` workflow.
+- Privacy and code-signing policies; consolidated docs to the wiki.
+
 ## 2.0.0
 
 Major release: **Authenticode code signing** for the Windows installer and
