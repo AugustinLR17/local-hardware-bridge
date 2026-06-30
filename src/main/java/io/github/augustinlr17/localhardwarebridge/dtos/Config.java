@@ -44,7 +44,7 @@ public class Config {
     public static class Server {
         private String address = "127.0.0.1";
         private String bind = "127.0.0.1";
-        private int port = 12212;
+        private int port = 57212;
         private Authentication authentication = new Authentication();
         private TLS tls = new TLS();
         private Cors cors = new Cors();

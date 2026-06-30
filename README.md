@@ -1,10 +1,27 @@
 # Local Hardware Bridge
 
+[![CI](https://github.com/AugustinLR17/local-hardware-bridge/actions/workflows/ci.yml/badge.svg)](https://github.com/AugustinLR17/local-hardware-bridge/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/AugustinLR17/local-hardware-bridge?sort=semver)](https://github.com/AugustinLR17/local-hardware-bridge/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/AugustinLR17/local-hardware-bridge/total)](https://github.com/AugustinLR17/local-hardware-bridge/releases)
+[![License](https://img.shields.io/github/license/AugustinLR17/local-hardware-bridge)](LICENSE)
+[![JDK](https://img.shields.io/badge/JDK-21%2B-orange?logo=openjdk&logoColor=white)](build.gradle)
+[![Signed by SignPath](https://img.shields.io/badge/Signed%20by-SignPath%20Foundation-blue)](https://signpath.org/)
+
+<!-- SonarQube badges below point at a self-hosted instance (http://localhost:9001) and only
+     render where that server is reachable. For public rendering on GitHub, host the analysis
+     on SonarCloud and replace the URLs accordingly. -->
+[![Quality Gate](http://localhost:9001/api/project_badges/measure?project=local-hardware-bridge&metric=alert_status&token=sqb_5fe9eadab7194a7d26d16ba2440062db1d901e2a)](http://localhost:9001/dashboard?id=local-hardware-bridge)
+[![Coverage](http://localhost:9001/api/project_badges/measure?project=local-hardware-bridge&metric=coverage&token=sqb_5fe9eadab7194a7d26d16ba2440062db1d901e2a)](http://localhost:9001/dashboard?id=local-hardware-bridge)
+
 > **Fork of** [WebApp Hardware Bridge](https://github.com/imTigger/webapp-hardware-bridge) by imTigger — originally licensed under MIT.
 
 **Local Hardware Bridge** exposes local printers and serial ports to a web browser running on the same machine. Built for POS systems, WMS, IoT dashboards, and any web app that needs silent access to local hardware without installing browser plugins or extensions.
 
 The bridge runs locally (127.0.0.1 by default). A website or local web app opens in the browser and talks to the bridge via HTTP/WebSocket. The bridge then talks to the OS printers and serial ports.
+
+![Web UI walkthrough](docs/assets/web-ui.gif)
+
+> Screenshots and demo recordings are generated automatically — see [`scripts/capture/`](scripts/capture).
 
 ## Features
 
@@ -42,10 +59,10 @@ java -jar local-hardware-bridge-*.jar
 java -cp local-hardware-bridge-*.jar io.github.augustinlr17.localhardwarebridge.Server
 
 # TUI mode (terminal interface)
-./lhb-tui --server http://127.0.0.1:12212
+./lhb-tui --server http://127.0.0.1:57212
 ```
 
-The Web UI is available at `http://127.0.0.1:12212` (default).
+The Web UI is available at `http://127.0.0.1:57212` (default).
 
 ## Operating Modes
 
@@ -57,7 +74,7 @@ graph LR
     LHB[Local Hardware Bridge]
     Printers[OS Printers]
     Serial[Serial Ports]
-    Browser -- HTTP/WebSocket<br/>127.0.0.1:12212 --> LHB
+    Browser -- HTTP/WebSocket<br/>127.0.0.1:57212 --> LHB
     LHB --> Printers
     LHB --> Serial
 ```
@@ -69,8 +86,10 @@ Use case: a cashier PC, a local POS, a warehouse workstation, or any desktop whe
 The TUI is a terminal dashboard for the administrator of the bridge. It connects to a running bridge instance and is **not** used by end users. It is useful for headless setups or when you want to monitor the bridge without opening a browser.
 
 ```bash
-./lhb-tui --server http://127.0.0.1:12212
+./lhb-tui --server http://127.0.0.1:57212
 ```
+
+![TUI admin demo](docs/assets/tui-demo.gif)
 
 ## Architecture
 
@@ -153,45 +172,45 @@ Full API documentation: [HTTP API Reference](https://github.com/AugustinLR17/loc
 
 ```bash
 # List available printers
-curl http://127.0.0.1:12212/system/printers.json
+curl http://127.0.0.1:57212/system/printers.json
 
 # Print a PDF from URL
-curl -X POST http://127.0.0.1:12212/printer \
+curl -X POST http://127.0.0.1:57212/printer \
   -H "Content-Type: application/json" \
   -d '{"type":"INVOICE","url":"https://example.com/invoice.pdf"}'
 
 # Print raw ESC/POS data
-curl -X POST http://127.0.0.1:12212/printer \
+curl -X POST http://127.0.0.1:57212/printer \
   -H "Content-Type: application/json" \
   -d '{"type":"RECEIPT","raw_content":"<base64-encoded-data>"}'
 
 # Add a printer mapping
-curl -X POST http://127.0.0.1:12212/printer/mappings \
+curl -X POST http://127.0.0.1:57212/printer/mappings \
   -H "Content-Type: application/json" \
   -d '{"type":"RECEIPT","name":"POS-80"}'
 
 # Check health
-curl http://127.0.0.1:12212/system/health
+curl http://127.0.0.1:57212/system/health
 ```
 
 ### Example: Serial port management
 
 ```bash
 # List serial ports
-curl http://127.0.0.1:12212/system/serials.json
+curl http://127.0.0.1:57212/system/serials.json
 
 # Add a serial mapping
-curl -X POST http://127.0.0.1:12212/serial/mappings \
+curl -X POST http://127.0.0.1:57212/serial/mappings \
   -H "Content-Type: application/json" \
   -d '{"type":"SCALE","name":"/dev/ttyUSB0","baudRate":9600,"numDataBits":8,"numStopBits":1,"parity":0}'
 
 # Write to serial port
-curl -X POST http://127.0.0.1:12212/serial/SCALE \
+curl -X POST http://127.0.0.1:57212/serial/SCALE \
   -H "Content-Type: text/plain" \
   -d 'W'
 
 # Check serial port status
-curl http://127.0.0.1:12212/serial/status
+curl http://127.0.0.1:57212/serial/status
 ```
 
 ## WebSocket Protocol
@@ -294,16 +313,16 @@ The bridge can check for new versions on GitHub Releases and optionally download
 
 ```bash
 # Check for updates
-curl http://127.0.0.1:12212/system/update/check
+curl http://127.0.0.1:57212/system/update/check
 
 # Download the update JAR
-curl -X POST http://127.0.0.1:12212/system/update/download
+curl -X POST http://127.0.0.1:57212/system/update/download
 
 # Apply and restart
-curl -X POST http://127.0.0.1:12212/system/update/apply
+curl -X POST http://127.0.0.1:57212/system/update/apply
 
 # Rollback if something goes wrong
-curl -X POST http://127.0.0.1:12212/system/update/rollback
+curl -X POST http://127.0.0.1:57212/system/update/rollback
 ```
 
 ### Emergency bypass
@@ -359,7 +378,7 @@ package manager. Include the file with a `<script>` tag and instantiate it.
 <script src="websocket-printer.js"></script>
 <script>
 const printer = new WebSocketPrinter({
-  url: 'ws://127.0.0.1:12212/printer',
+  url: 'ws://127.0.0.1:57212/printer',
   onConnect: () => console.log('connected'),
   onUpdate: (result) => console.log('print result:', result),
 });
@@ -375,7 +394,7 @@ printer.submit({ type: 'INVOICE', url: 'https://example.com/invoice.pdf' });
 <script src="websocket-weigh.js"></script>
 <script>
 new WebSocketWeigh({
-  url: 'ws://127.0.0.1:12212/serial/WEIGH',
+  url: 'ws://127.0.0.1:57212/serial/WEIGH',
   onUpdate: (weight, stable) => {
     console.log(`weight: ${weight} kg, stable: ${stable}`);
   },

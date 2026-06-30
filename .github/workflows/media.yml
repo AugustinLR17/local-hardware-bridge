@@ -1,0 +1,50 @@
+name: Capture media
+
+# Regenerate the screenshots / demo recordings in docs/assets on demand.
+# Run from the Actions tab (workflow_dispatch). Produces an artifact you can
+# download and commit, or — if "commit" is true — pushes the refreshed assets.
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'What to capture'
+        type: choice
+        default: all
+        options: [all, webui, tui]
+      commit:
+        description: 'Commit refreshed assets back to the branch'
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Capture media
+        run: |
+          chmod +x scripts/capture/capture.sh
+          scripts/capture/capture.sh "${{ inputs.target }}"
+
+      - name: Upload assets artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: media-assets
+          path: docs/assets/
+
+      - name: Commit refreshed assets
+        if: ${{ inputs.commit }}
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/assets/
+          if git diff --cached --quiet; then
+            echo "No asset changes to commit."
+          else
+            git commit -m "chore: regenerate docs/assets media [skip ci]"
+            git push
+          fi

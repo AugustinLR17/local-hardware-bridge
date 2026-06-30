@@ -19,3 +19,8 @@ __pycache__/
 
 # SonarQube analysis working directory
 .scannerwork/
+
+# Capture pipeline working files
+.gradle-docker/
+scripts/capture/node_modules/
+scripts/capture/package-lock.json

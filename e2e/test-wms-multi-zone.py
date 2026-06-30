@@ -6,9 +6,9 @@ Complex scenario: a warehouse is split into 3 zones, each with its own
 bridge instance managing a printer (delivery notes) and a serial device
 (weight scale). A central WMS web app routes operations across zones:
 
-- Zone A (Receiving):  bridge on :12215, printer "CUPS-PDF", scale "SCALE-A"
-- Zone B (Shipping):   bridge on :12216, printer "CUPS-PDF", scale "SCALE-B"
-- Zone C (Quality):    bridge on :12217, printer "CUPS-PDF", scale "SCALE-C"
+- Zone A (Receiving):  bridge on :57215, printer "CUPS-PDF", scale "SCALE-A"
+- Zone B (Shipping):   bridge on :57216, printer "CUPS-PDF", scale "SCALE-B"
+- Zone C (Quality):    bridge on :57217, printer "CUPS-PDF", scale "SCALE-C"
 
 The WMS can:
 1. Print delivery notes to any zone's printer
@@ -119,15 +119,15 @@ def write_config_json(workdir, port, token, printer_type="DELIVERY",
 
 ZONES = {
     "A_RECEIVING": {
-        "port": 12215, "token": "zone-a-receiving-token",
+        "port": 57215, "token": "zone-a-receiving-token",
         "workdir": "/tmp/zone-a", "printer_type": "DELIVERY",
     },
     "B_SHIPPING": {
-        "port": 12216, "token": "zone-b-shipping-token",
+        "port": 57216, "token": "zone-b-shipping-token",
         "workdir": "/tmp/zone-b", "printer_type": "DELIVERY",
     },
     "C_QUALITY": {
-        "port": 12217, "token": "zone-c-quality-token",
+        "port": 57217, "token": "zone-c-quality-token",
         "workdir": "/tmp/zone-c", "printer_type": "DELIVERY",
     },
 }
@@ -181,7 +181,7 @@ def main():
         sys.exit(1)
 
     # Wait for all required ports to be free before starting
-    for port in [12215, 12216, 12217]:
+    for port in [57215, 57216, 57217]:
         if not wait_for_port_free(port):
             print(f"FAIL: port {port} is still in use")
             sys.exit(1)

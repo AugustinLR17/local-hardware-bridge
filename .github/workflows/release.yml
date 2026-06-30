@@ -485,18 +485,18 @@ jobs:
             ```bash
             java -jar local-hardware-bridge-*.jar
             ```
-            Web UI at `http://127.0.0.1:12212`
+            Web UI at `http://127.0.0.1:57212`
 
             ### TUI (terminal)
             ```bash
             chmod +x lhb-tui-linux-amd64
-            ./lhb-tui-linux-amd64 http://127.0.0.1:12212
+            ./lhb-tui-linux-amd64 http://127.0.0.1:57212
             ```
 
             ### Linux systemd service (headless, auto-start on boot)
             ```bash
             # Install and start the service
-            curl -X POST http://127.0.0.1:12212/system/install-service
+            curl -X POST http://127.0.0.1:57212/system/install-service
 
             # Check status
             systemctl status local-hardware-bridge
@@ -505,13 +505,13 @@ jobs:
             journalctl -u local-hardware-bridge -f
 
             # Uninstall
-            curl -X POST http://127.0.0.1:12212/system/uninstall-service
+            curl -X POST http://127.0.0.1:57212/system/uninstall-service
             ```
 
             ### Run modes
             - **GUI mode**: `java -jar local-hardware-bridge.jar` (system tray icon)
             - **Server mode**: `java -cp local-hardware-bridge.jar io.github.augustinlr17.localhardwarebridge.Server` (headless)
-            - **TUI mode**: `./lhb-tui http://127.0.0.1:12212` (terminal dashboard)
+            - **TUI mode**: `./lhb-tui http://127.0.0.1:57212` (terminal dashboard)
           files: |
             artifacts/fat-jar/*.jar
             artifacts/windows-exe/*.exe

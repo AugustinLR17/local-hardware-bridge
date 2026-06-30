@@ -8,7 +8,7 @@ own token. The central app routes print jobs from any user to any bridge
 using the correct token for the target bridge.
 
 This test simulates the 3 bridges as 3 instances on different ports within
-the same Docker container (127.0.0.1:12212, :12213, :12214), each with its
+the same Docker container (127.0.0.1:57212, :57213, :57214), each with its
 own token. It verifies:
 
 1. Token isolation: each bridge only accepts its own token
@@ -97,7 +97,7 @@ def start_bridge(jar_path, port, token, workdir):
     # Wait for the bridge to bind, then configure it via the API
     base_url = f"http://127.0.0.1:{port}"
 
-    # The bridge starts with default config (no auth, port 12212).
+    # The bridge starts with default config (no auth, port 57212).
     # We need to set the port and token via config before it's useful.
     # Since the bridge reads port at startup, we write config.json first
     # in a dedicated working directory.
@@ -185,7 +185,7 @@ def main():
         sys.exit(1)
 
     # Wait for all required ports to be free before starting
-    for port in [12212, 12213, 12214]:
+    for port in [57212, 57213, 57214]:
         if not wait_for_port_free(port):
             print(f"FAIL: port {port} is still in use")
             sys.exit(1)
@@ -193,17 +193,17 @@ def main():
     # --- Bridge definitions ---
     bridges = {
         "A_FRANCE": {
-            "port": 12212,
+            "port": 57212,
             "token": "token-fr-75001",
             "workdir": "/tmp/bridge-a",
         },
         "B_SPAIN": {
-            "port": 12213,
+            "port": 57213,
             "token": "token-es-28001",
             "workdir": "/tmp/bridge-b",
         },
         "C_ENGLAND": {
-            "port": 12214,
+            "port": 57214,
             "token": "token-uk-sw1",
             "workdir": "/tmp/bridge-c",
         },

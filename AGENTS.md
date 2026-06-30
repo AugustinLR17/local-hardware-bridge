@@ -53,7 +53,7 @@ The E2E suite (`e2e/test.py`) exercises: `/system/health`, version, printer list
 ### TUI (Go)
 ```bash
 cd tui && go build -o lhb-tui .
-./lhb-tui --server http://127.0.0.1:12212 [--token my-secret-token]
+./lhb-tui --server http://127.0.0.1:57212 [--token my-secret-token]
 ```
 CI enforces `gofmt` formatting and `go vet`. The `LHB_TOKEN` env var is an alternative to `--token`.
 
@@ -297,7 +297,7 @@ Receive `PrintResult`:
 - **Cross-platform GUI**: `GUI.java` falls back to headless mode (log URL + `Thread.currentThread().join()` or a notification loop on Linux) when `SystemTray.isSupported()` returns false. On Windows, it re-spawns under `javaw.exe` to hide the console window. On Linux it offers systemd install; on macOS it offers launchd install.
 - **Service files**: `scripts/linux/` has a systemd unit, `scripts/macos/` has a launchd plist. Both use the `Server` main class (headless). Linux can also install the service at runtime via `POST /system/install-service` (migrates from the legacy `webapp-hardware-bridge` service name).
 - **WebSocket message size**: Set to unlimited (`-1`) in `Server.wsBefore()`. This matters for large print jobs. Automatic pings are enabled every 5 seconds.
-- **Default port**: 12212. Default bind is `127.0.0.1` (localhost only).
+- **Default port**: 57212. Default bind is `127.0.0.1` (localhost only).
 - **Web UI**: Single-page app using Petite-Vue (not Vue.js) + Bootstrap 5, served as static files from `src/main/resources/web/`. Axios for HTTP calls.
 - **Demo files**: `demo/` contains HTML examples and JS SDK files (`websocket-printer.js`, `websocket-serial.js`, `websocket-weigh.js`) for integrating with the bridge from web apps.
 - **DocumentService security**: URL downloads are restricted to `http`/`https` schemes only. `blockPrivateNetworks` config (opt-in, default off) rejects loopback/link-local/site-local addresses (SSRF mitigation). The TLS trust-all (`ignoreTLSCertificateError`) is scoped to a single connection — it never mutates the JVM-wide default. Path traversal is blocked: `getOutputFile()` strips directories from suggested filenames and verifies the canonical path stays inside the downloads dir.

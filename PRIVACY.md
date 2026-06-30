@@ -39,7 +39,7 @@ install directory:
 
 ## Network Access
 
-The application listens on `127.0.0.1:12212` (localhost) by default. It does
+The application listens on `127.0.0.1:57212` (localhost) by default. It does
 **not** initiate outbound network connections except:
 
 - When you submit a print job with a `url` field — the application downloads

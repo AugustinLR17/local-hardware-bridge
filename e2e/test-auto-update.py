@@ -26,7 +26,7 @@ import urllib.request
 import urllib.error
 
 
-BASE_URL = "http://127.0.0.1:12212"
+BASE_URL = "http://127.0.0.1:57212"
 
 
 def request(method, path, body=None, headers=None):
@@ -104,8 +104,8 @@ def main():
         sys.exit(1)
 
     # Wait for port to be free (previous test suites may have used it)
-    if not wait_for_port_free(12212):
-        print("FAIL: port 12212 is still in use")
+    if not wait_for_port_free(57212):
+        print("FAIL: port 57212 is still in use")
         sys.exit(1)
 
     # Start the bridge with a dedicated workdir
@@ -122,7 +122,7 @@ def main():
         "server": {
             "address": "127.0.0.1",
             "bind": "127.0.0.1",
-            "port": 12212,
+            "port": 57212,
             "authentication": {"enabled": False, "token": None},
             "tls": {"enabled": False, "selfSigned": True,
                     "cert": "tls/default-cert.pem", "key": "tls/default-key.pem",

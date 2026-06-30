@@ -150,7 +150,7 @@ func (p page) String() string {
 }
 
 func main() {
-	serverURL := "http://127.0.0.1:12212"
+	serverURL := "http://127.0.0.1:57212"
 	token := os.Getenv("LHB_TOKEN")
 
 	args := os.Args[1:]

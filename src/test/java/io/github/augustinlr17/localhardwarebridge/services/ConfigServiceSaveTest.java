@@ -142,7 +142,7 @@ public class ConfigServiceSaveTest {
         Config loaded = service.getConfig();
 
         assertEquals("127.0.0.1", loaded.getServer().getAddress());
-        assertEquals(12212, loaded.getServer().getPort());
+        assertEquals(57212, loaded.getServer().getPort());
         assertFalse(loaded.getServer().getAuthentication().isEnabled());
         assertTrue(loaded.getServer().getCors().isAllowAllOrigins());
         assertTrue(loaded.getPrinter().isEnabled());

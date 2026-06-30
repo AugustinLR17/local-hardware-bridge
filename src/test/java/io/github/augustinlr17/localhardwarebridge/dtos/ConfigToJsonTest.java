@@ -80,14 +80,14 @@ public class ConfigToJsonTest {
     @Test
     public void getUriHttpDefault() {
         Config.Server server = new Config.Server();
-        assertEquals("http://127.0.0.1:12212", server.getUri());
+        assertEquals("http://127.0.0.1:57212", server.getUri());
     }
 
     @Test
     public void getUriHttpsDefault() {
         Config.Server server = new Config.Server();
         server.getTls().setEnabled(true);
-        assertEquals("https://127.0.0.1:12212", server.getUri());
+        assertEquals("https://127.0.0.1:57212", server.getUri());
     }
 
     @Test

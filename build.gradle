@@ -1,6 +1,7 @@
 plugins {
     id 'java'
     id 'application'
+    id 'jacoco'
     id 'com.gradleup.shadow' version '9.4.3'
 }
 
@@ -42,6 +43,18 @@ dependencies {
 
 application {
     mainClass = 'io.github.augustinlr17.localhardwarebridge.Launcher'
+}
+
+test {
+    finalizedBy jacocoTestReport
+}
+
+jacocoTestReport {
+    dependsOn test
+    reports {
+        xml.required = true
+        html.required = true
+    }
 }
 
 jar {

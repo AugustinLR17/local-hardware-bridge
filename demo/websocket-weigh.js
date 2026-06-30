@@ -1,6 +1,6 @@
 function WebSocketWeigh(options) {
     var defaults = {
-        url: 'ws://127.0.0.1:12212/serial/WEIGH',
+        url: 'ws://127.0.0.1:57212/serial/WEIGH',
         weightRegex: new RegExp('([0-9]{1,2}\\.[0-9]{3})kg'),
         stableRegex: new RegExp('^ST.*\\s+'),
         onConnect: function () {

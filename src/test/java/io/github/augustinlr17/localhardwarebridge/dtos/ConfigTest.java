@@ -51,7 +51,7 @@ public class ConfigTest {
         // A few other documented defaults.
         assertEquals("127.0.0.1", config.getServer().getAddress());
         assertEquals("127.0.0.1", config.getServer().getBind());
-        assertEquals(12212, config.getServer().getPort());
+        assertEquals(57212, config.getServer().getPort());
         assertTrue(config.getPrinter().isEnabled());
         assertTrue(config.getSerial().isEnabled());
     }

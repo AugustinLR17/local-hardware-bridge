@@ -355,7 +355,7 @@ public class ConfigUpdateTest {
     public void updateCoexistsWithAllOtherSections() throws Exception {
         String json = "{"
             + "\"gui\":{\"notification\":{\"enabled\":true}},"
-            + "\"server\":{\"port\":12212},"
+            + "\"server\":{\"port\":57212},"
             + "\"security\":{\"endpoints\":{\"/printer\":{\"enabled\":true,\"password\":\"\"}}},"
             + "\"downloader\":{\"path\":\"downloads\"},"
             + "\"printer\":{\"enabled\":true},"
@@ -372,7 +372,7 @@ public class ConfigUpdateTest {
         assertNotNull(config.getSerial());
         assertNotNull(config.getUpdate());
         assertTrue(config.getUpdate().isEnabled());
-        assertEquals(12212, config.getServer().getPort());
+        assertEquals(57212, config.getServer().getPort());
     }
 
     // --- Update defaults persist through save/load ---

@@ -30,7 +30,7 @@ COPY e2e/print-test.pdf /app/print-test.pdf
 COPY e2e/entrypoint.sh /app/entrypoint.sh
 RUN chmod +x /app/entrypoint.sh
 
-# Expose bridge ports (12212-12214 = cross-bridge, 12215-12217 = WMS multi-zone)
-EXPOSE 12212 12213 12214 12215 12216 12217
+# Expose bridge ports (57212-57214 = cross-bridge, 57215-57217 = WMS multi-zone)
+EXPOSE 57212 57213 57214 57215 57216 57217
 
 ENTRYPOINT ["/app/entrypoint.sh"]

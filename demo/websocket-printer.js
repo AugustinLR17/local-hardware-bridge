@@ -1,6 +1,6 @@
 function WebSocketPrinter(options) {
     var defaults = {
-        url: "ws://127.0.0.1:12212/printer",
+        url: "ws://127.0.0.1:57212/printer",
         onConnect: function () {
         },
         onDisconnect: function () {

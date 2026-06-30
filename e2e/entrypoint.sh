@@ -35,7 +35,7 @@ BRIDGE_PID=$!
 
 # Wait for the bridge to be ready
 for i in {1..30}; do
-    if curl -sf http://127.0.0.1:12212/system/health >/dev/null 2>&1; then
+    if curl -sf http://127.0.0.1:57212/system/health >/dev/null 2>&1; then
         break
     fi
     sleep 1
@@ -49,7 +49,7 @@ TEST_EXIT=$?
 kill $BRIDGE_PID 2>/dev/null || true
 wait $BRIDGE_PID 2>/dev/null || true
 
-# Wait for port 12212 to be fully released (TIME_WAIT can hold it)
+# Wait for port 57212 to be fully released (TIME_WAIT can hold it)
 wait_port_free() {
     local port=$1
     for i in $(seq 1 60); do
@@ -61,20 +61,20 @@ wait_port_free() {
     return 1
 }
 
-wait_port_free 12212
+wait_port_free 57212
 
-# Run cross-bridge multi-tenant tests (3 bridge instances on ports 12212-12214)
+# Run cross-bridge multi-tenant tests (3 bridge instances on ports 57212-57214)
 python3 /app/test-cross-bridge.py
 CROSS_EXIT=$?
 
 # Kill any remaining bridge processes before starting WMS tests
 pkill -f "local-hardware-bridge.jar" 2>/dev/null || true
 # Wait for all ports to be released
-wait_port_free 12212
-wait_port_free 12213
-wait_port_free 12214
+wait_port_free 57212
+wait_port_free 57213
+wait_port_free 57214
 
-# Run WMS multi-zone tests (3 zone bridges on ports 12215-12217)
+# Run WMS multi-zone tests (3 zone bridges on ports 57215-57217)
 python3 /app/test-wms-multi-zone.py
 WMS_EXIT=$?
 
@@ -82,12 +82,12 @@ WMS_EXIT=$?
 pkill -f "local-hardware-bridge.jar" 2>/dev/null || true
 pkill -f "bridge.jar" 2>/dev/null || true
 # Wait for all ports to be released
-wait_port_free 12212
-wait_port_free 12215
-wait_port_free 12216
-wait_port_free 12217
+wait_port_free 57212
+wait_port_free 57215
+wait_port_free 57216
+wait_port_free 57217
 
-# Run auto-update API tests (single bridge on port 12212)
+# Run auto-update API tests (single bridge on port 57212)
 python3 /app/test-auto-update.py
 UPDATE_EXIT=$?
 

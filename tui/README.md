@@ -19,13 +19,13 @@ go build -o lhb-tui .
 
 ```bash
 # Local bridge
-./lhb-tui --server http://127.0.0.1:12212
+./lhb-tui --server http://127.0.0.1:57212
 
 # Remote bridge (server mode)
-./lhb-tui --server http://192.168.1.100:12212
+./lhb-tui --server http://192.168.1.100:57212
 
 # With authentication
-./lhb-tui --server http://192.168.1.100:12212 --token my-secret-token
+./lhb-tui --server http://192.168.1.100:57212 --token my-secret-token
 ```
 
 ## What you see

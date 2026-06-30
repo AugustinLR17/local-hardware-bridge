@@ -1,6 +1,6 @@
 function WebSocketSerial(options) {
     var defaults = {
-        url: 'ws://127.0.0.1:12212/serial/DISPLAY',
+        url: 'ws://127.0.0.1:57212/serial/DISPLAY',
         onConnect: function () {
         },
         onDisconnect: function () {
