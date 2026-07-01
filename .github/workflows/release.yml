@@ -280,17 +280,26 @@ jobs:
           APPRUN
           chmod +x AppDir/AppRun
 
-      - name: Download linuxdeploy
+          # .DirIcon — required by appimagetool (symlink to the hicolor icon)
+          ln -sf usr/share/icons/hicolor/256x256/apps/local-hardware-bridge.png AppDir/.DirIcon
+
+      # The jpackage app-image is self-contained (bundled JRE + native launcher).
+      # We use appimagetool directly instead of linuxdeploy because linuxdeploy
+      # tries to resolve ELF dependencies for the JRE's internal .so files
+      # (e.g. libmanagement_agent.so → libjvm.so) and fails — libjvm.so is inside
+      # the JRE in a non-standard path. appimagetool just packages the AppDir
+      # into an AppImage without dependency resolution, which is exactly what
+      # a self-contained jpackage app needs.
+      - name: Download appimagetool
         run: |
-          wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage -O linuxdeploy.AppImage
-          chmod +x linuxdeploy.AppImage
+          wget -q https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage -O appimagetool.AppImage
+          chmod +x appimagetool.AppImage
 
       - name: Build AppImage
         run: |
           export VERSION=${{ steps.version.outputs.VERSION }}
           export ARCH=x86_64
-          ./linuxdeploy.AppImage --appdir AppDir --output appimage
-          mv Local_Hardware_Bridge-*.AppImage local-hardware-bridge-${{ steps.version.outputs.VERSION }}-x86_64.AppImage
+          ./appimagetool.AppImage AppDir "local-hardware-bridge-${{ steps.version.outputs.VERSION }}-x86_64.AppImage"
 
       - name: Upload AppImage
         uses: actions/upload-artifact@v4
