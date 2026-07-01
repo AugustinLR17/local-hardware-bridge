@@ -1,5 +1,40 @@
 # Changelogs
 
+## 2.2.0
+
+Feature release: **Intune enterprise deployment** support and a
+per-machine installer mode.
+
+### Features
+- **Microsoft Intune deployment** — the bridge can now be deployed silently
+  across a fleet of Windows PCs via Intune (Endpoint Manager). The
+  `packaging/intune/` directory provides:
+  - `install.ps1` — silent install (`/S`), one-time enterprise config
+    deployment, best-effort Defender exclusion
+  - `uninstall.ps1` — clean uninstall with Defender exclusion removal
+  - `config-template.json` — enterprise defaults (auth token `lhb002`,
+    serial disabled, printer enabled, auto-update disabled, localhost bind)
+  - `README.md` — quick admin guide
+- **Per-machine installer mode** — `makensis /DPER_MACHINE=1 install.nsi`
+  installs to `C:\Program Files` with HKLM registry keys and admin rights.
+  Default stays per-user (backward compatible).
+- **Wiki guide** — `docs/Intune-Deployment.md` covers the full deployment
+  process: `.intunewin` preparation, Intune upload, detection rules,
+  Defender exclusion profile, per-machine mode, and troubleshooting.
+
+### Fixes
+- `ConfigServiceConcurrencyTest` was flaky (shared `ArrayList` across 16
+  threads) — switched to `Collections.synchronizedList()`.
+
+### Tests
+- `ConfigIntuneTemplateTest` (10 tests) — proves the Intune config template
+  loads via Jackson into `Config.class` with correct enterprise values
+  (strict mode, no unknown properties).
+
+### Security
+- `.gitignore` now blocks `aur_key` / `aur_key.pub` to prevent accidental
+  commit of AUR SSH keys.
+
 ## 2.1.1
 
 Incremental release: new print controls, expanded test coverage, and
