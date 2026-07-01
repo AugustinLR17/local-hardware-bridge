@@ -1,5 +1,31 @@
 # Changelogs
 
+## 2.1.1
+
+Incremental release: new print controls, expanded test coverage, and
+CI/packaging improvements (code signing, AUR publishing, Linux AppImage).
+
+### Features
+- **Duplex, color, and paper tray controls** in print requests — the
+  `PrintDocument` payload now accepts options to select duplex mode, color vs
+  monochrome, and paper source (tray) per print job.
+- **AUR publishing** — tagged releases now publish to the Arch User Repository
+  (`local-hardware-bridge-bin`) automatically.
+- **Linux AppImage with bundled JRE** — the AppImage is now fully
+  self-contained (JRE bundled via jpackage), no system Java required.
+
+### CI & packaging
+- **SSL.com eSigner** code signing for the Windows installer (replaces the
+  earlier Azure Trusted Signing attempt; SignPath was also evaluated and
+  rejected for insufficient popularity).
+- Removed Azure Trusted Signing from the release workflow.
+
+### Tests
+- Unit test coverage expanded to **737 tests** across DTOs, services,
+  WebSocket services, utils, and responses.
+- Extended E2E suite: `RemoteDisconnected` and connection-refused are now
+  caught in all test request helpers for flake resistance.
+
 ## 2.1.0
 
 Feature release: **auto-update system** and a less-conflicting default port,
