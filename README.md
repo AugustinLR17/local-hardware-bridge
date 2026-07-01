@@ -37,7 +37,7 @@ Grab the latest release from [Releases](https://github.com/AugustinLR17/local-ha
 |----------|------|
 | Cross-platform | `local-hardware-bridge-*.jar` (requires JDK 21+) |
 | Windows | `Local-Hardware-Bridge-*.exe` (single installer, bundled Java, runs in background, auto-start) |
-| Linux | `.AppImage` (requires JDK 21+) |
+| Linux | `.AppImage` (self-contained, bundled Java, no JDK needed) |
 | macOS | `.dmg` installer |
 
 > Windows binaries are Authenticode-signed in CI via [SSL.com eSigner](https://www.ssl.com/esigner/) (cloud code signing). See [Code Signing Policy](docs/CODE-SIGNING-POLICY.md).

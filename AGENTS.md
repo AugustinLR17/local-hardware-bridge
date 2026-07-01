@@ -61,7 +61,7 @@ CI enforces `gofmt` formatting and `go vet`. The `LHB_TOKEN` env var is an alter
 - **Windows installer**: `./gradlew createWindowsApp` (jpackage app-image) then `makensis /DPRODUCT_VERSION=<ver> install.nsi` → `lhb.exe`. Bundles a JRE via jpackage; the launcher is windowless (GUI subsystem, no console). Code signing is done via SSL.com eSigner (cloud code signing) in CI, gated on the `ESIGNER_ENABLED` repo variable; builds are unsigned until the variable and secrets are configured.
 - **Linux DEB**: `./gradlew createLinuxApp` (jpackage `--type deb`)
 - **Linux RPM**: `./gradlew createRpmApp` (jpackage `--type rpm`)
-- **Linux AppImage**: built in CI via linuxdeploy (release workflow)
+- **Linux AppImage**: built in CI via jpackage app-image + linuxdeploy (bundled JRE, self-contained)
 - **macOS .app**: built in CI via jpackage (release workflow, icon converted to .icns via sips/iconutil)
 
 ## CI Workflows (`.github/workflows/`)
