@@ -1,0 +1,55 @@
+{
+  "gui": {
+    "notification": {
+      "enabled": true
+    }
+  },
+  "server": {
+    "address": "127.0.0.1",
+    "bind": "127.0.0.1",
+    "port": 57212,
+    "authentication": {
+      "enabled": true,
+      "token": "lhb002"
+    },
+    "tls": {
+      "enabled": false,
+      "selfSigned": true,
+      "cert": "tls/default-cert.pem",
+      "key": "tls/default-key.pem",
+      "caBundle": null
+    },
+    "cors": {
+      "allowAllOrigins": true,
+      "allowedOrigins": []
+    }
+  },
+  "security": {
+    "endpoints": {}
+  },
+  "downloader": {
+    "ignoreTLSCertificateError": false,
+    "blockPrivateNetworks": false,
+    "timeout": 30.0,
+    "path": "downloads"
+  },
+  "printer": {
+    "enabled": true,
+    "autoAddUnknownType": false,
+    "fallbackToDefault": false,
+    "mappings": []
+  },
+  "serial": {
+    "enabled": false,
+    "mappings": []
+  },
+  "update": {
+    "enabled": false,
+    "autoDownload": false,
+    "autoInstall": false,
+    "includePrereleases": false,
+    "checkIntervalHours": 0,
+    "repository": "AugustinLR17/local-hardware-bridge",
+    "channel": "stable"
+  }
+}

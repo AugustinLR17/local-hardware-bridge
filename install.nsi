@@ -8,7 +8,11 @@
 ;     (GUI subsystem -> no console/terminal window)
 ;
 ; The installer wires up Start Menu / Desktop shortcuts and registers
-; auto-start via HKCU\...\Run pointing at that windowless launcher.
+; auto-start via HKCU\...\\Run pointing at that windowless launcher.
+;
+; Install scope:
+;   Default (per-user):  makensis /DPRODUCT_VERSION=<ver> install.nsi
+;   Per-machine:         makensis /DPRODUCT_VERSION=<ver> /DPER_MACHINE=1 install.nsi
 ;
 ; Build:
 ;   1. ./gradlew shadowJar
@@ -46,13 +50,24 @@
 !define LAUNCHER_EXE "${PRODUCT_NAME}.exe"
 
 ; --------------------------------
+; Install scope: per-user (default) or per-machine (/DPER_MACHINE=1)
+; --------------------------------
+!ifdef PER_MACHINE
+  !define REG_ROOT HKLM
+  InstallDir "$PROGRAMFILES\${PRODUCT_NAME}"
+  RequestExecutionLevel admin
+!else
+  !define REG_ROOT HKCU
+  InstallDir "$LOCALAPPDATA\${PRODUCT_NAME}"
+  RequestExecutionLevel user
+!endif
+
+; --------------------------------
 ; Installer attributes
 ; --------------------------------
 Name "${PRODUCT_NAME}"
 OutFile "lhb.exe"
-InstallDir "$LOCALAPPDATA\${PRODUCT_NAME}"
-InstallDirRegKey HKCU "${PRODUCT_REGKEY}" "Install_Dir"
-RequestExecutionLevel user
+InstallDirRegKey ${REG_ROOT} "${PRODUCT_REGKEY}" "Install_Dir"
 
 ; Version info embedded in the EXE
 VIProductVersion "${PRODUCT_VERSION}.0"
@@ -137,19 +152,19 @@ Section "!Main Application" SEC_MAIN
   File "icon.ico"
 
   ; Write registry
-  WriteRegStr HKCU "${PRODUCT_REGKEY}" "Install_Dir" "$INSTDIR"
-  WriteRegStr HKCU "${PRODUCT_REGKEY}" "Version" "${PRODUCT_VERSION}"
+  WriteRegStr ${REG_ROOT} "${PRODUCT_REGKEY}" "Install_Dir" "$INSTDIR"
+  WriteRegStr ${REG_ROOT} "${PRODUCT_REGKEY}" "Version" "${PRODUCT_VERSION}"
 
-  WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "DisplayName" "${PRODUCT_NAME}"
-  WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "UninstallString" '"$INSTDIR\uninstall.exe"'
-  WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "InstallLocation" "$INSTDIR"
-  WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "DisplayVersion" "${PRODUCT_VERSION}"
-  WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "Publisher" "${PRODUCT_PUBLISHER}"
-  WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "URLInfoAbout" "${PRODUCT_URL}"
-  WriteRegStr HKCU "${PRODUCT_UNINST_KEY}" "DisplayIcon" '"$INSTDIR\icon.ico"'
-  WriteRegDWORD HKCU "${PRODUCT_UNINST_KEY}" "NoModify" 1
-  WriteRegDWORD HKCU "${PRODUCT_UNINST_KEY}" "NoRepair" 1
-  WriteRegDWORD HKCU "${PRODUCT_UNINST_KEY}" "EstimatedSize" 150000
+  WriteRegStr ${REG_ROOT} "${PRODUCT_UNINST_KEY}" "DisplayName" "${PRODUCT_NAME}"
+  WriteRegStr ${REG_ROOT} "${PRODUCT_UNINST_KEY}" "UninstallString" '"$INSTDIR\uninstall.exe"'
+  WriteRegStr ${REG_ROOT} "${PRODUCT_UNINST_KEY}" "InstallLocation" "$INSTDIR"
+  WriteRegStr ${REG_ROOT} "${PRODUCT_UNINST_KEY}" "DisplayVersion" "${PRODUCT_VERSION}"
+  WriteRegStr ${REG_ROOT} "${PRODUCT_UNINST_KEY}" "Publisher" "${PRODUCT_PUBLISHER}"
+  WriteRegStr ${REG_ROOT} "${PRODUCT_UNINST_KEY}" "URLInfoAbout" "${PRODUCT_URL}"
+  WriteRegStr ${REG_ROOT} "${PRODUCT_UNINST_KEY}" "DisplayIcon" '"$INSTDIR\icon.ico"'
+  WriteRegDWORD ${REG_ROOT} "${PRODUCT_UNINST_KEY}" "NoModify" 1
+  WriteRegDWORD ${REG_ROOT} "${PRODUCT_UNINST_KEY}" "NoRepair" 1
+  WriteRegDWORD ${REG_ROOT} "${PRODUCT_UNINST_KEY}" "EstimatedSize" 150000
 
   WriteUninstaller "$INSTDIR\uninstall.exe"
 
@@ -176,9 +191,9 @@ SectionEnd
 ; Section: Auto-start on boot (optional)
 ; --------------------------------
 Section "Start automatically when Windows starts" SEC_AUTOSTART
-  ; Point HKCU\...\Run at the windowless launcher. A single quoted path with no
+  ; Point Run key at the windowless launcher. A single quoted path with no
   ; arguments is parsed reliably by Windows and starts the app in the background.
-  WriteRegStr HKCU "${RUN_KEY}" "${PRODUCT_NAME}" '"$INSTDIR\${LAUNCHER_EXE}"'
+  WriteRegStr ${REG_ROOT} "${RUN_KEY}" "${PRODUCT_NAME}" '"$INSTDIR\${LAUNCHER_EXE}"'
 SectionEnd
 
 ; --------------------------------
@@ -220,13 +235,13 @@ Section "Uninstall"
   ExecWait 'taskkill /F /IM "${LAUNCHER_EXE}"' $0
 
   ; Remove auto-start
-  DeleteRegValue HKCU "${RUN_KEY}" "${PRODUCT_NAME}"
+  DeleteRegValue ${REG_ROOT} "${RUN_KEY}" "${PRODUCT_NAME}"
 
   ; Remove registry keys
-  DeleteRegKey HKCU "${PRODUCT_UNINST_KEY}"
-  DeleteRegKey HKCU "${PRODUCT_REGKEY}"
+  DeleteRegKey ${REG_ROOT} "${PRODUCT_UNINST_KEY}"
+  DeleteRegKey ${REG_ROOT} "${PRODUCT_REGKEY}"
 
-  ; Clean up legacy registry keys
+  ; Clean up legacy registry keys (always per-user)
   DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\WebApp Hardware Bridge"
   DeleteRegKey HKCU "SOFTWARE\WebApp Hardware Bridge"
   DeleteRegValue HKCU "${RUN_KEY}" "WebApp Hardware Bridge"
