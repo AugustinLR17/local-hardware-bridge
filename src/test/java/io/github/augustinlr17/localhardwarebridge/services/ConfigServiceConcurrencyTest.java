@@ -4,6 +4,7 @@ import io.github.augustinlr17.localhardwarebridge.dtos.Config;
 import org.junit.Test;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -72,7 +73,7 @@ public class ConfigServiceConcurrencyTest {
         int readers = 16;
         ExecutorService pool = Executors.newFixedThreadPool(readers);
         CountDownLatch start = new CountDownLatch(1);
-        List<Config> results = new ArrayList<>();
+        List<Config> results = Collections.synchronizedList(new ArrayList<>());
         List<Throwable> exceptions = new ArrayList<>();
 
         for (int i = 0; i < readers; i++) {

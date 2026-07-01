@@ -24,3 +24,7 @@ __pycache__/
 .gradle-docker/
 scripts/capture/node_modules/
 scripts/capture/package-lock.json
+
+# AUR SSH keys (never commit)
+aur_key
+aur_key.pub
