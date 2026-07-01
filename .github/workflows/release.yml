@@ -254,9 +254,8 @@ jobs:
           mkdir -p AppDir/usr/lib
           cp -r "build/dist/appimage/Local Hardware Bridge" AppDir/usr/lib/local-hardware-bridge
 
-          # Desktop entry
-          mkdir -p AppDir/usr/share/applications
-          cat > AppDir/usr/share/applications/local-hardware-bridge.desktop << 'DESKTOP'
+          # Desktop entry — appimagetool looks for *.desktop at the AppDir root
+          cat > AppDir/local-hardware-bridge.desktop << 'DESKTOP'
           [Desktop Entry]
           Name=Local Hardware Bridge
           Comment=Exposes local printer and serial port to web browsers
@@ -267,9 +266,9 @@ jobs:
           Categories=Utility;Network;
           DESKTOP
 
-          # Icon
-          mkdir -p AppDir/usr/share/icons/hicolor/256x256/apps
-          cp src/main/resources/icon.png AppDir/usr/share/icons/hicolor/256x256/apps/local-hardware-bridge.png
+          # Icon — appimagetool looks for the icon at AppDir root via .DirIcon
+          cp src/main/resources/icon.png AppDir/local-hardware-bridge.png
+          ln -sf local-hardware-bridge.png AppDir/.DirIcon
 
           # AppRun — delegates to the jpackage native launcher (which finds its bundled JRE)
           cat > AppDir/AppRun << 'APPRUN'
@@ -279,9 +278,6 @@ jobs:
           exec "$APPDIR/usr/lib/local-hardware-bridge/Local Hardware Bridge" "$@"
           APPRUN
           chmod +x AppDir/AppRun
-
-          # .DirIcon — required by appimagetool (symlink to the hicolor icon)
-          ln -sf usr/share/icons/hicolor/256x256/apps/local-hardware-bridge.png AppDir/.DirIcon
 
       # The jpackage app-image is self-contained (bundled JRE + native launcher).
       # We use appimagetool directly instead of linuxdeploy because linuxdeploy
