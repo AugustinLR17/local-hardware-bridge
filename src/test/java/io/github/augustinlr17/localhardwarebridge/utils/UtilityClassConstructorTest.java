@@ -40,4 +40,14 @@ public class UtilityClassConstructorTest {
         CertificateGenerator instance = ctor.newInstance();
         assertNotNull(instance);
     }
+
+    @Test
+    public void systemdServiceGeneratorHasPrivateConstructor() throws Exception {
+        Constructor<SystemdServiceGenerator> ctor = SystemdServiceGenerator.class.getDeclaredConstructor();
+        assertTrue("SystemdServiceGenerator should have a declared constructor",
+                ctor.getParameterCount() == 0);
+        int modifiers = ctor.getModifiers();
+        assertTrue("SystemdServiceGenerator constructor should be private",
+                Modifier.isPrivate(modifiers));
+    }
 }

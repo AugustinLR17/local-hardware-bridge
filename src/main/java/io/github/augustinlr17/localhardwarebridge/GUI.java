@@ -9,6 +9,7 @@ import io.github.augustinlr17.localhardwarebridge.interfaces.WebSocketServerInte
 import io.github.augustinlr17.localhardwarebridge.interfaces.WebSocketServiceInterface;
 import io.github.augustinlr17.localhardwarebridge.services.ConfigService;
 import io.github.augustinlr17.localhardwarebridge.services.UpdateService;
+import io.github.augustinlr17.localhardwarebridge.utils.SystemdServiceGenerator;
 import io.github.augustinlr17.localhardwarebridge.utils.ThreadUtil;
 
 import javax.imageio.ImageIO;
@@ -305,17 +306,18 @@ public class GUI implements WebSocketServiceInterface {
         try {
             Path serviceFile = Paths.get("/etc/systemd/system/local-hardware-bridge.service");
             Path legacyServiceFile = Paths.get("/etc/systemd/system/webapp-hardware-bridge.service");
-            boolean installed = Files.exists(serviceFile);
+            boolean installed = SystemdServiceGenerator.isServiceInstalled();
             boolean legacyInstalled = Files.exists(legacyServiceFile);
             String installedVersion = null;
 
             if (installed) {
-                String content = Files.readString(serviceFile);
-                int idx = content.indexOf("# LHB_VERSION=");
-                if (idx >= 0) {
-                    int end = content.indexOf('\n', idx);
-                    if (end < 0) end = content.length();
-                    installedVersion = content.substring(idx + 14, end).trim();
+                try {
+                    String content = Files.readString(serviceFile);
+                    installedVersion = SystemdServiceGenerator.extractVersionFromUnit(content);
+                } catch (java.nio.file.AccessDeniedException ade) {
+                    // File is root-owned (installed via pkexec) — can't read it
+                    // as a normal user. Treat as "installed, version unknown".
+                    log.debug("Cannot read service file (root-owned): {}", ade.getMessage());
                 }
             }
 
@@ -446,8 +448,8 @@ public class GUI implements WebSocketServiceInterface {
             // Copy the JAR to a stable location so the service doesn't break if
             // the user moves/deletes the download. /opt is the standard FHS path
             // for third-party software.
-            String installDir = "/opt/local-hardware-bridge";
-            String installedJarPath = installDir + "/local-hardware-bridge.jar";
+            String installDir = SystemdServiceGenerator.getInstallDir();
+            String installedJarPath = SystemdServiceGenerator.getInstalledJarPath();
 
             // Create install dir and copy the JAR (requires root)
             ProcessBuilder mkdir = new ProcessBuilder(PKEXEC, "mkdir", "-p", installDir);
@@ -458,18 +460,8 @@ public class GUI implements WebSocketServiceInterface {
 
             // Service uses Server (headless) — GUI requires a display and would
             // crash under systemd where no X/Wayland session is available.
-            String serviceContent = "[Unit]\n"
-                + "# LHB_VERSION=" + Constants.VERSION + "\n"
-                + "Description=Local Hardware Bridge\n"
-                + "After=network.target\n\n"
-                + "[Service]\n"
-                + "Type=simple\n"
-                + "ExecStart=" + javaExec + " -cp " + installedJarPath + " io.github.augustinlr17.localhardwarebridge.Server\n"
-                + "WorkingDirectory=" + installDir + "\n"
-                + "Restart=on-failure\n"
-                + "RestartSec=5\n\n"
-                + "[Install]\n"
-                + "WantedBy=multi-user.target\n";
+            String serviceContent = SystemdServiceGenerator.generateServiceUnit(
+                javaExec, jarPath, installDir, Constants.VERSION);
 
             Path tempFile = Files.createTempFile("local-hardware-bridge", ".service");
             // Restrict temp file to owner-only before writing the systemd unit.

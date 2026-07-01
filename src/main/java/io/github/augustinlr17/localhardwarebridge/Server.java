@@ -20,6 +20,7 @@ import io.github.augustinlr17.localhardwarebridge.responses.PrintResult;
 import io.github.augustinlr17.localhardwarebridge.services.ConfigService;
 import io.github.augustinlr17.localhardwarebridge.services.UpdateService;
 import io.github.augustinlr17.localhardwarebridge.utils.CertificateGenerator;
+import io.github.augustinlr17.localhardwarebridge.utils.SystemdServiceGenerator;
 import io.github.augustinlr17.localhardwarebridge.utils.ThreadUtil;
 import io.github.augustinlr17.localhardwarebridge.websocketservices.PrinterWebSocketService;
 import io.github.augustinlr17.localhardwarebridge.websocketservices.SerialWebSocketService;
@@ -987,21 +988,11 @@ public class Server implements WebSocketServerInterface {
 
             // Copy the JAR to a stable location so the service doesn't break if
             // the user moves/deletes the download.
-            String installDir = "/opt/local-hardware-bridge";
-            String installedJarPath = installDir + "/local-hardware-bridge.jar";
+            String installDir = SystemdServiceGenerator.getInstallDir();
+            String installedJarPath = SystemdServiceGenerator.getInstalledJarPath();
 
-            String serviceContent = "[Unit]\n"
-                + "# LHB_VERSION=" + Constants.VERSION + "\n"
-                + "Description=Local Hardware Bridge\n"
-                + "After=network.target\n\n"
-                + "[Service]\n"
-                + "Type=simple\n"
-                + "ExecStart=" + javaExec + " -cp " + installedJarPath + " io.github.augustinlr17.localhardwarebridge.Server\n"
-                + "WorkingDirectory=" + installDir + "\n"
-                + "Restart=on-failure\n"
-                + "RestartSec=5\n\n"
-                + "[Install]\n"
-                + "WantedBy=multi-user.target\n";
+            String serviceContent = SystemdServiceGenerator.generateServiceUnit(
+                javaExec, jarPath, installDir, Constants.VERSION);
 
             String serviceName = "local-hardware-bridge.service";
             String legacyServiceName = Constants.LEGACY_SERVICE_NAME + ".service";
