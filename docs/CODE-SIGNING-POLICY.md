@@ -1,13 +1,12 @@
 # Code Signing Policy
 
-**Last updated:** June 28, 2026
+**Last updated:** July 01, 2026
 
-This document describes the code signing practices for Local Hardware Bridge, as
-required by the [SignPath Foundation](https://signpath.org/) open source code
-signing program.
+This document describes the code signing practices for Local Hardware Bridge.
 
-> Free code signing provided by SignPath Foundation, certificate by SignPath
-> Foundation.
+Windows binaries are Authenticode-signed in CI via [SSL.com eSigner](https://www.ssl.com/esigner/)
+(cloud code signing). The signing certificate is a Personal ID Code Signing
+certificate issued by SSL.com (IV+OV validation).
 
 ## What Is Signed
 
@@ -31,17 +30,23 @@ these false positives and gives users confidence in the software's origin.
 ## Signing Process
 
 Signing is performed automatically in CI (GitHub Actions) on every tagged
-release:
+release, using the [`sslcom/esigner-codesign`](https://github.com/SSLcom/esigner-codesign)
+GitHub Action:
 
 1. The build produces a jpackage app-image (bundled JRE + native launcher).
-2. The native launcher (`Local Hardware Bridge.exe`) is signed.
+2. The native launcher (`Local Hardware Bridge.exe`) is signed via eSigner
+   (cloud signing — no PFX stored on the runner).
 3. NSIS packages the signed app-image into a single installer.
-4. The installer (`Local-Hardware-Bridge-<version>.exe`) is signed.
-5. Both signatures are verified (`Get-AuthenticodeSignature`) before publishing.
+4. The installer (`Local-Hardware-Bridge-<version>.exe`) is signed via eSigner.
+5. Both signed artifacts are uploaded to the GitHub Release.
+
+The signing steps are gated on the `ESIGNER_ENABLED` repository variable and
+require four repository secrets (`ES_USERNAME`, `ES_PASSWORD`, `CREDENTIAL_ID`,
+`ES_TOTP_SECRET`). When the variable is not set, builds produce unsigned
+binaries.
 
 The signing configuration is defined in:
 - `.github/workflows/release.yml` (CI signing steps)
-- [Development Guide](https://github.com/AugustinLR17/local-hardware-bridge/wiki/Development-Guide) (local signing instructions)
 
 ## Access Control
 
@@ -51,7 +56,8 @@ The signing configuration is defined in:
   administrators can add or modify them.
 - **Trigger:** Signing runs only on signed git tags (`v*`), which require push
   access to the repository.
-- **Multi-factor authentication:** GitHub account has 2FA enabled.
+- **Multi-factor authentication:** GitHub account has 2FA enabled; the SSL.com
+  eSigner account uses TOTP (time-based one-time password) for API signing.
 
 ## Artifact Integrity
 
@@ -59,12 +65,6 @@ The signing configuration is defined in:
 - The build is reproducible: anyone can clone the repository at a given tag and
   rebuild the artifacts.
 - SHA256 checksums are published alongside each release (`SHA256SUMS`).
-
-## Revocation
-
-If a signing key is compromised, or if the project is found to violate the
-SignPath Foundation terms, certificates may be revoked by SignPath Foundation.
-The project maintainer will cooperate fully with any investigation.
 
 ## Contact
 

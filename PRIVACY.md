@@ -52,9 +52,9 @@ The application listens on `127.0.0.1:57212` (localhost) by default. It does
 The application does not integrate any third-party analytics, advertising, or
 tracking services.
 
-Windows binaries are code-signed by [SignPath Foundation](https://signpath.org/)
-(free code signing for open source projects). This is a build-time process only
-and does not involve any runtime data collection.
+Windows binaries are code-signed in CI via [SSL.com eSigner](https://www.ssl.com/esigner/)
+(cloud code signing). This is a build-time process only and does not involve
+any runtime data collection.
 
 ## Open Source
 

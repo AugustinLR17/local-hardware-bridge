@@ -5,7 +5,6 @@
 [![Downloads](https://img.shields.io/github/downloads/AugustinLR17/local-hardware-bridge/total)](https://github.com/AugustinLR17/local-hardware-bridge/releases)
 [![License](https://img.shields.io/github/license/AugustinLR17/local-hardware-bridge)](LICENSE)
 [![JDK](https://img.shields.io/badge/JDK-21%2B-orange?logo=openjdk&logoColor=white)](build.gradle)
-[![Signed by SignPath](https://img.shields.io/badge/Signed%20by-SignPath%20Foundation-blue)](https://signpath.org/)
 
 > **Fork of** [WebApp Hardware Bridge](https://github.com/imTigger/webapp-hardware-bridge) by imTigger — originally licensed under MIT.
 
@@ -41,7 +40,7 @@ Grab the latest release from [Releases](https://github.com/AugustinLR17/local-ha
 | Linux | `.AppImage` (requires JDK 21+) |
 | macOS | `.dmg` installer |
 
-> **Free code signing provided by [SignPath Foundation](https://signpath.org/)** — Windows binaries are Authenticode-signed at no cost courtesy of the SignPath open source program. Certificate issued by SignPath Foundation.
+> Windows binaries are Authenticode-signed in CI via [SSL.com eSigner](https://www.ssl.com/esigner/) (cloud code signing). See [Code Signing Policy](docs/CODE-SIGNING-POLICY.md).
 
 ### Run
 
