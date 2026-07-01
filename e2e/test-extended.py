@@ -398,10 +398,15 @@ def main():
     print("\n--- Restart guard ---")
     s, b, h = request("POST", "/system/restart.json")
     assert_true("first restart accepted", s in (200, 202), f"got {s}")
-    # Immediately send a second restart — should get 409 (already restarting)
+    # Immediately send a second restart. Two valid outcomes:
+    #   409 — server still up, restarting flag set ("already restarting")
+    #   -1  — server already stopped by the restart thread (connection refused)
+    # Both prove a restart is in progress; 409 is not guaranteed because
+    # stop() can shut down Jetty before this request reaches the server.
     s, b, h = request("POST", "/system/restart.json")
-    assert_eq("second restart rejected (409)", s, 409)
-    assert_in("already restarting message", "already restarting", b)
+    assert_true("second restart rejected (409 or connection refused)", s in (409, -1), f"got {s}")
+    if s == 409:
+        assert_in("already restarting message", "already restarting", b)
 
     # Wait for restart to complete
     healthy = False
