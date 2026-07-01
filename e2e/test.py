@@ -8,6 +8,7 @@ import sys
 import time
 import urllib.request
 import urllib.error
+import http.client
 
 BASE_URL = "http://127.0.0.1:57212"
 
@@ -27,6 +28,8 @@ def request(method, path, body=None, headers=None):
             return resp.status, resp.read().decode("utf-8")
     except urllib.error.HTTPError as e:
         return e.code, e.read().decode("utf-8")
+    except (urllib.error.URLError, http.client.RemoteDisconnected, ConnectionResetError, ConnectionRefusedError, OSError) as e:
+        return -1, str(e)
 
 
 def assert_eq(name, actual, expected):

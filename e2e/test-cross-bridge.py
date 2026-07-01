@@ -26,6 +26,7 @@ import sys
 import time
 import urllib.request
 import urllib.error
+import http.client
 
 
 def request(base_url, method, path, body=None, headers=None, token=None):
@@ -46,6 +47,8 @@ def request(base_url, method, path, body=None, headers=None, token=None):
     except urllib.error.HTTPError as e:
         return e.code, e.read().decode("utf-8")
     except urllib.error.URLError as e:
+        return -1, str(e)
+    except (http.client.RemoteDisconnected, ConnectionResetError, ConnectionRefusedError, OSError) as e:
         return -1, str(e)
 
 

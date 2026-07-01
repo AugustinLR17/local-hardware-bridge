@@ -24,6 +24,7 @@ import sys
 import time
 import urllib.request
 import urllib.error
+import http.client
 
 
 BASE_URL = "http://127.0.0.1:57212"
@@ -45,6 +46,8 @@ def request(method, path, body=None, headers=None):
     except urllib.error.HTTPError as e:
         return e.code, e.read().decode("utf-8")
     except urllib.error.URLError as e:
+        return -1, str(e)
+    except (http.client.RemoteDisconnected, ConnectionResetError, ConnectionRefusedError, OSError) as e:
         return -1, str(e)
 
 

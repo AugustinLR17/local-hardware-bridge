@@ -31,6 +31,7 @@ import sys
 import time
 import urllib.request
 import urllib.error
+import http.client
 
 BASE_URL = "http://127.0.0.1:57212"
 
@@ -61,6 +62,8 @@ def request(method, path, body=None, headers=None, raw_body=None, binary=False):
             return e.code, raw, dict(e.headers)
         return e.code, raw.decode("utf-8", errors="replace"), dict(e.headers)
     except urllib.error.URLError as e:
+        return -1, str(e), {}
+    except (http.client.RemoteDisconnected, ConnectionResetError, ConnectionRefusedError, OSError) as e:
         return -1, str(e), {}
 
 
