@@ -1,5 +1,14 @@
 # Changelogs
 
+## 2.2.1
+
+### Fixes
+- **Linux AppImage broken** — the AppRun script pointed at
+  `usr/lib/local-hardware-bridge/Local Hardware Bridge` but jpackage places
+  the launcher in `bin/` (`usr/lib/local-hardware-bridge/bin/Local Hardware
+  Bridge`). The AppImage failed to start with "Aucun fichier ou dossier de
+  ce nom".
+
 ## 2.2.0
 
 Feature release: **Intune enterprise deployment** support and a

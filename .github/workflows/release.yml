@@ -270,12 +270,12 @@ jobs:
           cp src/main/resources/icon.png AppDir/local-hardware-bridge.png
           ln -sf local-hardware-bridge.png AppDir/.DirIcon
 
-          # AppRun — delegates to the jpackage native launcher (which finds its bundled JRE)
+          # AppRun — delegates to the jpackage launcher (which finds its bundled JRE)
           cat > AppDir/AppRun << 'APPRUN'
           #!/bin/bash
           SELF=$(readlink -f "$0")
           APPDIR=$(dirname "$SELF")
-          exec "$APPDIR/usr/lib/local-hardware-bridge/Local Hardware Bridge" "$@"
+          exec "$APPDIR/usr/lib/local-hardware-bridge/bin/Local Hardware Bridge" "$@"
           APPRUN
           chmod +x AppDir/AppRun
 
