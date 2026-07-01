@@ -290,6 +290,11 @@ jobs:
       # the JRE in a non-standard path. appimagetool just packages the AppDir
       # into an AppImage without dependency resolution, which is exactly what
       # a self-contained jpackage app needs.
+      - name: Install libfuse2
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libfuse2
+
       - name: Download appimagetool
         run: |
           wget -q https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage -O appimagetool.AppImage
