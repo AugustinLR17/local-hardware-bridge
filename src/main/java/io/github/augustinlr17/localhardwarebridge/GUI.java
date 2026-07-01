@@ -9,6 +9,7 @@ import io.github.augustinlr17.localhardwarebridge.interfaces.WebSocketServerInte
 import io.github.augustinlr17.localhardwarebridge.interfaces.WebSocketServiceInterface;
 import io.github.augustinlr17.localhardwarebridge.services.ConfigService;
 import io.github.augustinlr17.localhardwarebridge.services.UpdateService;
+import io.github.augustinlr17.localhardwarebridge.utils.LaunchdPlistGenerator;
 import io.github.augustinlr17.localhardwarebridge.utils.SystemdServiceGenerator;
 import io.github.augustinlr17.localhardwarebridge.utils.ThreadUtil;
 
@@ -397,25 +398,8 @@ public class GUI implements WebSocketServiceInterface {
                 String workingDir = System.getProperty(USER_DIR_PROP);
                 String javaExec = javaHome + "/bin/java";
 
-                String plistContent = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
-                    + "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"
-                    + "<plist version=\"1.0\">\n<dict>\n"
-                    + "    <key>Label</key>\n"
-                    + "    <string>io.github.augustinlr17.localhardwarebridge</string>\n"
-                    + "    <key>ProgramArguments</key>\n"
-                    + "    <array>\n"
-                    + "        <string>" + javaExec + "</string>\n"
-                    + "        <string>-cp</string>\n"
-                    + "        <string>" + classpath + "</string>\n"
-                    + "        <string>io.github.augustinlr17.localhardwarebridge.GUI</string>\n"
-                    + "    </array>\n"
-                    + "    <key>WorkingDirectory</key>\n"
-                    + "    <string>" + workingDir + "</string>\n"
-                    + "    <key>RunAtLoad</key>\n"
-                    + "    <true/>\n"
-                    + "    <key>KeepAlive</key>\n"
-                    + "    <true/>\n"
-                    + "</dict>\n</plist>";
+                String plistContent = LaunchdPlistGenerator.generatePlist(
+                    javaExec, classpath, workingDir);
 
                 Files.writeString(plistPath, plistContent);
                 log.info("Installed macOS LaunchAgent at {}", plistPath);

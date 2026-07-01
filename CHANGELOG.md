@@ -1,5 +1,21 @@
 # Changelogs
 
+## 2.2.3
+
+### Fixes
+- **AccessDeniedException on startup** — `offerLinuxServiceInstall()` tried
+  to read the root-owned systemd unit file with `Files.readString()`,
+  crashing when the file exists but isn't user-readable. Now catches
+  `AccessDeniedException` and treats the service as "installed, version
+  unknown".
+
+### Refactoring
+- **Extracted `SystemdServiceGenerator`** — the systemd unit generation
+  logic was duplicated between `GUI.java` and `Server.java`. It's now a
+  testable static utility in `utils/` with comprehensive JUnit tests
+  covering: Server vs GUI entry point, /opt install path, version
+  extraction, restart policy, and file readability.
+
 ## 2.2.2
 
 ### Fixes
