@@ -134,14 +134,36 @@ jobs:
         shell: powershell
 
       # --------------------------------------------------------------------------
-      # Code signing — TODO: wire up SignPath
+      # Code signing via SSL.com eSigner (cloud code signing)
       # --------------------------------------------------------------------------
-      # Azure Trusted Signing has been removed and will not be used. Windows
-      # binaries are currently produced UNSIGNED, so Microsoft Defender flags the
-      # auto-start registry entry as persistence (ASEP) and SmartScreen warns.
-      # To fix this, sign BOTH the jpackage launcher ("Local Hardware Bridge.exe",
-      # embedded by NSIS and pointed at by the HKCU\...\Run auto-start key) and the
-      # final NSIS installer via SignPath, before the "Upload Windows EXE" step.
+      # Signs the jpackage native launcher ("Local Hardware Bridge.exe") so
+      # Microsoft Defender doesn't flag the auto-start registry entry as
+      # persistence (ASEP) and SmartScreen doesn't warn.
+      #
+      # Gated on the ESIGNER_ENABLED repo variable so the build still produces
+      # an unsigned installer when the certificate isn't ready yet. To enable:
+      #   Repository Settings → Secrets and variables → Actions → Variables
+      #   ESIGNER_ENABLED = true
+      # And add these secrets (Actions → Secrets):
+      #   ES_USERNAME     — SSL.com account email
+      #   ES_PASSWORD     — SSL.com account password
+      #   CREDENTIAL_ID   — eSigner credential ID (from SSL.com dashboard)
+      #   ES_TOTP_SECRET  — TOTP secret for eSigner OAuth (see SSL.com docs)
+      - name: Sign jpackage launcher with eSigner
+        if: ${{ vars.ESIGNER_ENABLED == 'true' }}
+        uses: sslcom/esigner-codesign@develop
+        with:
+          command: sign
+          username: ${{ secrets.ES_USERNAME }}
+          password: ${{ secrets.ES_PASSWORD }}
+          credential_id: ${{ secrets.CREDENTIAL_ID }}
+          totp_secret: ${{ secrets.ES_TOTP_SECRET }}
+          file_path: ${{ github.workspace }}\build\dist\appimage\Local Hardware Bridge\Local Hardware Bridge.exe
+          override: true
+          malware_block: false
+          environment_name: PROD
+          jvm_max_memory: 2048M
+
       - name: Install NSIS
         run: choco install nsis -y
         shell: powershell
@@ -154,6 +176,21 @@ jobs:
           New-Item -ItemType Directory -Force -Path build/dist/windows-exe | Out-Null
           Move-Item -Force lhb.exe "build/dist/windows-exe/Local-Hardware-Bridge-${{ steps.version.outputs.VERSION }}.exe"
         shell: powershell
+
+      - name: Sign NSIS installer with eSigner
+        if: ${{ vars.ESIGNER_ENABLED == 'true' }}
+        uses: sslcom/esigner-codesign@develop
+        with:
+          command: sign
+          username: ${{ secrets.ES_USERNAME }}
+          password: ${{ secrets.ES_PASSWORD }}
+          credential_id: ${{ secrets.CREDENTIAL_ID }}
+          totp_secret: ${{ secrets.ES_TOTP_SECRET }}
+          file_path: ${{ github.workspace }}\build\dist\windows-exe\Local-Hardware-Bridge-${{ steps.version.outputs.VERSION }}.exe
+          override: true
+          malware_block: false
+          environment_name: PROD
+          jvm_max_memory: 2048M
 
       - name: Upload Windows EXE
         uses: actions/upload-artifact@v4
@@ -378,7 +415,7 @@ jobs:
             | Platform | File | Notes |
             |----------|------|-------|
             | Cross-platform | `local-hardware-bridge-*.jar` | Requires JDK 21+ |
-            | Windows | `Local-Hardware-Bridge-*.exe` | Single installer, bundled Java, runs in background, auto-start |
+            | Windows | `Local-Hardware-Bridge-*.exe` | Single installer, bundled Java, runs in background, auto-start${{ vars.ESIGNER_ENABLED == 'true' && ', code-signed via SSL.com eSigner' || '' }} |
             | Linux | `.AppImage` | Requires JDK 21+, portable |
             | macOS | `.dmg` installer | Intel & Apple Silicon |
             | Terminal | `lhb-tui-*` | Admin dashboard, no JVM needed |
