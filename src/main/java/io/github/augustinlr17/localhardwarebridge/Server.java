@@ -33,6 +33,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.security.MessageDigest;
 import java.util.*;
@@ -981,9 +982,13 @@ public class Server implements WebSocketServerInterface {
             }
 
             String jarPath = Paths.get(Server.class.getProtectionDomain().getCodeSource().getLocation().toURI()).toAbsolutePath().toString();
-            String workingDir = System.getProperty("user.dir");
             String javaHome = System.getProperty("java.home");
             String javaExec = javaHome + "/bin/java";
+
+            // Copy the JAR to a stable location so the service doesn't break if
+            // the user moves/deletes the download.
+            String installDir = "/opt/local-hardware-bridge";
+            String installedJarPath = installDir + "/local-hardware-bridge.jar";
 
             String serviceContent = "[Unit]\n"
                 + "# LHB_VERSION=" + Constants.VERSION + "\n"
@@ -991,8 +996,8 @@ public class Server implements WebSocketServerInterface {
                 + "After=network.target\n\n"
                 + "[Service]\n"
                 + "Type=simple\n"
-                + "ExecStart=" + javaExec + " -cp " + jarPath + " io.github.augustinlr17.localhardwarebridge.Server\n"
-                + "WorkingDirectory=" + workingDir + "\n"
+                + "ExecStart=" + javaExec + " -cp " + installedJarPath + " io.github.augustinlr17.localhardwarebridge.Server\n"
+                + "WorkingDirectory=" + installDir + "\n"
                 + "Restart=on-failure\n"
                 + "RestartSec=5\n\n"
                 + "[Install]\n"
@@ -1003,6 +1008,12 @@ public class Server implements WebSocketServerInterface {
             Path serviceFile = Path.of(SYSTEMD_PATH + serviceName);
 
             try {
+                // Copy the JAR to /opt/local-hardware-bridge/ (stable location)
+                Path installDirPath = Path.of(installDir);
+                Files.createDirectories(installDirPath);
+                Files.copy(Path.of(jarPath), Path.of(installedJarPath),
+                    StandardCopyOption.REPLACE_EXISTING);
+
                 // Migrate from legacy service name if it exists
                 Path legacyServiceFile = Path.of(SYSTEMD_PATH + legacyServiceName);
                 if (Files.exists(legacyServiceFile)) {

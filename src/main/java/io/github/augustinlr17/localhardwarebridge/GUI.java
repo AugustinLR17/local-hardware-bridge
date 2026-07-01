@@ -12,6 +12,7 @@ import io.github.augustinlr17.localhardwarebridge.services.UpdateService;
 import io.github.augustinlr17.localhardwarebridge.utils.ThreadUtil;
 
 import javax.imageio.ImageIO;
+import javax.swing.JFrame;
 import javax.swing.JOptionPane;
 import java.awt.*;
 import java.io.File;
@@ -255,8 +256,7 @@ public class GUI implements WebSocketServiceInterface {
                         + "Download and install now?\n"
                         + "The app will restart automatically after installation.";
 
-                int choice = JOptionPane.showConfirmDialog(
-                        null,
+                int choice = showConfirmDialog(
                         message,
                         Constants.APP_NAME + " - Update Available",
                         JOptionPane.YES_NO_OPTION,
@@ -321,8 +321,7 @@ public class GUI implements WebSocketServiceInterface {
 
             // Offer to migrate from legacy service name
             if (legacyInstalled && !installed) {
-                int choice = JOptionPane.showConfirmDialog(
-                    null,
+                int choice = showConfirmDialog(
                     "An existing \"webapp-hardware-bridge\" service was detected.\n"
                         + "Migrate to the new \"local-hardware-bridge\" service?\n"
                         + "(The old service will be stopped and removed.)",
@@ -345,8 +344,7 @@ public class GUI implements WebSocketServiceInterface {
 
             int choice;
             if (!installed) {
-                choice = JOptionPane.showConfirmDialog(
-                    null,
+                choice = showConfirmDialog(
                     "Install Local Hardware Bridge as a systemd service so it starts automatically?\n"
                         + "This requires administrator rights.",
                     Constants.APP_NAME + " - Install Service",
@@ -354,8 +352,7 @@ public class GUI implements WebSocketServiceInterface {
                     JOptionPane.QUESTION_MESSAGE
                 );
             } else if (!Constants.VERSION.equals(installedVersion)) {
-                choice = JOptionPane.showConfirmDialog(
-                    null,
+                choice = showConfirmDialog(
                     "Service v" + (installedVersion == null ? "?" : installedVersion) + " is installed.\n"
                         + "Update to v" + Constants.VERSION + "?",
                     Constants.APP_NAME + " - Update Service",
@@ -385,8 +382,7 @@ public class GUI implements WebSocketServiceInterface {
                 return; // Already installed
             }
 
-            int choice = JOptionPane.showConfirmDialog(
-                null,
+            int choice = showConfirmDialog(
                 "Install Local Hardware Bridge as a login item so it starts automatically?",
                 Constants.APP_NAME + " - Install Service",
                 JOptionPane.YES_NO_OPTION,
@@ -427,20 +423,49 @@ public class GUI implements WebSocketServiceInterface {
         }
     }
 
+    /**
+     * Shows a confirm dialog with a parent frame so it has a proper size on
+     * Linux (JOptionPane with null parent renders minuscule on some WMs).
+     */
+    private int showConfirmDialog(String message, String title, int optionType, int messageType) {
+        JFrame frame = new JFrame(title);
+        frame.setUndecorated(true);
+        frame.setSize(0, 0);
+        frame.setLocationRelativeTo(null);
+        frame.setVisible(true);
+        int choice = JOptionPane.showConfirmDialog(frame, message, title, optionType, messageType);
+        frame.dispose();
+        return choice;
+    }
+
     private void installLinuxService() {
         try {
             String jarPath = Paths.get(GUI.class.getProtectionDomain().getCodeSource().getLocation().toURI()).toAbsolutePath().toString();
-            String workingDir = System.getProperty(USER_DIR_PROP);
             String javaExec = System.getProperty(JAVA_HOME_PROP) + "/bin/java";
 
+            // Copy the JAR to a stable location so the service doesn't break if
+            // the user moves/deletes the download. /opt is the standard FHS path
+            // for third-party software.
+            String installDir = "/opt/local-hardware-bridge";
+            String installedJarPath = installDir + "/local-hardware-bridge.jar";
+
+            // Create install dir and copy the JAR (requires root)
+            ProcessBuilder mkdir = new ProcessBuilder(PKEXEC, "mkdir", "-p", installDir);
+            mkdir.inheritIO().start().waitFor();
+
+            ProcessBuilder copyJar = new ProcessBuilder(PKEXEC, "cp", jarPath, installedJarPath);
+            copyJar.inheritIO().start().waitFor();
+
+            // Service uses Server (headless) — GUI requires a display and would
+            // crash under systemd where no X/Wayland session is available.
             String serviceContent = "[Unit]\n"
                 + "# LHB_VERSION=" + Constants.VERSION + "\n"
                 + "Description=Local Hardware Bridge\n"
                 + "After=network.target\n\n"
                 + "[Service]\n"
                 + "Type=simple\n"
-                + "ExecStart=" + javaExec + " -cp " + jarPath + " io.github.augustinlr17.localhardwarebridge.GUI\n"
-                + "WorkingDirectory=" + workingDir + "\n"
+                + "ExecStart=" + javaExec + " -cp " + installedJarPath + " io.github.augustinlr17.localhardwarebridge.Server\n"
+                + "WorkingDirectory=" + installDir + "\n"
                 + "Restart=on-failure\n"
                 + "RestartSec=5\n\n"
                 + "[Install]\n"

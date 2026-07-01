@@ -5,7 +5,7 @@
 
 pkgname='local-hardware-bridge-bin'
 _pkgname='local-hardware-bridge'
-pkgver='2.2.1'
+pkgver='2.2.2'
 pkgrel=1
 pkgdesc='Exposes local printers and serial ports to web browsers via WebSocket and HTTP APIs'
 arch=('any')

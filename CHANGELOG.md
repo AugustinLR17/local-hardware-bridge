@@ -1,5 +1,20 @@
 # Changelogs
 
+## 2.2.2
+
+### Fixes
+- **Linux systemd service crashed on startup** — the service launched `GUI`
+  (which needs a display) instead of `Server` (headless). Under systemd
+  where no X/Wayland session exists, `GUI` crashed trying to show a
+  `JOptionPane`. The service now launches `Server`.
+- **JAR path in service pointed to the download folder** — the systemd unit
+  hardcoded the JAR location at runtime, so moving or deleting the download
+  broke the service. The JAR is now copied to `/opt/local-hardware-bridge/`
+  during service installation, and the unit points there.
+- **Dialog windows were too small on Linux** — `JOptionPane` with a `null`
+  parent renders minuscule on some window managers. All confirm dialogs now
+  use a parent `JFrame` so they have a proper size.
+
 ## 2.2.1
 
 ### Fixes
