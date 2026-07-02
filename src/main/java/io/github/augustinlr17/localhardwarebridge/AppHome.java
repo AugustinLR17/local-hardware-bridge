@@ -47,6 +47,19 @@ public final class AppHome {
             if (resolved == null) {
                 resolved = resolveViaJavaHome();
             }
+            // Strategy 4: AppImage mount is read-only — use a persistent home dir.
+            // AppImages mount at /tmp/.mount_<name> on Linux; the config/logs/tls
+            // can't live inside the squashfs. Fall back to ~/.local/share/<app>.
+            if (resolved != null && isAppImageMount(resolved)) {
+                File homeConfigDir = getAppDataDir();
+                if (homeConfigDir != null) {
+                    ensureDir(homeConfigDir);
+                    // Migrate: if no config exists in the XDG dir but one exists in
+                    // the systemd service dir (/opt/local-hardware-bridge/), copy it.
+                    migrateExistingConfig(homeConfigDir);
+                    resolved = homeConfigDir;
+                }
+            }
             if (resolved != null) {
                 System.setProperty("user.dir", resolved.getAbsolutePath());
             }
@@ -148,5 +161,82 @@ public final class AppHome {
             return appDir;
         }
         return null;
+    }
+
+    /**
+     * Detects whether the resolved path is inside an AppImage mount point
+     * (e.g. {@code /tmp/.mount_local-XXXXX/...} on Linux).
+     */
+    static boolean isAppImageMount(File dir) {
+        if (dir == null) return false;
+        String path = dir.getAbsolutePath();
+        // AppImages mount at /tmp/.mount_<name> on Linux
+        return path.contains("/.mount_") || path.contains("/.AppImage_");
+    }
+
+    /**
+     * Returns a writable per-user data directory for the application.
+     * Uses XDG_DATA_HOME on Linux, APPDATA on Windows, ~/Library/Application Support on macOS.
+     */
+    static File getAppDataDir() {
+        String appName = "local-hardware-bridge";
+        String os = System.getProperty("os.name", "").toLowerCase();
+
+        if (os.contains("windows")) {
+            String appData = System.getenv("APPDATA");
+            if (appData != null) {
+                return new File(appData, appName);
+            }
+        } else if (os.contains("mac")) {
+            String home = System.getProperty("user.home");
+            if (home != null) {
+                return new File(home, "Library/Application Support/" + appName);
+            }
+        } else {
+            // Linux / Unix — respect XDG_DATA_HOME
+            String xdgData = System.getenv("XDG_DATA_HOME");
+            if (xdgData != null && !xdgData.isEmpty()) {
+                return new File(xdgData, appName);
+            }
+            String home = System.getProperty("user.home");
+            if (home != null) {
+                return new File(home, ".local/share/" + appName);
+            }
+        }
+        return null;
+    }
+
+    private static void ensureDir(File dir) {
+        if (!dir.exists() && !dir.mkdirs()) {
+            // Best effort — caller will handle write failures
+        }
+    }
+
+    /**
+     * If no config.json exists in the target dir, tries to copy one from known
+     * locations (systemd service dir, CWD). This ensures AppImage users don't
+     * lose their existing config on first launch.
+     */
+    private static void migrateExistingConfig(File targetDir) {
+        File targetConfig = new File(targetDir, "config.json");
+        if (targetConfig.exists()) {
+            return; // Already have a config
+        }
+        // Try systemd service install location
+        File[] candidates = {
+            new File("/opt/local-hardware-bridge/config.json"),
+            new File("config.json"),
+            new File(System.getProperty("user.home", ""), "config.json")
+        };
+        for (File src : candidates) {
+            if (src.exists() && src.isFile() && src.canRead()) {
+                try {
+                    java.nio.file.Files.copy(src.toPath(), targetConfig.toPath());
+                } catch (Exception e) {
+                    // Best effort — ConfigService will create defaults if this fails
+                }
+                return;
+            }
+        }
     }
 }

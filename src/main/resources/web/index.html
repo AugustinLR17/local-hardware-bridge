@@ -549,7 +549,7 @@
                         <div style="width:200px">
                             <select class="lhb-form-control" v-model="printer.name" aria-label="Printer">
                                 <option value="" disabled>Select a printer...</option>
-                                <option :value="p.name" v-for="p in printers">{{ p.name }}</option>
+                                <option :value="p.name" v-for="p in printers">{{ p.name }}{{ (p.state === 'stopped' || p.state === 'processing' || !p.acceptingJobs) ? ' (offline)' : '' }}</option>
                             </select>
                         </div>
                         <button @click="removePrinter(index)" class="lhb-btn lhb-btn-danger lhb-btn-sm" style="padding:0.3rem 0.5rem" aria-label="Remove printer mapping">&#10005;</button>
@@ -794,7 +794,7 @@
                             <label class="lhb-row-label lhb-form-label" :for="'prn-name-'+index">Printer</label>
                             <div class="lhb-row-value">
                                 <select :id="'prn-name-'+index" class="lhb-form-control" v-model="printer.name">
-                                    <option :value="p.name" v-for="p in printers">{{ p.name }}</option>
+                                    <option :value="p.name" v-for="p in printers">{{ p.name }}{{ (p.state === 'stopped' || p.state === 'processing' || !p.acceptingJobs) ? ' (offline)' : '' }}</option>
                                 </select>
                             </div>
                         </div>

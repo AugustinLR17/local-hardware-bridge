@@ -452,6 +452,18 @@ public class UpdateService {
         try {
             int code = conn.getResponseCode();
             if (code != 200) {
+                if (code == 403) {
+                    String retryAfter = conn.getHeaderField("X-RateLimit-Reset");
+                    String remaining = conn.getHeaderField("X-RateLimit-Remaining");
+                    if ("0".equals(remaining)) {
+                        long resetEpoch = retryAfter != null ? Long.parseLong(retryAfter) : 0;
+                        long waitMinutes = resetEpoch > 0
+                            ? Math.max(1, (resetEpoch - System.currentTimeMillis() / 1000) / 60)
+                            : 0;
+                        throw new IOException("GitHub API rate limit exceeded" + (waitMinutes > 0 ? " — retry in " + waitMinutes + " min" : ""));
+                    }
+                    throw new IOException("GitHub API returned 403 Forbidden (rate limit or access denied)");
+                }
                 throw new IOException("GitHub API returned HTTP " + code);
             }
 

@@ -23,6 +23,7 @@ import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.util.Locale;
 import java.util.Objects;
@@ -383,13 +384,15 @@ public class GUI implements WebSocketServiceInterface {
                     JOptionPane.QUESTION_MESSAGE
                 );
                 if (choice == JOptionPane.YES_OPTION) {
-                    // Stop and remove legacy service first
-                    new ProcessBuilder(PKEXEC, SYSTEMCTL, "disable", "--now", "webapp-hardware-bridge.service")
+                    // Stop and remove legacy service, then install new one.
+                    // Single pkexec for the disable + daemon-reload — installLinuxService does its own.
+                    Path legacyScript = Files.createTempFile("lhb-legacy", ".sh");
+                    Files.writeString(legacyScript,
+                        "#!/bin/sh\nsystemctl disable --now webapp-hardware-bridge.service 2>/dev/null || true\nrm -f /etc/systemd/system/webapp-hardware-bridge.service\nsystemctl daemon-reload\n");
+                    legacyScript.toFile().setExecutable(true);
+                    new ProcessBuilder(PKEXEC, "sh", legacyScript.toString())
                         .redirectErrorStream(true).start().waitFor();
-                    Files.deleteIfExists(legacyServiceFile);
-                    new ProcessBuilder(PKEXEC, SYSTEMCTL, "daemon-reload")
-                        .redirectErrorStream(true).start().waitFor();
-                    // Then install new service
+                    Files.deleteIfExists(legacyScript);
                     installLinuxService();
                 }
                 return;
@@ -479,39 +482,39 @@ public class GUI implements WebSocketServiceInterface {
             String jarPath = Paths.get(GUI.class.getProtectionDomain().getCodeSource().getLocation().toURI()).toAbsolutePath().toString();
             String javaExec = System.getProperty(JAVA_HOME_PROP) + "/bin/java";
 
-            // Copy the JAR to a stable location so the service doesn't break if
-            // the user moves/deletes the download. /opt is the standard FHS path
-            // for third-party software.
             String installDir = SystemdServiceGenerator.getInstallDir();
             String installedJarPath = SystemdServiceGenerator.getInstalledJarPath();
 
-            // Create install dir and copy the JAR (requires root)
-            ProcessBuilder mkdir = new ProcessBuilder(PKEXEC, "mkdir", "-p", installDir);
-            mkdir.inheritIO().start().waitFor();
-
-            ProcessBuilder copyJar = new ProcessBuilder(PKEXEC, "cp", jarPath, installedJarPath);
-            copyJar.inheritIO().start().waitFor();
-
-            // Service uses Server (headless) — GUI requires a display and would
-            // crash under systemd where no X/Wayland session is available.
             String serviceContent = SystemdServiceGenerator.generateServiceUnit(
                 javaExec, jarPath, installDir, Constants.VERSION);
 
             Path tempFile = Files.createTempFile("local-hardware-bridge", ".service");
-            // Restrict temp file to owner-only before writing the systemd unit.
             restrictTempFilePermissions(tempFile);
             Files.writeString(tempFile, serviceContent, StandardOpenOption.TRUNCATE_EXISTING);
 
-            ProcessBuilder copy = new ProcessBuilder(PKEXEC, "cp", tempFile.toString(), "/etc/systemd/system/local-hardware-bridge.service");
-            copy.inheritIO().start().waitFor();
+            Path tempJar = Files.createTempFile("local-hardware-bridge-jar", ".jar");
+            Files.copy(Path.of(jarPath), tempJar, StandardCopyOption.REPLACE_EXISTING);
 
-            ProcessBuilder daemonReload = new ProcessBuilder(PKEXEC, SYSTEMCTL, "daemon-reload");
-            daemonReload.inheritIO().start().waitFor();
+            // Single pkexec call that does everything — only ONE password prompt.
+            // Writes a temp shell script and runs it via pkexec sh.
+            Path script = Files.createTempFile("lhb-install", ".sh");
+            String scriptContent = "#!/bin/sh\n"
+                + "set -e\n"
+                + "mkdir -p " + shellQuote(installDir) + "\n"
+                + "cp -f " + shellQuote(tempJar.toString()) + " " + shellQuote(installedJarPath) + "\n"
+                + "cp -f " + shellQuote(tempFile.toString()) + " " + shellQuote("/etc/systemd/system/local-hardware-bridge.service") + "\n"
+                + "systemctl daemon-reload\n"
+                + "systemctl enable --now local-hardware-bridge.service\n"
+                + "rm -f " + shellQuote(tempFile.toString()) + " " + shellQuote(tempJar.toString()) + "\n";
+            Files.writeString(script, scriptContent);
+            script.toFile().setExecutable(true);
 
-            ProcessBuilder enable = new ProcessBuilder(PKEXEC, SYSTEMCTL, "enable", "--now", "local-hardware-bridge.service");
-            enable.inheritIO().start().waitFor();
+            ProcessBuilder pb = new ProcessBuilder(PKEXEC, "sh", script.toString());
+            pb.inheritIO().start().waitFor();
 
+            Files.deleteIfExists(script);
             Files.deleteIfExists(tempFile);
+            Files.deleteIfExists(tempJar);
             notify(Constants.APP_NAME, "Service installed and started", TrayIcon.MessageType.INFO);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -627,5 +630,10 @@ public class GUI implements WebSocketServiceInterface {
             f.setWritable(false, false);
             f.setWritable(true, true);
         }
+    }
+
+    /** Single-quotes a path for safe inclusion in a shell script. */
+    private static String shellQuote(String s) {
+        return "'" + s.replace("'", "'\"'\"'") + "'";
     }
 }

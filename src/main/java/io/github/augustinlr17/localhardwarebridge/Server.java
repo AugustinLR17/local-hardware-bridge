@@ -681,11 +681,30 @@ public class Server implements WebSocketServerInterface {
      * HTTP API - Printer endpoints
      */
     private void registerPrinterEndpoints() {
-        // List OS printers
+        // List OS printers (with offline/idle state)
         javalinServer.get("/system/printers.json", ctx -> {
             ArrayList<PrintServiceDTO> dtos = new ArrayList<>();
             for (PrintService service : PrinterJob.lookupPrintServices()) {
-                dtos.add(new PrintServiceDTO(service.getName(), ""));
+                String state = "unknown";
+                boolean accepting = false;
+                try {
+                    javax.print.attribute.standard.PrinterState ps = service.getAttribute(javax.print.attribute.standard.PrinterState.class);
+                    if (ps != null) {
+                        state = ps.toString().toLowerCase();
+                    } else {
+                        state = "idle";
+                    }
+                } catch (Exception e) {
+                    state = "unknown";
+                }
+                try {
+                    javax.print.attribute.standard.PrinterIsAcceptingJobs acc =
+                        service.getAttribute(javax.print.attribute.standard.PrinterIsAcceptingJobs.class);
+                    accepting = acc != null && acc == javax.print.attribute.standard.PrinterIsAcceptingJobs.ACCEPTING_JOBS;
+                } catch (Exception e) {
+                    accepting = false;
+                }
+                dtos.add(new PrintServiceDTO(service.getName(), "", accepting, state));
             }
             ctx.contentType(ContentType.APPLICATION_JSON).result(objectMapper.writeValueAsString(dtos));
         });

@@ -354,11 +354,15 @@ public class PrinterWebSocketService implements WebSocketServiceInterface {
         PrintService printService = printerSearchResult.getDocPrintJob().getPrintService();
         PrinterCapabilities caps = detectPrinterCapabilities(printService);
 
-        if (caps.supportsRaw) {
+        if (caps.isThermalOnly()) {
+            // Only supports raw/AUTOSENSE — definitely a thermal/ESC-POS printer.
             printRaw(printDocument, printerSearchResult);
         } else {
-            log.info("Printer '{}' does not support raw/AUTOSENSE, converting raw content to image",
-                    printerSearchResult.getName());
+            // Supports image and/or PDF in addition to raw — it's a laser/inkjet.
+            // Raw ESC/POS data would be sent as application/octet-stream which most
+            // non-thermal printers reject. Convert to image instead.
+            log.info("Printer '{}' is not thermal-only (raw={}, image={}, pdf={}), converting raw content to image",
+                    printerSearchResult.getName(), caps.supportsRaw, caps.supportsImage, caps.supportsPDF);
             printRawAsImage(printDocument, printerSearchResult);
         }
     }

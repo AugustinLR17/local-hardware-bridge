@@ -46,6 +46,7 @@ application {
 }
 
 test {
+    systemProperty 'lhb.test', 'true'
     finalizedBy jacocoTestReport
 }
 

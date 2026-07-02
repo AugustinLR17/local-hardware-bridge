@@ -154,19 +154,20 @@ public final class SingleInstanceGuard {
     }
 
     private static void trySystemctlStop() {
-        String[] serviceNames = {
-            "local-hardware-bridge.service",
-            Constants.LEGACY_SERVICE_NAME + ".service"
-        };
-        for (String svc : serviceNames) {
-            try {
-                ProcessBuilder pb = new ProcessBuilder("pkexec", "systemctl", "stop", svc);
-                pb.redirectErrorStream(true);
-                Process p = pb.start();
-                p.waitFor(10, java.util.concurrent.TimeUnit.SECONDS);
-            } catch (Exception e) {
-                log.debug("systemctl stop {} failed: {}", svc, e.getMessage());
-            }
+        // Bypass in test/CI environments to avoid triggering pkexec password prompts.
+        if (Boolean.getBoolean("lhb.test") || Boolean.getBoolean("lhb.no-systemctl")) {
+            return;
+        }
+        // Single pkexec call for both services — only ONE password prompt.
+        try {
+            ProcessBuilder pb = new ProcessBuilder("pkexec", "systemctl", "stop",
+                "local-hardware-bridge.service",
+                Constants.LEGACY_SERVICE_NAME + ".service");
+            pb.redirectErrorStream(true);
+            Process p = pb.start();
+            p.waitFor(10, java.util.concurrent.TimeUnit.SECONDS);
+        } catch (Exception e) {
+            log.debug("systemctl stop failed: {}", e.getMessage());
         }
     }
 
