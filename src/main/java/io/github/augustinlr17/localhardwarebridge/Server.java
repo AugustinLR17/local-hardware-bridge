@@ -21,6 +21,7 @@ import io.github.augustinlr17.localhardwarebridge.responses.PrintResult;
 import io.github.augustinlr17.localhardwarebridge.services.ConfigService;
 import io.github.augustinlr17.localhardwarebridge.services.UpdateService;
 import io.github.augustinlr17.localhardwarebridge.utils.CertificateGenerator;
+import io.github.augustinlr17.localhardwarebridge.utils.SingleInstanceGuard;
 import io.github.augustinlr17.localhardwarebridge.utils.SystemdServiceGenerator;
 import io.github.augustinlr17.localhardwarebridge.utils.ThreadUtil;
 import io.github.augustinlr17.localhardwarebridge.websocketservices.PrinterWebSocketService;
@@ -92,6 +93,23 @@ public class Server implements WebSocketServerInterface {
         // already anchors before any app class loads. Idempotent, no-op outside a JAR.
         AppHome.anchor();
         try {
+            // Check if another instance is already running on the configured port.
+            // In headless/server mode we log a warning and exit — the GUI mode shows
+            // an interactive dialog instead.
+            Config.Server serverConfig = ConfigService.getInstance().getConfig().getServer();
+            String bind = serverConfig.getBind();
+            int port = serverConfig.getPort();
+
+            if (SingleInstanceGuard.isAlreadyRunning(bind, port)) {
+                if (SingleInstanceGuard.isOurApp(bind, port)) {
+                    log.warn("Another {} instance is already running on port {}. Use the GUI mode to replace it, or stop the other instance first.", Constants.APP_NAME, port);
+                    System.exit(1);
+                } else {
+                    log.error("Port {} is already in use by another application", port);
+                    System.exit(1);
+                }
+            }
+
             new Server().start();
         } catch (JavalinBindException e) {
             // Top-level entry point only: a bind failure here is fatal for the process.

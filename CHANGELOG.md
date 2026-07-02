@@ -2,31 +2,14 @@
 
 ## 2.3.1
 
-### Fixes
-- **File type detection failed with `file_content` and no URL** — when a PDF or
-  image was sent via `file_content` (Base64) without a `url` field, the bridge
-  returned "Unknown file type: null" because type detection only inspected the
-  URL path extension. Now falls back to sniffing the decoded content's magic
-  bytes (`%PDF` for PDF, `89 50 4E 47` for PNG, `FF D8 FF` for JPEG, `GIF8` for
-  GIF) when the URL has no usable extension. The output file also gets the
-  correct extension inferred from the content.
-- **Auto-update did not update the systemd service JAR** — `UpdateService.applyUpdate()`
-  only replaced the JAR at the current runtime location. When running from an
-  AppImage (read-only mount) or a different directory than the systemd service,
-  the JAR at `/opt/local-hardware-bridge/local-hardware-bridge.jar` was never
-  updated. Now, if the systemd service is installed, the update targets the
-  service JAR and optionally syncs the current runtime JAR too. Rollback also
-  targets the systemd JAR.
-
-### Tests
-- Added unit tests for content-based file type detection (PDF/PNG/JPEG/GIF magic
-  bytes, URL extension priority, invalid base64, empty content).
-- Added unit tests for `DocumentService.sniffExtension()` and extension inference
-  on inline content filenames.
-- Added E2E tests for printing a PDF via `file_content` without a URL, and with
-  a URL that has no extension (regression tests for the detection bug).
-
-## 2.3.0
+### Features
+- **Single-instance enforcement with user prompt** — when starting a new
+  instance and the configured port is already occupied by another Local
+  Hardware Bridge, the GUI mode shows a dialog asking the user whether to
+  stop the old instance and take over. If accepted, the old instance is
+  stopped via `/system/restart.json` and the port is freed. In headless
+  server mode, the new instance logs a warning and exits cleanly. Non-LHB
+  processes on the port are detected and reported separately.
 
 ### Fixes
 - **File type detection failed with `file_content` and no URL** — when a PDF or
@@ -51,6 +34,8 @@
   on inline content filenames.
 - Added E2E tests for printing a PDF via `file_content` without a URL, and with
   a URL that has no extension (regression tests for the detection bug).
+- Added unit tests for `SingleInstanceGuard` (port detection, app identification,
+  port-free wait timeout).
 
 ## 2.2.3
 

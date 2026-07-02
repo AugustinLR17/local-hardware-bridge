@@ -10,6 +10,7 @@ import io.github.augustinlr17.localhardwarebridge.interfaces.WebSocketServiceInt
 import io.github.augustinlr17.localhardwarebridge.services.ConfigService;
 import io.github.augustinlr17.localhardwarebridge.services.UpdateService;
 import io.github.augustinlr17.localhardwarebridge.utils.LaunchdPlistGenerator;
+import io.github.augustinlr17.localhardwarebridge.utils.SingleInstanceGuard;
 import io.github.augustinlr17.localhardwarebridge.utils.SystemdServiceGenerator;
 import io.github.augustinlr17.localhardwarebridge.utils.ThreadUtil;
 
@@ -92,6 +93,56 @@ public class GUI implements WebSocketServiceInterface {
     }
 
     public void launch() throws Exception {
+        // Check if another instance is already running on the configured port.
+        // If it is our app, offer to stop it and take over.
+        Config.Server serverConfig = config.getServer();
+        String bind = serverConfig.getBind();
+        int port = serverConfig.getPort();
+
+        if (SingleInstanceGuard.isAlreadyRunning(bind, port)) {
+            if (SingleInstanceGuard.isOurApp(bind, port)) {
+                String version = System.getProperty("lhb.server") != null ? "Server" : "GUI";
+                int choice = JOptionPane.showConfirmDialog(
+                    null,
+                    "Another " + Constants.APP_NAME + " instance is already running on port " + port + ".\n"
+                        + "Do you want to stop it and start this one instead?",
+                    Constants.APP_NAME + " - Instance Already Running",
+                    JOptionPane.YES_NO_OPTION,
+                    JOptionPane.QUESTION_MESSAGE
+                );
+                if (choice == JOptionPane.YES_OPTION) {
+                    log.info("Stopping existing instance on {}:{}", bind, port);
+                    String token = serverConfig.getAuthentication().isEnabled() ? serverConfig.getAuthentication().getToken() : null;
+                    SingleInstanceGuard.stopInstance(bind, port, token);
+                    if (!SingleInstanceGuard.waitForPortFree(bind, port, java.time.Duration.ofSeconds(15))) {
+                        log.error("Old instance did not free port {} within timeout", port);
+                        JOptionPane.showMessageDialog(
+                            null,
+                            "Could not stop the existing instance on port " + port + ".\n"
+                                + "Please close it manually and try again.",
+                            Constants.APP_NAME + " - Error",
+                            JOptionPane.ERROR_MESSAGE
+                        );
+                        System.exit(1);
+                    }
+                    log.info("Port {} is now free, starting new instance", port);
+                } else {
+                    log.info("User chose not to stop existing instance, exiting");
+                    System.exit(0);
+                }
+            } else {
+                // Port is occupied by something that is not our app
+                JOptionPane.showMessageDialog(
+                    null,
+                    "Port " + port + " is already in use by another application.\n"
+                        + "Please change the port in the config or close the other application.",
+                    Constants.APP_NAME + " - Port In Use",
+                    JOptionPane.WARNING_MESSAGE
+                );
+                System.exit(1);
+            }
+        }
+
         server.start();
 
         String os = System.getProperty(OS_NAME_PROP, "").toLowerCase(Locale.ROOT);
