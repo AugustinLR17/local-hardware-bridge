@@ -1021,6 +1021,36 @@ public class Server implements WebSocketServerInterface {
             restartThread.start();
         });
 
+        // Shutdown endpoint — stops the server permanently (System.exit(0)).
+        // Used by SingleInstanceGuard to free the port so a new instance can take over.
+        // Unlike /system/restart.json, this does NOT restart — the process exits cleanly.
+        // systemd's Restart=on-failure does NOT trigger on exit code 0, so the service
+        // stays stopped until manually started or the new instance binds the port.
+        javalinServer.post("/system/shutdown", ctx -> {
+            if (!isConfirmed(ctx)) {
+                ctx.status(400).contentType(ContentType.APPLICATION_JSON)
+                        .result("{\"error\": \"Confirmation required. Add ?confirm=true or X-Confirm: true header.\"}");
+                return;
+            }
+
+            messageToService(NOTIFICATION_CHANNEL, objectMapper.writeValueAsString(new NotificationDTO(WARNING_LEVEL, "Shutdown", "Server is shutting down...")));
+
+            ctx.contentType(ContentType.APPLICATION_JSON).result("{\"status\": \"shutting down\"}");
+
+            Thread shutdownThread = new Thread(() -> {
+                try {
+                    ThreadUtil.silentSleep(500);
+                    stop();
+                    System.exit(0);
+                } catch (Exception e) {
+                    log.error("Failed to shut down server", e);
+                    System.exit(1);
+                }
+            }, "server-shutdown");
+            shutdownThread.setDaemon(false);
+            shutdownThread.start();
+        });
+
         // Health check
         javalinServer.get("/system/health", ctx -> {
             ObjectNode health = objectMapper.createObjectNode();

@@ -114,7 +114,7 @@ public class GUI implements WebSocketServiceInterface {
                     log.info("Stopping existing instance on {}:{}", bind, port);
                     String token = serverConfig.getAuthentication().isEnabled() ? serverConfig.getAuthentication().getToken() : null;
                     SingleInstanceGuard.stopInstance(bind, port, token);
-                    if (!SingleInstanceGuard.waitForPortFree(bind, port, java.time.Duration.ofSeconds(15))) {
+                    if (!SingleInstanceGuard.waitForPortFree(bind, port, java.time.Duration.ofSeconds(30))) {
                         log.error("Old instance did not free port {} within timeout", port);
                         JOptionPane.showMessageDialog(
                             null,

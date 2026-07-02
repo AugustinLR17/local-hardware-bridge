@@ -80,9 +80,10 @@ public final class SingleInstanceGuard {
     }
 
     /**
-     * Sends a restart request to the running instance. This causes the old
-     * instance to stop and restart on the same port. After a short delay the
-     * port is freed and the new instance can bind.
+     * Sends a shutdown request to the running instance. This causes the old
+     * instance to stop permanently (System.exit(0)) and free the port.
+     * Unlike a restart, the old instance does not come back — the new instance
+     * can then bind the port.
      *
      * <p>If the old instance has authentication enabled, the {@code token}
      * parameter is sent as a Bearer token.
@@ -90,11 +91,11 @@ public final class SingleInstanceGuard {
      * @param host  the bind host
      * @param port  the port
      * @param token the auth token (may be {@code null})
-     * @return {@code true} if the restart request was accepted (200/202)
+     * @return {@code true} if the shutdown request was accepted (200/202)
      */
     public static boolean stopInstance(String host, int port, String token) {
         try {
-            String url = "http://" + host + ":" + port + "/system/restart.json?confirm=true";
+            String url = "http://" + host + ":" + port + "/system/shutdown?confirm=true";
             HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
             conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
             conn.setReadTimeout(READ_TIMEOUT_MS);
