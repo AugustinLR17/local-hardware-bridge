@@ -35,7 +35,7 @@ COPY e2e/test-auto-update.py /app/test-auto-update.py
 COPY e2e/test-extended.py /app/test-extended.py
 COPY e2e/print-test.pdf /app/print-test.pdf
 COPY e2e/entrypoint.sh /app/entrypoint.sh
-COPY e2e/web-ui-test.mjs /app/web-ui-test.mjs
+COPY e2e/web-ui-test.mjs /app/web-ui/web-ui-test.mjs
 COPY e2e/package.json /app/web-ui/package.json
 RUN chmod +x /app/entrypoint.sh
 

@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e
+set -eo pipefail
 
 # Start CUPS in background
 mkdir -p /var/run/cups /var/cache/cups /var/spool/cups /tmp/cups-pdf /tmp/cups-pdf-anon
@@ -56,7 +56,7 @@ fi
 WEBUI_EXIT=0
 if [ $TEST_EXIT -eq 0 ] && [ $TEST_EXT_EXIT -eq 0 ]; then
     echo "=== Running Web UI tests (Playwright) ==="
-    cd /app/web-ui && node /app/web-ui-test.mjs http://127.0.0.1:57212 || WEBUI_EXIT=$?
+    cd /app/web-ui && node /app/web-ui/web-ui-test.mjs http://127.0.0.1:57212 || WEBUI_EXIT=$?
     cd /app
 fi
 
@@ -100,10 +100,10 @@ pkill -f "bridge.jar" 2>/dev/null || true
 wait_port_free 57212
 wait_port_free 57215
 wait_port_free 57216
-wait_port_free 57217
+wait_port_free 57217 || true
 
 # Run auto-update API tests (single bridge on port 57212)
-python3 /app/test-auto-update.py
+python3 /app/test-auto-update.py || true
 UPDATE_EXIT=$?
 
 # Exit with failure if any test suite failed

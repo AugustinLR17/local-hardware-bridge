@@ -165,26 +165,26 @@ async function run() {
             fail('text tab shows editable textarea', 'textarea not visible');
         }
 
-        // ─── 9. Switch to Image tab shows canvas ───
+        // ─── 9. Switch to Image tab shows SVG preview ───
         await imageTab.click();
         await sleep(500);
-        const canvas = page.locator('#testCanvas');
-        const canvasVisible = await canvas.isVisible();
-        if (canvasVisible) {
-            ok('image tab shows preview canvas');
+        const img = page.locator('img[src="test-page.svg"]').first();
+        const imgVisible = await img.isVisible();
+        if (imgVisible) {
+            ok('image tab shows test page SVG preview');
         } else {
-            fail('image tab shows preview canvas', 'canvas not visible');
+            fail('image tab shows test page SVG preview', 'SVG image not visible');
         }
 
-        // ─── 10. Switch to PDF tab shows canvas ───
+        // ─── 10. Switch to PDF tab shows SVG preview ───
         await pdfTab.click();
         await sleep(500);
-        const pdfCanvas = page.locator('#testCanvasPdf');
-        const pdfCanvasVisible = await pdfCanvas.isVisible();
-        if (pdfCanvasVisible) {
-            ok('pdf tab shows preview canvas');
+        const pdfImg = page.locator('img[src="test-page.svg"]').first();
+        const pdfImgVisible = await pdfImg.isVisible();
+        if (pdfImgVisible) {
+            ok('pdf tab shows test page SVG preview');
         } else {
-            fail('pdf tab shows preview canvas', 'canvas not visible');
+            fail('pdf tab shows test page SVG preview', 'SVG image not visible');
         }
 
         // ─── 11. Close modal ───

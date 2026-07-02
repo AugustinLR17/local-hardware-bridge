@@ -1117,16 +1117,20 @@
                 </div>
 
                 <div v-if="testPrintModal.format === 'image'">
-                    <canvas id="testCanvas" width="400" height="520" style="max-width:100%;border-radius:8px;border:1px solid var(--lhb-border)"></canvas>
+                    <div style="max-width:100%;border-radius:8px;border:1px solid var(--lhb-border);overflow:hidden">
+                        <img src="test-page.svg" alt="Test page preview" style="width:100%;display:block"/>
+                    </div>
                     <p style="font-size:0.78rem;color:var(--lhb-text-dim);margin-top:0.5rem">
-                        Renders a branded test page as a PNG image.
+                        Branded test page sent as a PNG image.
                     </p>
                 </div>
 
                 <div v-if="testPrintModal.format === 'pdf'">
-                    <canvas id="testCanvasPdf" width="400" height="520" style="max-width:100%;border-radius:8px;border:1px solid var(--lhb-border)"></canvas>
+                    <div style="max-width:100%;border-radius:8px;border:1px solid var(--lhb-border);overflow:hidden">
+                        <img src="test-page.svg" alt="Test page preview" style="width:100%;display:block"/>
+                    </div>
                     <p style="font-size:0.78rem;color:var(--lhb-text-dim);margin-top:0.5rem">
-                        Renders a branded test page as a PDF document.
+                        Branded test page sent as a PDF document.
                     </p>
                 </div>
             </div>
@@ -1588,8 +1592,6 @@ createApp({
         // Default format
         this.testPrintModal.format = 'txt'
         this.testPrintModal.show = true
-        // Draw canvas previews after DOM updates
-        setTimeout(() => { this.drawTestCanvas('image'); this.drawTestCanvas('pdf') }, 50)
     },
 
     closeTestPrint() {
@@ -1597,96 +1599,22 @@ createApp({
         this.testPrintModal.sending = false
     },
 
-    drawTestCanvas(which) {
-        const canvasId = which === 'pdf' ? 'testCanvasPdf' : 'testCanvas'
-        const canvas = document.getElementById(canvasId)
-        if (!canvas) return
-        const ctx = canvas.getContext('2d')
-        const W = canvas.width, H = canvas.height
-
-        // Always white background for printing
-        ctx.fillStyle = '#ffffff'
-        ctx.fillRect(0, 0, W, H)
-
-        // Draw all static content first, then logo async
-        const drawContent = () => {
-            // White bg (clear any previous draw)
-            ctx.fillStyle = '#ffffff'
-            ctx.fillRect(0, 0, W, H)
-
-            // Border
-            ctx.strokeStyle = '#e0e0e8'
-            ctx.lineWidth = 2
-            ctx.strokeRect(10, 10, W - 20, H - 20)
-
-            // Title
-            ctx.fillStyle = '#1a1a2e'
-            ctx.font = 'bold 20px sans-serif'
-            ctx.textAlign = 'center'
-            ctx.fillText('Local Hardware Bridge', W / 2, 60)
-
-            // Subtitle
-            ctx.font = '14px sans-serif'
-            ctx.fillStyle = '#666666'
-            ctx.fillText('Test Print', W / 2, 85)
-
-            // Divider
-            ctx.strokeStyle = '#dddddd'
-            ctx.lineWidth = 1
-            ctx.beginPath()
-            ctx.moveTo(40, 105)
-            ctx.lineTo(W - 40, 105)
-            ctx.stroke()
-
-            // Info
-            ctx.textAlign = 'left'
-            ctx.fillStyle = '#333333'
-            ctx.font = '13px monospace'
-            const now = new Date().toLocaleString()
-            const lines = [
-                'Date:     ' + now,
-                'Printer:  ' + (this.testPrintModal.printerName || 'Unknown'),
-                'Type:     ' + (this.testPrintModal.printer ? this.testPrintModal.printer.type : 'Unknown'),
-                'Version:  ' + (this.health ? this.health.version : '?'),
-            ]
-            lines.forEach((line, i) => { ctx.fillText(line, 40, 140 + i * 22) })
-
-            // Description
-            ctx.font = '12px sans-serif'
-            ctx.fillStyle = '#888888'
-            const desc = [
-                'This test page confirms that your printer is',
-                'correctly configured and receiving jobs from',
-                'the Local Hardware Bridge service.',
-                '',
-                'If you can read this text, printing works!'
-            ]
-            desc.forEach((line, i) => { ctx.fillText(line, 40, 260 + i * 20) })
-
-            // Footer badge
-            ctx.font = 'bold 11px sans-serif'
-            ctx.fillStyle = '#5b5fef'
-            ctx.textAlign = 'center'
-            ctx.fillText(which.toUpperCase() + ' TEST', W / 2, H - 25)
-        }
-
-        drawContent()
-
-        // Load logo and redraw everything (logo may take time to load)
-        if (!this._testLogo) {
-            this._testLogo = new Image()
-            this._testLogo.onload = () => {
-                drawContent()
-                // Draw logo centered at top
-                const ls = 56
-                ctx.drawImage(this._testLogo, (W - ls) / 2, 10, ls, ls)
+    renderSvgToCanvas(svgUrl, w, h) {
+        return new Promise((resolve, reject) => {
+            const img = new Image()
+            img.onload = () => {
+                const canvas = document.createElement('canvas')
+                canvas.width = w
+                canvas.height = h
+                const ctx = canvas.getContext('2d')
+                ctx.fillStyle = '#ffffff'
+                ctx.fillRect(0, 0, w, h)
+                ctx.drawImage(img, 0, 0, w, h)
+                resolve(canvas)
             }
-            this._testLogo.src = '/icon.png'
-        } else if (this._testLogo.complete) {
-            drawContent()
-            const ls = 56
-            ctx.drawImage(this._testLogo, (W - ls) / 2, 10, ls, ls)
-        }
+            img.onerror = reject
+            img.src = svgUrl
+        })
     },
 
     sendTestPrint() {
@@ -1704,22 +1632,20 @@ createApp({
                 .catch(err => this.handleError(err, 'Test print'))
                 .finally(() => { this.testPrintModal.sending = false })
         } else if (this.testPrintModal.format === 'image') {
-            const canvas = document.getElementById('testCanvas')
-            const dataUrl = canvas.toDataURL('image/png')
-            const b64 = dataUrl.split(',')[1]
-            axios.post('/printer', { type: printer.type, file_content: b64, url: 'test-print.png', id })
-                .then(r => this.handleTestPrintResult(r, printer))
-                .catch(err => this.handleError(err, 'Test print'))
-                .finally(() => { this.testPrintModal.sending = false })
+            this.renderSvgToCanvas('test-page.svg', 800, 1131).then(canvas => {
+                const b64 = canvas.toDataURL('image/png').split(',')[1]
+                return axios.post('/printer', { type: printer.type, file_content: b64, url: 'test-print.png', id })
+            }).then(r => this.handleTestPrintResult(r, printer))
+              .catch(err => this.handleError(err, 'Test print'))
+              .finally(() => { this.testPrintModal.sending = false })
         } else if (this.testPrintModal.format === 'pdf') {
-            const canvas = document.getElementById('testCanvasPdf')
-            // Generate a minimal PDF wrapping the canvas JPEG
-            const jpegDataUrl = canvas.toDataURL('image/jpeg', 0.92)
-            const pdfB64 = this.generateMinimalPdf(jpegDataUrl, canvas.width, canvas.height)
-            axios.post('/printer', { type: printer.type, file_content: pdfB64, url: 'test-print.pdf', id })
-                .then(r => this.handleTestPrintResult(r, printer))
-                .catch(err => this.handleError(err, 'Test print'))
-                .finally(() => { this.testPrintModal.sending = false })
+            this.renderSvgToCanvas('test-page.svg', 800, 1131).then(canvas => {
+                const jpegDataUrl = canvas.toDataURL('image/jpeg', 0.92)
+                const pdfB64 = this.generateMinimalPdf(jpegDataUrl, canvas.width, canvas.height)
+                return axios.post('/printer', { type: printer.type, file_content: pdfB64, url: 'test-print.pdf', id })
+            }).then(r => this.handleTestPrintResult(r, printer))
+              .catch(err => this.handleError(err, 'Test print'))
+              .finally(() => { this.testPrintModal.sending = false })
         }
     },
 
