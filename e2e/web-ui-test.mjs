@@ -3,7 +3,7 @@
 // Runs inside the E2E Docker container against a live bridge instance.
 // Verifies that the most critical user interactions work:
 //   - Dashboard loads and shows version
-//   - Tab navigation (Simple → Advanced → Security)
+//   - Tab navigation (Dashboard → Advanced → Security)
 //   - Save config button triggers PUT /config.json
 //   - Test print modal opens with Text/Image/PDF tabs
 //   - Restart button sends ?confirm=true
@@ -76,7 +76,7 @@ async function run() {
     }
 
     // ─── 4. Tab navigation ───
-    const tabs = ['Simple', 'Advanced', 'Security'];
+    const tabs = ['Dashboard', 'Advanced', 'Security'];
     for (const tabLabel of tabs) {
         try {
             const tab = page.getByRole('tab', { name: tabLabel });
@@ -121,8 +121,8 @@ async function run() {
 
     // ─── 6. Test print modal opens ───
     try {
-        // Go to Simple tab
-        await page.locator('text=Simple').first().click({ timeout: 5000 });
+        // Go to Dashboard tab
+        await page.locator('text=Dashboard').first().click({ timeout: 5000 });
         await sleep(500);
 
         // Find the first "Test print" button

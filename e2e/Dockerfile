@@ -25,8 +25,14 @@ COPY e2e/cups-pdf.conf /etc/cups/cups-pdf.conf
 # Add CUPS admin user
 RUN useradd lpadmin -G lpadmin || true
 
-# Copy application files
 WORKDIR /app
+
+# Install Playwright + Chromium browser (before test files so dep layer is cached)
+COPY e2e/package.json /app/web-ui/package.json
+RUN cd /app/web-ui && npm install --production && \
+    npx playwright install --with-deps chromium
+
+# Copy application files
 COPY build/libs/local-hardware-bridge-*.jar /app/local-hardware-bridge.jar
 COPY e2e/test.py /app/test.py
 COPY e2e/test-cross-bridge.py /app/test-cross-bridge.py
@@ -36,12 +42,7 @@ COPY e2e/test-extended.py /app/test-extended.py
 COPY e2e/print-test.pdf /app/print-test.pdf
 COPY e2e/entrypoint.sh /app/entrypoint.sh
 COPY e2e/web-ui-test.mjs /app/web-ui/web-ui-test.mjs
-COPY e2e/package.json /app/web-ui/package.json
 RUN chmod +x /app/entrypoint.sh
-
-# Install Playwright + Chromium browser
-RUN cd /app/web-ui && npm install --production && \
-    npx playwright install --with-deps chromium
 
 # Expose bridge ports (57212-57214 = cross-bridge, 57215-57217 = WMS multi-zone)
 EXPOSE 57212 57213 57214 57215 57216 57217
