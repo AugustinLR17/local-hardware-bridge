@@ -1253,15 +1253,17 @@ public class Server implements WebSocketServerInterface {
         // Apply the update: replaces the JAR and triggers a restart — requires ?confirm=true
         javalinServer.post("/system/update/apply", ctx -> {
             try {
-                if (!isConfirmed(ctx)) {
-                    ctx.status(400).contentType(ContentType.APPLICATION_JSON)
-                            .result("{\"error\": \"Confirmation required. Add ?confirm=true or X-Confirm: true header.\"}");
-                    return;
-                }
-
+                // Check for pending update BEFORE requiring confirmation — no point
+                // asking for confirm if there's nothing to apply.
                 java.nio.file.Path pending = updateService.consumePendingUpdate();
                 if (pending == null) {
                     ctx.status(409).json("{\"error\": \"No pending update to apply. Download first.\"}");
+                    return;
+                }
+
+                if (!isConfirmed(ctx)) {
+                    ctx.status(400).contentType(ContentType.APPLICATION_JSON)
+                            .result("{\"error\": \"Confirmation required. Add ?confirm=true or X-Confirm: true header.\"}");
                     return;
                 }
 

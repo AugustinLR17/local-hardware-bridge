@@ -272,7 +272,7 @@ def main():
 
         # --- 8. POST /system/update/rollback (should not crash) ---
         print("\n--- Rollback without backup ---")
-        s, b = request("POST", "/system/update/rollback")
+        s, b = request("POST", "/system/update/rollback?confirm=true")
         # Rollback starts an async process — it should return 200 (rolling back)
         # even if there's no backup (the rollback will fail internally but not crash)
         assert_true("rollback returns 200 or 409", s in (200, 409),
