@@ -9,8 +9,8 @@
     "bind": "127.0.0.1",
     "port": 57212,
     "authentication": {
-      "enabled": true,
-      "token": "lhb002"
+      "enabled": false,
+      "token": null
     },
     "tls": {
       "enabled": false,

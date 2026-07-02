@@ -29,7 +29,7 @@ the scripts below for manual builds or config-only updates.
 
 The CI package bundles the installer (no desktop icon), install/uninstall
 scripts, and the enterprise config template with:
-   - `authentication.enabled = true`, `token = "lhb002"`
+   - `authentication.enabled = false` (no token required)
    - `serial.enabled = false`
    - `printer.enabled = true`
    - `update.enabled = true`, `autoDownload = true`, `autoInstall = true`

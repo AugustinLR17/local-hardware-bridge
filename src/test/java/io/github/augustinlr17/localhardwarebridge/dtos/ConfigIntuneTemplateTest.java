@@ -16,7 +16,7 @@ import static org.junit.Assert.*;
  *
  * <p>This proves the template is structurally compatible with the Config DTO —
  * no missing required fields, no unknown properties that would break, and the
- * enterprise values (auth token, serial disabled, printer enabled, update
+ * enterprise values (auth disabled, serial disabled, printer enabled, update
  * disabled) are correctly mapped.
  *
  * <p>The test reads the template from the project root (Gradle's working
@@ -71,17 +71,15 @@ public class ConfigIntuneTemplateTest {
     }
 
     @Test
-    public void templateHasEnterpriseAuthSettings() throws Exception {
+    public void templateHasAuthDisabled() throws Exception {
         File template = findTemplateFile();
         assumeTemplateExists(template);
 
         String json = new String(Files.readAllBytes(template.toPath()), StandardCharsets.UTF_8);
         Config config = new ObjectMapper().readValue(json, Config.class);
 
-        assertTrue("Auth must be enabled in enterprise template",
+        assertFalse("Auth must be disabled in enterprise template",
             config.getServer().getAuthentication().isEnabled());
-        assertEquals("Auth token must be 'lhb002' in enterprise template",
-            "lhb002", config.getServer().getAuthentication().getToken());
     }
 
     @Test
@@ -155,8 +153,7 @@ public class ConfigIntuneTemplateTest {
         String json2 = mapper.writerWithDefaultPrettyPrinter().writeValueAsString(config1);
         Config config2 = mapper.readValue(json2, Config.class);
 
-        assertEquals("Auth token round-trip", "lhb002", config2.getServer().getAuthentication().getToken());
-        assertTrue("Auth enabled round-trip", config2.getServer().getAuthentication().isEnabled());
+        assertFalse("Auth disabled round-trip", config2.getServer().getAuthentication().isEnabled());
         assertFalse("Serial disabled round-trip", config2.getSerial().isEnabled());
         assertTrue("Printer enabled round-trip", config2.getPrinter().isEnabled());
         assertTrue("Update enabled round-trip", config2.getUpdate().isEnabled());

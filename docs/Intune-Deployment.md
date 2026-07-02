@@ -18,8 +18,8 @@ The deployment consists of three parts:
    and deploys an enterprise config.
 2. **Endpoint Protection profile** — a Microsoft Defender exclusion for the
    install directory (prevents false-positive quarantines).
-3. **Config template** — a `config.json` with enterprise defaults (auth token,
-   serial disabled, printer enabled, auto-update enabled).
+3. **Config template** — a `config.json` with enterprise defaults (no
+   auth, serial disabled, printer enabled, auto-update enabled).
 
 For updating the config on already-deployed machines (without redeploying the
 app), see [Updating the Configuration](#updating-the-configuration) below.
@@ -34,7 +34,7 @@ app), see [Updating the Configuration](#updating-the-configuration) below.
   (file: `Local-Hardware-Bridge-<version>.intunewin`).
   This is a ready-to-upload Win32 app package built in CI with:
   - No desktop icon (NSIS built with `NO_DESKTOP_ICON`)
-  - Enterprise config template (auto-update enabled, auth token `lhb002`)
+  - Enterprise config template (auto-update enabled, no auth required)
   - Install/uninstall PowerShell wrappers
 - **Alternatively**, build manually using `IntuneWinAppUtil.exe` (see
   [Manual .intunewin build](#manual-intunewin-build) below)
@@ -56,7 +56,7 @@ defaults are:
 ```json
 {
   "server": {
-    "authentication": { "enabled": true, "token": "lhb002" },
+    "authentication": { "enabled": false },
     "bind": "127.0.0.1",
     "port": 57212
   },
@@ -70,8 +70,7 @@ Key decisions:
 
 | Field                          | Default     | Notes                                      |
 |--------------------------------|-------------|--------------------------------------------|
-| `server.authentication.enabled`| `true`      | Requires a token for all API/WS calls      |
-| `server.authentication.token`  | `"lhb002"`  | **Change this** before deploying           |
+| `server.authentication.enabled`| `false`     | No token required; enable if you need auth |
 | `server.bind`                  | `127.0.0.1` | Localhost only. Use `0.0.0.0` for network  |
 | `serial.enabled`               | `false`     | Disabled unless you use serial devices     |
 | `printer.enabled`              | `true`      | Always on; idle if no printer is connected |
@@ -229,11 +228,10 @@ On a target machine after Intune sync:
    - Folder: `%LOCALAPPDATA%\Local Hardware Bridge\Local Hardware Bridge.exe`
 2. Check the config:
    - `%LOCALAPPDATA%\Local Hardware Bridge\config.json` should contain the
-     enterprise settings (token `lhb002`, serial disabled, etc.)
+     enterprise settings (auth disabled, serial disabled, etc.)
 3. Check the service:
    - Open `http://127.0.0.1:57212/system/health` in a browser
-   - The response should include `"status": "OK"` and `"version": "2.1.1"`
-   - With auth enabled, unauthenticated requests to other endpoints return 401
+   - The response should include `"status": "UP"` and the current version
 4. Check Defender:
    - Run `Get-MpPreference` in an elevated PowerShell
    - `ExclusionPath` should include the user's LHB install folder
@@ -296,11 +294,10 @@ rights. Use this if you deploy in **Device context** (SYSTEM account).
 
 ### Authentication errors (401)
 
-- The default template enables auth with token `lhb002`. All API/WS requests
-  must include `Authorization: Bearer lhb002` (or `?token=lhb002` for
-  WebSocket). The `/system/health` endpoint is exempt and always works.
-- If you changed the token in the template, make sure the Web UI and any
-  integrating web apps use the new token.
+- The default template ships with auth **disabled**. If you enabled
+  `server.authentication.enabled`, all API/WS requests must include
+  `Authorization: Bearer <token>` (or `?token=<token>` for WebSocket).
+  The `/system/health` endpoint is always exempt.
 
 ---
 
@@ -319,21 +316,29 @@ rights. Use this if you deploy in **Device context** (SYSTEM account).
 
 There are two scenarios for updating LHB on deployed machines:
 
-### Scenario 1 — New app version (e.g. v2.2.4 → v2.2.5)
+### Scenario 1 — New app version (e.g. v2.3.0 → v2.3.1)
 
-Use Intune **app supersedence** (remplacement):
+**Option A: Use the CI-built `.intunewin` (recommended)**
 
-1. Download the new `lhb.exe` from the GitHub release.
-2. Rebuild the `.intunewin` package with the new installer (same `install.ps1`,
-   `uninstall.ps1`, `config-template.json` — these are stable across versions).
-3. Create a **new** Win32 app in Intune for the new version.
-4. In the new app → **Supersedence** → select the old app.
-5. Intune will automatically:
+1. Download the new `Local-Hardware-Bridge-<version>.intunewin` from the
+   GitHub release.
+2. Create a **new** Win32 app in Intune and upload the new `.intunewin`.
+3. In the new app → **Supersedence** → select the old app.
+4. Intune will automatically:
    - Uninstall the old version (runs `uninstall.ps1` — removes the entire
      install directory including `config.json`).
    - Install the new version (runs `install.ps1` — deploys the new
      `config-template.json` as `config.json`).
-6. Assign to groups (use pilot groups first for progressive rollout).
+5. Assign to groups (use pilot groups first for progressive rollout).
+
+**Option B: Manual build**
+
+1. Download the new `Local-Hardware-Bridge-<version>.exe` from the GitHub
+   release.
+2. Rebuild the `.intunewin` package with the new installer (same `install.ps1`,
+   `uninstall.ps1`, `config-template.json` — these are stable across versions).
+   See [Step 2 — Option B](#option-b-build-manually) for instructions.
+3. Follow steps 2-5 from Option A above.
 
 > **Note:** Because `uninstall.ps1` removes the entire install directory, the
 > old `config.json` is lost. The new `install.ps1` deploys the fresh
@@ -423,7 +428,7 @@ needed, active print jobs and serial connections are not disrupted.
 2. Deploy via Option B (API live update) — no restart needed on any machine.
 3. Verify on one machine:
    ```
-   curl -H "Authorization: Bearer lhb002" http://127.0.0.1:57212/printer/mappings
+   curl http://127.0.0.1:57212/printer/mappings
    ```
 
 ---
@@ -438,4 +443,4 @@ needed, active print jobs and serial connections are not disrupted.
 | `config-template.json` | `packaging/intune/`            | No (stable, edit locally) |
 | `update-config.ps1`    | `packaging/intune/`            | No (stable)               |
 | `update-config-api.ps1`| `packaging/intune/`            | No (stable)               |
-| `install.intunewin`    | Built by admin (Windows)       | Rebuild after lhb.exe update |
+| `install.intunewin`    | GitHub Releases (CI-built) or manual build | Rebuild after lhb.exe update |

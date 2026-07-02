@@ -139,10 +139,8 @@ public class IntunePackagingTest {
         String json = readIntuneFile("config-template.json");
         Config config = new ObjectMapper().readValue(json, Config.class);
 
-        assertTrue("auth must be enabled in the template",
+        assertFalse("auth must be disabled in the template",
                 config.getServer().getAuthentication().isEnabled());
-        assertEquals("auth token must be lhb002",
-                "lhb002", config.getServer().getAuthentication().getToken());
 
         assertFalse("serial must be disabled in the template",
                 config.getSerial().isEnabled());
