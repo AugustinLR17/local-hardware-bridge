@@ -347,8 +347,8 @@ def main():
         # --- Section 6: Bridge restart recovery ---
         print("\n=== Section 6: Bridge restart recovery ===")
 
-        # Restart zone B
-        s, b = request(ZONES["B_SHIPPING"]["base_url"], "POST", "/system/restart.json",
+        # Restart zone B (requires ?confirm=true since the security fix)
+        s, b = request(ZONES["B_SHIPPING"]["base_url"], "POST", "/system/restart.json?confirm=true",
                        token=ZONES["B_SHIPPING"]["token"])
         assert_true("zone B restart accepted", s in (200, 202))
 
