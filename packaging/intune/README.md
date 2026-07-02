@@ -12,13 +12,15 @@ Microsoft Intune (Endpoint Manager) in a corporate environment.
 | `config-template.json`| Enterprise base config (auth, serial off, printer on, ...)  |
 
 These files are **stable across versions** — they are NOT attached to GitHub
-Releases. Download `lhb.exe` from the latest release and combine it with the
-scripts from this directory.
+Releases. Download the NSIS installer from the latest release and combine it
+with the scripts from this directory.
 
 ## Quick start
 
-1. Download `lhb.exe` from the [latest release](https://github.com/AugustinLR17/local-hardware-bridge/releases/latest).
-2. Place `lhb.exe`, `install.ps1`, `uninstall.ps1`, and `config-template.json`
+1. Download the NSIS installer from the
+   [latest release](https://github.com/AugustinLR17/local-hardware-bridge/releases/latest)
+   (either `lhb.exe` or `Local-Hardware-Bridge-<version>.exe` — both work).
+2. Place the installer, `install.ps1`, `uninstall.ps1`, and `config-template.json`
    in a single folder.
 3. Edit `config-template.json` to match your enterprise policy (token, port,
    etc.). The default template ships with:

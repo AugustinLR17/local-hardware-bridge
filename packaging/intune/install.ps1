@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Intune install wrapper for Local Hardware Bridge.
 .DESCRIPTION
@@ -9,7 +9,8 @@
        (best-effort; the primary exclusion should be an Intune Endpoint
        Protection profile, but this covers manual/admin installs).
 .PARAMETER InstallerPath
-    Path to lhb.exe. Defaults to the script's own directory.
+    Path to the NSIS installer. Auto-detected: looks for lhb.exe or
+    Local-Hardware-Bridge-<version>.exe in the script directory.
 .PARAMETER ConfigTemplate
     Path to config-template.json. Defaults to the script's own directory.
 .NOTES
@@ -20,8 +21,8 @@
 
 [CmdletBinding()]
 param(
-    [string]$InstallerPath = "$PSScriptRoot\lhb.exe",
-    [string]$ConfigTemplate = "$PSScriptRoot\config-template.json"
+    [string]$InstallerPath = "",
+    [string]$ConfigTemplate = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -29,7 +30,36 @@ $ProductName = "Local Hardware Bridge"
 $InstallRegKey = "HKCU:\SOFTWARE\$ProductName"
 
 # ---------------------------------------------------------------------------
-# 0. Logging helper
+# 0. Resolve script directory (PSScriptRoot can be empty in some contexts)
+# ---------------------------------------------------------------------------
+if ($PSScriptRoot) {
+    $ScriptDir = $PSScriptRoot
+} elseif ($MyInvocation.MyCommand.Path) {
+    $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+} else {
+    $ScriptDir = (Get-Location).Path
+}
+
+# Auto-detect the installer exe if not explicitly provided.
+# Accepts lhb.exe or Local-Hardware-Bridge-<version>.exe.
+if (-not $InstallerPath) {
+    $exactMatch = Join-Path $ScriptDir "lhb.exe"
+    if (Test-Path $exactMatch) {
+        $InstallerPath = $exactMatch
+    } else {
+        $patternMatch = Get-ChildItem -Path $ScriptDir -Filter "Local-Hardware-Bridge-*.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+        if ($patternMatch) {
+            $InstallerPath = $patternMatch.FullName
+        }
+    }
+}
+
+if (-not $ConfigTemplate) {
+    $ConfigTemplate = Join-Path $ScriptDir "config-template.json"
+}
+
+# ---------------------------------------------------------------------------
+# 0b. Logging helper
 # ---------------------------------------------------------------------------
 function Write-Log([string]$Msg) {
     $ts = Get-Date -Format "yyyy-MM-dd HH:mm:ss"

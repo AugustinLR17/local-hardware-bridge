@@ -81,7 +81,9 @@ On a Windows machine:
 
 1. Create a working folder, e.g. `C:\Intune\LHB\`.
 2. Place these files in the folder:
-   - `lhb.exe` (from the GitHub release)
+   - The NSIS installer from the GitHub release — either `lhb.exe` or
+     `Local-Hardware-Bridge-<version>.exe` (the install script auto-detects
+     both names; no need to rename)
    - `install.ps1` (from `packaging/intune/`)
    - `uninstall.ps1` (from `packaging/intune/`)
    - `config-template.json` (from `packaging/intune/`, edited in Step 1)

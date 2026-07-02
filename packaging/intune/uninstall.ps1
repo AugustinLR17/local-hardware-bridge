@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Intune uninstall wrapper for Local Hardware Bridge.
 .DESCRIPTION
