@@ -191,9 +191,13 @@ SectionEnd
 ; Section: Auto-start on boot (optional)
 ; --------------------------------
 Section "Start automatically when Windows starts" SEC_AUTOSTART
-  ; Point Run key at the windowless launcher. A single quoted path with no
-  ; arguments is parsed reliably by Windows and starts the app in the background.
+  ; Point Run key at the windowless launcher with the install dir as
+  ; working directory. Without this, Windows uses System32 as CWD and
+  ; the app cannot find config.json.
   WriteRegStr ${REG_ROOT} "${RUN_KEY}" "${PRODUCT_NAME}" '"$INSTDIR\${LAUNCHER_EXE}"'
+  ; The Run key does not support a separate WorkingDir value, so the
+  ; app's AppHome.anchor() resolves user.dir from the JAR location
+  ; (jpackage layout: <install>/app/<jar>) to fix this at the JVM level.
 SectionEnd
 
 ; --------------------------------

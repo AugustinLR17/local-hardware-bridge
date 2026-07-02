@@ -26,6 +26,12 @@ public final class AppHome {
      * Set {@code user.dir} to the directory containing the running JAR.
      * No-op when running from exploded classes (development / IDE), which keeps
      * the project directory as the working directory.
+     *
+     * <p>When packaged with jpackage, the JAR lives in an {@code app/}
+     * sub-directory of the install folder. The config, logs, and TLS
+     * certificates sit in the install folder (parent of {@code app/}),
+     * so we walk up one level when the JAR is inside an {@code app/}
+     * directory.
      */
     public static void anchor() {
         try {
@@ -39,6 +45,15 @@ public final class AppHome {
             }
             File appDir = codeSource.getParentFile();
             if (appDir != null && appDir.isDirectory()) {
+                // jpackage layout: <install_dir>/app/<jar> — config.json is in <install_dir>
+                if ("app".equals(appDir.getName())) {
+                    File installDir = appDir.getParentFile();
+                    if (installDir != null && installDir.isDirectory()) {
+                        System.setProperty("user.dir", installDir.getAbsolutePath());
+                        return;
+                    }
+                }
+                // Flat layout (shadow JAR, manual java -jar)
                 System.setProperty("user.dir", appDir.getAbsolutePath());
             }
         } catch (Exception e) {

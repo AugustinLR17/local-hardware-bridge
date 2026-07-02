@@ -141,24 +141,33 @@ public class Server implements WebSocketServerInterface {
             }
         });
 
-        // Add WebSocket Auth
+        // Add WebSocket Auth — reject the HTTP upgrade request before the WS
+        // connection is established. Using wsBeforeUpgrade (HTTP context) instead
+        // of wsBefore (WS context) because closeSession() in wsBefore leaves the
+        // connection briefly open, allowing messages to slip through.
+        javalinServer.wsBeforeUpgrade(ctx -> {
+            Config.Authentication currentAuth = configService.getConfig().getServer().getAuthentication();
+            if (currentAuth.isEnabled()) {
+                String expectedToken = currentAuth.getToken();
+                if (expectedToken != null && !expectedToken.isBlank()) {
+                    String providedToken = ctx.queryParam("token");
+                    // Also accept Bearer token from the Authorization header
+                    String bearer = extractBearerToken(ctx.header("Authorization"));
+                    if (constantTimeEquals(providedToken, expectedToken) || constantTimeEquals(bearer, expectedToken)) {
+                        return;
+                    }
+                }
+                ctx.status(401).result("WebSocket authentication required");
+            }
+        });
+
+        // Add WebSocket config (message size limits, pings) — runs after auth passes
         javalinServer.wsBefore(ctx -> {
             ctx.onConnect(wsConnectContext -> {
                 wsConnectContext.session.getPolicy().setMaxBinaryMessageSize(-1);
                 wsConnectContext.session.getPolicy().setMaxTextMessageSize(-1);
 
                 wsConnectContext.enableAutomaticPings(5, TimeUnit.SECONDS);
-
-                Config.Authentication currentAuth = configService.getConfig().getServer().getAuthentication();
-                if (currentAuth.isEnabled()) {
-                    String expectedToken = currentAuth.getToken();
-                    String providedToken = wsConnectContext.queryParam("token");
-                    if (expectedToken != null && !expectedToken.isBlank() && constantTimeEquals(providedToken, expectedToken)) {
-                        return;
-                    }
-
-                    wsConnectContext.closeSession(1003, "Invalid token");
-                }
             });
         });
 
