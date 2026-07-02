@@ -96,6 +96,31 @@ def main():
     result = json.loads(body)
     assert_eq("print success", result.get("success"), True)
 
+    # 6c. Print via file_content (base64) WITHOUT a url field.
+    # This tests the content-based file-type detection: the bridge must detect
+    # the PDF from the %PDF magic bytes in the decoded content, not from a URL
+    # extension. Regression test for "Unknown file type: null" bug.
+    with open("/app/print-test.pdf", "rb") as f:
+        pdf_bytes = f.read()
+    pdf_b64 = base64.b64encode(pdf_bytes).decode("ascii")
+    pdf_doc_no_url = {"type": "TEST", "file_content": pdf_b64, "id": "e2e-pdf-no-url"}
+    status, body = request("POST", "/printer", pdf_doc_no_url)
+    assert_eq("pdf no-url print status", status, 200)
+    result = json.loads(body)
+    assert_eq("pdf no-url print success", result.get("success"), True)
+
+    # 6d. Same PDF but with a url that has no extension (content sniffing fallback)
+    pdf_doc_url_no_ext = {
+        "type": "TEST",
+        "file_content": pdf_b64,
+        "url": "http://example.com/document",
+        "id": "e2e-pdf-url-noext",
+    }
+    status, body = request("POST", "/printer", pdf_doc_url_no_ext)
+    assert_eq("pdf url-noext print status", status, 200)
+    result = json.loads(body)
+    assert_eq("pdf url-noext print success", result.get("success"), True)
+
     # 6b. Path-traversal probe: a malicious suggested filename must not let an inline
     # document escape the downloads directory. We point the "url" (used only as a suggested
     # filename when file_content is present) at ../../../../tmp/lhb_pwn.pdf and assert the

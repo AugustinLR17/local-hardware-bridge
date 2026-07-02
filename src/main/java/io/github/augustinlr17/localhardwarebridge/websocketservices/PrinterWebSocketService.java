@@ -168,21 +168,104 @@ public class PrinterWebSocketService implements WebSocketServiceInterface {
     }
 
     /**
-     * Return if PrintDocument is image
+     * Decode the first bytes of {@code file_content} (Base64) to sniff the file signature.
+     *
+     * @return the decoded leading bytes (up to 16), or {@code null} if file_content is
+     *         absent or cannot be decoded.
      */
-    private boolean isImage(PrintDocument printDocument) {
-        String filename = urlFilename(printDocument);
-
-        return filename.toLowerCase().matches("^.*\\.(jpg|jpeg|png|gif)$");
+    private byte[] sniffFileContent(PrintDocument printDocument) {
+        String b64 = printDocument.getFileContent();
+        if (b64 == null || b64.isEmpty()) {
+            return null;
+        }
+        try {
+            byte[] decoded = Base64.decodeBase64(b64);
+            int len = Math.min(decoded.length, 16);
+            byte[] head = new byte[len];
+            System.arraycopy(decoded, 0, head, 0, len);
+            return head;
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     /**
-     * Return if PrintDocument is PDF
+     * Check if the decoded {@code file_content} starts with a known image magic signature.
+     * Supports PNG, JPEG, and GIF.
+     */
+    private boolean isImageByContent(PrintDocument printDocument) {
+        byte[] head = sniffFileContent(printDocument);
+        if (head == null || head.length < 3) {
+            return false;
+        }
+        // PNG: 89 50 4E 47
+        if (head.length >= 4 && (head[0] & 0xFF) == 0x89 && head[1] == 'P' && head[2] == 'N' && head[3] == 'G') {
+            return true;
+        }
+        // JPEG: FF D8 FF
+        if (head.length >= 3 && (head[0] & 0xFF) == 0xFF && (head[1] & 0xFF) == 0xD8 && (head[2] & 0xFF) == 0xFF) {
+            return true;
+        }
+        // GIF: 47 49 46 38
+        if (head.length >= 4 && head[0] == 'G' && head[1] == 'I' && head[2] == 'F' && head[3] == '8') {
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Check if the decoded {@code file_content} starts with the PDF magic signature.
+     */
+    private boolean isPDFByContent(PrintDocument printDocument) {
+        byte[] head = sniffFileContent(printDocument);
+        if (head == null || head.length < 4) {
+            return false;
+        }
+        // PDF: 25 50 44 46 (%PDF)
+        return head[0] == '%' && head[1] == 'P' && head[2] == 'D' && head[3] == 'F';
+    }
+
+    /**
+     * Return if PrintDocument is image.
+     *
+     * Detection order:
+     * <ol>
+     *   <li>URL path extension (as before, query/fragment-safe)</li>
+     *   <li>If URL has no usable extension but {@code file_content} is present,
+     *       sniff the decoded magic bytes.</li>
+     * </ol>
+     */
+    private boolean isImage(PrintDocument printDocument) {
+        String filename = urlFilename(printDocument);
+        String lowerFilename = filename.toLowerCase();
+
+        if (lowerFilename.matches("^.*\\.(jpg|jpeg|png|gif)$")) {
+            return true;
+        }
+        // Only fall back to content sniffing if the URL has no usable extension.
+        if (lowerFilename.matches("^.*\\.[a-z0-9]{1,10}$")) {
+            return false;
+        }
+        return isImageByContent(printDocument);
+    }
+
+    /**
+     * Return if PrintDocument is PDF.
+     *
+     * Same dual detection strategy as {@link #isImage}.
      */
     private boolean isPDF(PrintDocument printDocument) {
         String filename = urlFilename(printDocument);
+        String lowerFilename = filename.toLowerCase();
 
-        return filename.toLowerCase().matches("^.*\\.(pdf)$");
+        if (lowerFilename.matches("^.*\\.(pdf)$")) {
+            return true;
+        }
+        // Only fall back to content sniffing if the URL has no usable extension.
+        if (lowerFilename.matches("^.*\\.[a-z0-9]{1,10}$")) {
+            return false;
+        }
+        return isPDFByContent(printDocument);
     }
 
     // --- Printer capability detection ---

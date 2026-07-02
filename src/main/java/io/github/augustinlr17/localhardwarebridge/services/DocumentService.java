@@ -60,6 +60,16 @@ public class DocumentService {
         if (printDocument.getFileContent() != null) {
             // For inline content, getUrl() is only a suggested filename; strip any directories.
             rawName = FilenameUtils.getName(printDocument.getUrl());
+            // If the URL had no usable filename (or was null), infer an extension from
+            // the decoded content's magic bytes so downstream libraries can identify it.
+            if (rawName == null || rawName.isEmpty() || !rawName.contains(".")) {
+                String ext = sniffExtension(printDocument.getFileContent());
+                if (rawName == null || rawName.isEmpty()) {
+                    rawName = printDocument.getUuid().toString() + ext;
+                } else {
+                    rawName = rawName + ext;
+                }
+            }
         } else {
             URL url = new URL(printDocument.getUrl());
             rawName = FilenameUtils.getName(url.getPath());
@@ -152,6 +162,45 @@ public class DocumentService {
 
         long timeFinish = System.currentTimeMillis();
         log.info("File {} downloaded in {} ms", outputFile.getName(), timeFinish - timeStart);
+    }
+
+    /**
+     * Sniffs the file extension from the leading bytes of Base64-encoded content.
+     *
+     * @param base64Content the Base64-encoded file content
+     * @return a file extension including the dot (e.g. {@code ".pdf"}, {@code ".png"}),
+     *         or {@code ""} if the content is absent or the signature is unrecognized.
+     */
+    static String sniffExtension(String base64Content) {
+        if (base64Content == null || base64Content.isEmpty()) {
+            return "";
+        }
+        try {
+            byte[] decoded = Base64.getDecoder().decode(base64Content);
+            int len = Math.min(decoded.length, 8);
+            if (len < 4) {
+                return "";
+            }
+            // PDF: %PDF
+            if (decoded[0] == '%' && decoded[1] == 'P' && decoded[2] == 'D' && decoded[3] == 'F') {
+                return ".pdf";
+            }
+            // PNG: 89 50 4E 47
+            if ((decoded[0] & 0xFF) == 0x89 && decoded[1] == 'P' && decoded[2] == 'N' && decoded[3] == 'G') {
+                return ".png";
+            }
+            // JPEG: FF D8 FF
+            if ((decoded[0] & 0xFF) == 0xFF && (decoded[1] & 0xFF) == 0xD8 && (decoded[2] & 0xFF) == 0xFF) {
+                return ".jpg";
+            }
+            // GIF: 47 49 46 38
+            if (decoded[0] == 'G' && decoded[1] == 'I' && decoded[2] == 'F' && decoded[3] == '8') {
+                return ".gif";
+            }
+        } catch (Exception e) {
+            // ignore — return empty extension
+        }
+        return "";
     }
 
     /**

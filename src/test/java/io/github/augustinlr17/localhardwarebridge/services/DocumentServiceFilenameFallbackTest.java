@@ -8,6 +8,7 @@ import org.junit.Test;
 import java.io.File;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.util.Base64;
 
 import static org.junit.Assert.*;
 
@@ -84,5 +85,78 @@ public class DocumentServiceFilenameFallbackTest {
         assertTrue(out.getCanonicalPath().startsWith(basePath));
         String name = out.getName();
         assertFalse("filename must not be empty when url is null", name.isEmpty());
+    }
+
+    // --- sniffExtension tests ---
+
+    @Test
+    public void sniffExtensionDetectsPdf() {
+        byte[] pdf = "%PDF-1.4\n".getBytes(StandardCharsets.ISO_8859_1);
+        assertEquals(".pdf", DocumentService.sniffExtension(Base64.getEncoder().encodeToString(pdf)));
+    }
+
+    @Test
+    public void sniffExtensionDetectsPng() {
+        byte[] png = new byte[]{(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A};
+        assertEquals(".png", DocumentService.sniffExtension(Base64.getEncoder().encodeToString(png)));
+    }
+
+    @Test
+    public void sniffExtensionDetectsJpeg() {
+        byte[] jpeg = new byte[]{(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, (byte) 0xE0};
+        assertEquals(".jpg", DocumentService.sniffExtension(Base64.getEncoder().encodeToString(jpeg)));
+    }
+
+    @Test
+    public void sniffExtensionDetectsGif() {
+        byte[] gif = "GIF87a".getBytes(StandardCharsets.US_ASCII);
+        assertEquals(".gif", DocumentService.sniffExtension(Base64.getEncoder().encodeToString(gif)));
+    }
+
+    @Test
+    public void sniffExtensionReturnsEmptyForUnknownContent() {
+        byte[] random = "Hello World".getBytes(StandardCharsets.UTF_8);
+        assertEquals("", DocumentService.sniffExtension(Base64.getEncoder().encodeToString(random)));
+    }
+
+    @Test
+    public void sniffExtensionReturnsEmptyForNullOrEmptyInput() {
+        assertEquals("", DocumentService.sniffExtension(null));
+        assertEquals("", DocumentService.sniffExtension(""));
+    }
+
+    @Test
+    public void sniffExtensionReturnsEmptyForInvalidBase64() {
+        assertEquals("", DocumentService.sniffExtension("!!!notbase64!!!"));
+    }
+
+    // --- Extension added to inline content filename ---
+
+    @Test
+    public void inlinePdfContentGetsPdfExtension() throws Throwable {
+        byte[] pdf = "%PDF-1.4 test".getBytes(StandardCharsets.ISO_8859_1);
+        String b64 = Base64.getEncoder().encodeToString(pdf);
+        File out = invokeGetOutputFile(doc("{\"file_content\":\"" + b64 + "\"}"));
+        assertNotNull(out);
+        assertTrue("filename should have .pdf extension: " + out.getName(), out.getName().endsWith(".pdf"));
+    }
+
+    @Test
+    public void inlinePngContentGetsPngExtension() throws Throwable {
+        byte[] png = new byte[]{(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A, 0, 0, 0, 0};
+        String b64 = Base64.getEncoder().encodeToString(png);
+        File out = invokeGetOutputFile(doc("{\"file_content\":\"" + b64 + "\"}"));
+        assertNotNull(out);
+        assertTrue("filename should have .png extension: " + out.getName(), out.getName().endsWith(".png"));
+    }
+
+    @Test
+    public void inlineContentWithUrlExtensionKeepsUrlExtension() throws Throwable {
+        // URL says .pdf — the URL extension should be used, not content sniffing
+        byte[] png = new byte[]{(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A};
+        String b64 = Base64.getEncoder().encodeToString(png);
+        File out = invokeGetOutputFile(doc("{\"file_content\":\"" + b64 + "\",\"url\":\"http://x/doc.pdf\"}"));
+        assertNotNull(out);
+        assertTrue("filename should have .pdf from URL: " + out.getName(), out.getName().endsWith(".pdf"));
     }
 }

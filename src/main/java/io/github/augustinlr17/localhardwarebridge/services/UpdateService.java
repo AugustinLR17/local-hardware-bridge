@@ -6,6 +6,7 @@ import io.github.augustinlr17.localhardwarebridge.Constants;
 import io.github.augustinlr17.localhardwarebridge.dtos.Config;
 import io.github.augustinlr17.localhardwarebridge.dtos.ReleaseInfo;
 import io.github.augustinlr17.localhardwarebridge.dtos.UpdateStatusDTO;
+import io.github.augustinlr17.localhardwarebridge.utils.SystemdServiceGenerator;
 import io.github.augustinlr17.localhardwarebridge.utils.VersionComparator;
 import lombok.Getter;
 import lombok.extern.log4j.Log4j2;
@@ -259,6 +260,43 @@ public class UpdateService {
         }
 
         Path currentJar = getCurrentJarPath();
+
+        // If running from a read-only location (e.g. AppImage mount) or from a
+        // different JAR than the systemd service, try to update the systemd
+        // service JAR at /opt/local-hardware-bridge/ instead.
+        Path systemdJar = Path.of(SystemdServiceGenerator.getInstalledJarPath());
+        boolean systemdInstalled = SystemdServiceGenerator.isServiceInstalled();
+
+        if (systemdInstalled && Files.isRegularFile(systemdJar)) {
+            // If the current JAR is the systemd JAR, replace it directly.
+            // Otherwise (AppImage, download folder, etc.), update the systemd JAR
+            // so the service picks up the new version on restart.
+            Path target = systemdJar.equals(currentJar) ? currentJar : systemdJar;
+            Path backup = target.resolveSibling(target.getFileName() + ".bak");
+            log.info("Applying update: replacing {} with {} (backup: {})", target, newJar, backup);
+
+            Files.copy(target, backup, StandardCopyOption.REPLACE_EXISTING);
+            try {
+                Files.move(newJar, target, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            } catch (AtomicMoveNotSupportedException e) {
+                Files.move(newJar, target, StandardCopyOption.REPLACE_EXISTING);
+            }
+
+            // If the current JAR is writable and different from the systemd JAR,
+            // also update it so the running instance is consistent.
+            if (currentJar != null && !currentJar.equals(systemdJar) && Files.isWritable(currentJar)) {
+                try {
+                    Files.copy(target, currentJar, StandardCopyOption.REPLACE_EXISTING);
+                } catch (Exception e) {
+                    log.warn("Could not sync update to current JAR at {}: {}", currentJar, e.getMessage());
+                }
+            }
+
+            log.info("Update applied successfully. Old JAR backed up at {}", backup);
+            return backup;
+        }
+
+        // Fallback: no systemd service installed, just replace the current JAR
         if (currentJar == null || !Files.isRegularFile(currentJar)) {
             throw new IOException("Cannot determine current JAR path for replacement");
         }
@@ -266,10 +304,7 @@ public class UpdateService {
         Path backup = currentJar.resolveSibling(currentJar.getFileName() + ".bak");
         log.info("Applying update: replacing {} with {} (backup: {})", currentJar, newJar, backup);
 
-        // Back up the current JAR
         Files.copy(currentJar, backup, StandardCopyOption.REPLACE_EXISTING);
-
-        // Replace the current JAR with the new one
         try {
             Files.move(newJar, currentJar, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
         } catch (AtomicMoveNotSupportedException e) {
@@ -286,6 +321,24 @@ public class UpdateService {
      * @return true if rollback succeeded
      */
     public boolean rollback() throws IOException {
+        // If systemd service is installed, rollback the systemd JAR.
+        Path systemdJar = Path.of(SystemdServiceGenerator.getInstalledJarPath());
+        if (SystemdServiceGenerator.isServiceInstalled() && Files.isRegularFile(systemdJar)) {
+            Path backup = systemdJar.resolveSibling(systemdJar.getFileName() + ".bak");
+            if (!Files.isRegularFile(backup)) {
+                log.warn("No backup JAR found at {}", backup);
+                return false;
+            }
+            try {
+                Files.move(backup, systemdJar, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
+            } catch (AtomicMoveNotSupportedException e) {
+                Files.move(backup, systemdJar, StandardCopyOption.REPLACE_EXISTING);
+            }
+            log.info("Rolled back to previous JAR from {}", backup);
+            return true;
+        }
+
+        // Fallback: rollback the current JAR
         Path currentJar = getCurrentJarPath();
         if (currentJar == null) {
             return false;

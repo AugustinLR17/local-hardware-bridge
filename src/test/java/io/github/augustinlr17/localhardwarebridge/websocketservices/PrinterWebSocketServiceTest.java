@@ -6,6 +6,7 @@ import org.junit.BeforeClass;
 import org.junit.Test;
 
 import java.lang.reflect.Method;
+import java.util.Base64;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -176,5 +177,93 @@ public class PrinterWebSocketServiceTest {
     public void urlFilenameHandlesNullUrl() throws Exception {
         PrintDocument nullUrl = new ObjectMapper().readValue("{}", PrintDocument.class);
         assertEquals("", (String) urlFilename.invoke(service, nullUrl));
+    }
+
+    // --- Content-based detection (file_content without URL or with URL without extension) ---
+
+    /** Minimal valid PDF: %PDF-1.4 header. */
+    private static final byte[] PDF_MAGIC = "%PDF-1.4\n%\u00e2\u00e3\u00cf\u00d3\n".getBytes(java.nio.charset.StandardCharsets.ISO_8859_1);
+    /** Minimal PNG signature: 89 50 4E 47 0D 0A 1A 0A. */
+    private static final byte[] PNG_MAGIC = new byte[]{(byte) 0x89, 'P', 'N', 'G', 0x0D, 0x0A, 0x1A, 0x0A};
+    /** Minimal JPEG SOI marker: FF D8 FF E0. */
+    private static final byte[] JPEG_MAGIC = new byte[]{(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, (byte) 0xE0};
+    /** GIF87a header. */
+    private static final byte[] GIF_MAGIC = "GIF87a".getBytes(java.nio.charset.StandardCharsets.US_ASCII);
+
+    private static String b64(byte[] data) {
+        return Base64.getEncoder().encodeToString(data);
+    }
+
+    private PrintDocument docWithContent(String fileContent) throws Exception {
+        String json = new ObjectMapper().writeValueAsString(new java.util.HashMap<String, String>() {{
+            put("file_content", fileContent);
+        }});
+        return new ObjectMapper().readValue(json, PrintDocument.class);
+    }
+
+    private PrintDocument docWithContentAndUrl(String fileContent, String url) throws Exception {
+        String json = new ObjectMapper().writeValueAsString(new java.util.HashMap<String, String>() {{
+            put("file_content", fileContent);
+            put("url", url);
+        }});
+        return new ObjectMapper().readValue(json, PrintDocument.class);
+    }
+
+    @Test
+    public void pdfByContentWithoutUrl() throws Exception {
+        assertTrue((Boolean) isPDF.invoke(service, docWithContent(b64(PDF_MAGIC))));
+    }
+
+    @Test
+    public void pdfByContentWithUrlNoExtension() throws Exception {
+        // URL has no .pdf extension; content should be sniffed.
+        assertTrue((Boolean) isPDF.invoke(service, docWithContentAndUrl(b64(PDF_MAGIC), "http://x/document")));
+    }
+
+    @Test
+    public void pngByContentWithoutUrl() throws Exception {
+        assertTrue((Boolean) isImage.invoke(service, docWithContent(b64(PNG_MAGIC))));
+    }
+
+    @Test
+    public void jpegByContentWithoutUrl() throws Exception {
+        assertTrue((Boolean) isImage.invoke(service, docWithContent(b64(JPEG_MAGIC))));
+    }
+
+    @Test
+    public void gifByContentWithoutUrl() throws Exception {
+        assertTrue((Boolean) isImage.invoke(service, docWithContent(b64(GIF_MAGIC))));
+    }
+
+    @Test
+    public void imageByContentWithUrlNoExtension() throws Exception {
+        assertTrue((Boolean) isImage.invoke(service, docWithContentAndUrl(b64(PNG_MAGIC), "http://x/photo")));
+    }
+
+    @Test
+    public void nonImageNonPdfContentIsNotDetected() throws Exception {
+        // Random bytes that don't match any known magic
+        byte[] random = "Hello World this is not a file".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        assertFalse((Boolean) isImage.invoke(service, docWithContent(b64(random))));
+        assertFalse((Boolean) isPDF.invoke(service, docWithContent(b64(random))));
+    }
+
+    @Test
+    public void urlExtensionStillPrioritizedOverContent() throws Exception {
+        // URL says .pdf but content is PNG — URL wins (security: query/fragment already stripped)
+        assertTrue((Boolean) isPDF.invoke(service, docWithContentAndUrl(b64(PNG_MAGIC), "http://x/file.pdf")));
+        assertFalse((Boolean) isImage.invoke(service, docWithContentAndUrl(b64(PNG_MAGIC), "http://x/file.pdf")));
+    }
+
+    @Test
+    public void emptyFileContentIsNotDetected() throws Exception {
+        assertFalse((Boolean) isPDF.invoke(service, docWithContent("")));
+        assertFalse((Boolean) isImage.invoke(service, docWithContent("")));
+    }
+
+    @Test
+    public void invalidBase64ContentIsNotDetected() throws Exception {
+        assertFalse((Boolean) isPDF.invoke(service, docWithContent("!!!notbase64!!!")));
+        assertFalse((Boolean) isImage.invoke(service, docWithContent("!!!notbase64!!!")));
     }
 }
