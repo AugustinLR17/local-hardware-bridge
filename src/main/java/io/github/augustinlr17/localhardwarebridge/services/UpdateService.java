@@ -301,6 +301,25 @@ public class UpdateService {
             throw new IOException("Cannot determine current JAR path for replacement");
         }
 
+        // Check if the current JAR is writable. On Linux AppImage, the JAR lives
+        // inside a read-only FUSE mount (/tmp/.mount_*/.../*.jar) and cannot be
+        // replaced. In that case, fail with a clear message instead of a
+        // confusing FileSystemException.
+        if (!Files.isWritable(currentJar)) {
+            String appImage = System.getenv("APPIMAGE");
+            if (appImage != null && !appImage.isEmpty()) {
+                throw new IOException(
+                    "Auto-update is not supported inside an AppImage (read-only mount). "
+                    + "Download the new AppImage from GitHub: "
+                    + "https://github.com/AugustinLR17/local-hardware-bridge/releases/latest"
+                );
+            }
+            throw new IOException(
+                "Cannot update: current JAR location is read-only (" + currentJar + "). "
+                + "Please update manually."
+            );
+        }
+
         Path backup = currentJar.resolveSibling(currentJar.getFileName() + ".bak");
         log.info("Applying update: replacing {} with {} (backup: {})", currentJar, newJar, backup);
 
