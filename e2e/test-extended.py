@@ -329,7 +329,7 @@ def main():
     assert_eq("enable auth for basic test", s, 200)
 
     # Restart so the auth change takes effect (token required — auth is now live)
-    s, b, h = request("POST", "/system/restart.json", headers={"Authorization": "Bearer basictoken123"})
+    s, b, h = request("POST", "/system/restart.json?confirm=true", headers={"Authorization": "Bearer basictoken123"})
     assert_true("restart for auth accepted", s in (200, 202), f"got {s}")
     time.sleep(2)
 
@@ -374,7 +374,7 @@ def main():
     request("PUT", "/config.json", body=config, headers={"Authorization": "Bearer basictoken123"})
 
     # Restart to apply the auth disable
-    s, b, h = request("POST", "/system/restart.json", headers={"Authorization": "Bearer basictoken123"})
+    s, b, h = request("POST", "/system/restart.json?confirm=true", headers={"Authorization": "Bearer basictoken123"})
     assert_true("restart to restore auth accepted", s in (200, 202, 409), f"got {s}")
 
     # Wait for restart
@@ -400,14 +400,14 @@ def main():
     # NOTE: This test causes a server restart. It must be near the end
     # so subsequent tests don't hit a restarting server.
     print("\n--- Restart guard ---")
-    s, b, h = request("POST", "/system/restart.json")
+    s, b, h = request("POST", "/system/restart.json?confirm=true")
     assert_true("first restart accepted", s in (200, 202), f"got {s}")
     # Immediately send a second restart. Two valid outcomes:
     #   409 — server still up, restarting flag set ("already restarting")
     #   -1  — server already stopped by the restart thread (connection refused)
     # Both prove a restart is in progress; 409 is not guaranteed because
     # stop() can shut down Jetty before this request reaches the server.
-    s, b, h = request("POST", "/system/restart.json")
+    s, b, h = request("POST", "/system/restart.json?confirm=true")
     assert_true("second restart rejected (409 or connection refused)", s in (409, -1), f"got {s}")
     if s == 409:
         assert_in("already restarting message", "already restarting", b)
