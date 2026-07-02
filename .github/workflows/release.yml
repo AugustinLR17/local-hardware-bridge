@@ -240,30 +240,8 @@ jobs:
         shell: powershell
 
       - name: Download IntuneWinAppUtil
-        run: |
-          # Retry with backoff — GitHub sometimes drops connections on CI runners.
-          $urls = @(
-            "https://github.com/microsoft/Microsoft-Win32-Content-Prep-Tool/releases/latest/download/IntuneWinAppUtil.exe",
-            "https://github.com/microsoft/Microsoft-Win32-Content-Prep-Tool/releases/download/v1.8.4/IntuneWinAppUtil.exe"
-          )
-          $downloaded = $false
-          foreach ($url in $urls) {
-            for ($i = 1; $i -le 3; $i++) {
-              Write-Host "Attempt $i — $url"
-              try {
-                Invoke-WebRequest -Uri $url -OutFile "IntuneWinAppUtil.exe" -UseBasicParsing
-                $downloaded = $true
-                break
-              } catch {
-                Write-Host "Failed: $($_.Exception.Message)"
-                Start-Sleep -Seconds 5
-              }
-            }
-            if ($downloaded) { break }
-          }
-          if (-not $downloaded) { throw "Failed to download IntuneWinAppUtil.exe after all retries" }
-          Write-Host "Downloaded IntuneWinAppUtil.exe"
-        shell: powershell
+        run: powershell -ExecutionPolicy Bypass -File packaging/intune/download-intunewinutil.ps1
+        shell: pwsh
 
       - name: Build .intunewin package
         run: |
