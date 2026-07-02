@@ -26,8 +26,8 @@ The deployment consists of three parts:
 ## Prerequisites
 
 - **Intune license** (Microsoft 365 E3/E5 or Intune Plan 1)
-- **IntuneWinAppUtil.exe** — download from
-  [GitHub: microsoftgraph/powershell-intune-app-wrapping-tool](https://github.com/microsoftgraph/powershell-intune-app-wrapping-tool/releases)
+- **IntuneWinAppUtil.exe** — download directly from
+  [GitHub: Microsoft/Win32-Content-Prep-Tool](https://github.com/microsoft/Microsoft-Win32-Content-Prep-Tool/blob/master/IntuneWinAppUtil.exe)
   (Windows-only utility, run on a Windows machine)
 - **`lhb.exe`** — download from the
   [latest GitHub release](https://github.com/AugustinLR17/local-hardware-bridge/releases/latest)
