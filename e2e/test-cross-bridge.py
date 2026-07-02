@@ -337,6 +337,8 @@ def main():
             bridges["B_SPAIN"]["base_url"], "GET", "/config.json",
             token=bridges["B_SPAIN"]["token"])
         config = json.loads(config_body)
+        # Restore the real token (GET /config.json masks it as "***")
+        config["server"]["authentication"]["token"] = bridges["B_SPAIN"]["token"]
         config["security"]["endpoints"]["/printer"] = {
             "enabled": True, "password": "print-pin-es"
         }
