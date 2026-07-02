@@ -429,6 +429,34 @@
             word-break: break-all;
         }
         .lhb-monitor-empty { color: var(--lhb-text-dim); }
+
+        /* Test print modal */
+        .lhb-modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); z-index: 9998;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .lhb-modal {
+            background: var(--lhb-bg-card); border-radius: 14px; padding: 0;
+            max-width: 520px; width: 90%; max-height: 85vh; overflow: auto;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3); z-index: 9999;
+        }
+        .lhb-modal-header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 1rem 1.25rem; border-bottom: 1px solid var(--lhb-border);
+        }
+        .lhb-modal-title { font-weight: 700; font-size: 1rem; }
+        .lhb-modal-close { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--lhb-text-dim); padding: 0; line-height: 1; }
+        .lhb-modal-body { padding: 1.25rem; }
+        .lhb-modal-footer { padding: 1rem 1.25rem; border-top: 1px solid var(--lhb-border); display: flex; justify-content: flex-end; gap: 0.5rem; }
+        .lhb-format-tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+        .lhb-format-tab {
+            flex: 1; padding: 0.6rem; text-align: center; cursor: pointer;
+            border: 2px solid var(--lhb-border); border-radius: 8px;
+            font-size: 0.85rem; font-weight: 600; transition: all 0.15s;
+            background: transparent; color: var(--lhb-text);
+        }
+        .lhb-format-tab.active { border-color: var(--lhb-accent); background: var(--lhb-accent-bg); color: var(--lhb-accent); }
     </style>
 </head>
 <body>
@@ -1060,6 +1088,52 @@
             </div>
         </div>
     </div>
+
+    <!-- Test Print Modal -->
+    <div class="lhb-modal-overlay" v-if="testPrintModal.show" @click.self="closeTestPrint">
+        <div class="lhb-modal">
+            <div class="lhb-modal-header">
+                <span class="lhb-modal-title">Test Print &mdash; {{ testPrintModal.printerName }}</span>
+                <button class="lhb-modal-close" @click="closeTestPrint">&times;</button>
+            </div>
+            <div class="lhb-modal-body">
+                <div class="lhb-format-tabs">
+                    <button class="lhb-format-tab" :class="{active: testPrintModal.format === 'txt'}" @click="testPrintModal.format = 'txt'">Text</button>
+                    <button class="lhb-format-tab" :class="{active: testPrintModal.format === 'image'}" @click="testPrintModal.format = 'image'">Image</button>
+                    <button class="lhb-format-tab" :class="{active: testPrintModal.format === 'pdf'}" @click="testPrintModal.format = 'pdf'">PDF</button>
+                </div>
+
+                <div v-if="testPrintModal.format === 'txt'">
+                    <label class="lhb-form-label" for="test-txt">Raw text content</label>
+                    <textarea id="test-txt" class="lhb-form-control" v-model="testPrintModal.txtContent" rows="6"
+                              style="font-family:'SF Mono','Fira Code',monospace;font-size:0.82rem;resize:vertical"></textarea>
+                    <p style="font-size:0.78rem;color:var(--lhb-text-dim);margin-top:0.5rem">
+                        Sent as raw ESC/POS text. Best for thermal receipt printers.
+                    </p>
+                </div>
+
+                <div v-if="testPrintModal.format === 'image'">
+                    <canvas id="testCanvas" width="400" height="520" style="max-width:100%;border-radius:8px;border:1px solid var(--lhb-border)"></canvas>
+                    <p style="font-size:0.78rem;color:var(--lhb-text-dim);margin-top:0.5rem">
+                        Renders a branded test page as a PNG image.
+                    </p>
+                </div>
+
+                <div v-if="testPrintModal.format === 'pdf'">
+                    <canvas id="testCanvasPdf" width="400" height="520" style="max-width:100%;border-radius:8px;border:1px solid var(--lhb-border)"></canvas>
+                    <p style="font-size:0.78rem;color:var(--lhb-text-dim);margin-top:0.5rem">
+                        Renders a branded test page as a PDF document.
+                    </p>
+                </div>
+            </div>
+            <div class="lhb-modal-footer">
+                <button class="lhb-btn lhb-btn-outline" @click="closeTestPrint">Cancel</button>
+                <button class="lhb-btn lhb-btn-accent" @click="sendTestPrint" :disabled="testPrintModal.sending">
+                    {{ testPrintModal.sending ? 'Sending...' : 'Print' }}
+                </button>
+            </div>
+        </div>
+    </div>
 </div>
 
 <script src="js/bootstrap.bundle.min.js"></script>
@@ -1130,6 +1204,8 @@ createApp({
     // Polling timers
     healthTimer: null,
     statusTimer: null,
+    // Test print modal
+    testPrintModal: { show: false, format: 'txt', printer: null, printerName: '', txtContent: '', sending: false },
 
     lockedEndpoints: ['/config.json', '/system/health'],
     endpointGroups: [
@@ -1479,24 +1555,188 @@ createApp({
     },
 
     /* ---------------- Test print ---------------- */
-    testPrint(printer) {
+    openTestPrint(printer) {
         if (!printer.type) { this.toast('Set a type name first', 'error'); return }
-        // Small ESC/POS raw sample: init, text, feed, full cut. Base64 encoded.
-        const init = '\x1B\x40'
-        const cut = '\x1D\x56\x00'
-        const text = init + 'Local Hardware Bridge\nTest Print\n' + new Date().toLocaleString() + '\n\n\n\n' + cut
-        const raw = btoa(text)
-        axios.post('/printer', { type: printer.type, raw_content: raw, id: 'test-' + Date.now() })
-            .then(response => {
-                const d = response.data || {}
-                if (d.success === false) {
-                    this.toast('Print failed: ' + (d.message || 'unknown error'), 'error')
-                } else {
-                    this.toast('Test print sent to ' + (d.printerName || printer.name || printer.type), 'success')
-                }
-            })
-            .catch(err => this.handleError(err, 'Test print'))
+        const now = new Date().toLocaleString()
+        this.testPrintModal.printer = printer
+        this.testPrintModal.printerName = printer.name || printer.type
+        this.testPrintModal.format = 'txt'
+        this.testPrintModal.sending = false
+        this.testPrintModal.txtContent =
+            'Local Hardware Bridge\n' +
+            'Test Print\n' +
+            'Printer: ' + (printer.name || '?') + '\n' +
+            now + '\n'
+        this.testPrintModal.show = true
+        // Draw canvas previews after DOM updates
+        setTimeout(() => { this.drawTestCanvas('image'); this.drawTestCanvas('pdf') }, 50)
     },
+
+    closeTestPrint() {
+        this.testPrintModal.show = false
+        this.testPrintModal.sending = false
+    },
+
+    drawTestCanvas(which) {
+        const canvasId = which === 'pdf' ? 'testCanvasPdf' : 'testCanvas'
+        const canvas = document.getElementById(canvasId)
+        if (!canvas) return
+        const ctx = canvas.getContext('2d')
+        const W = canvas.width, H = canvas.height
+        const isDark = this.theme === 'dark'
+
+        // Background
+        ctx.fillStyle = isDark ? '#1e1e2e' : '#ffffff'
+        ctx.fillRect(0, 0, W, H)
+
+        // Border
+        ctx.strokeStyle = isDark ? '#3b3b54' : '#e0e0e8'
+        ctx.lineWidth = 2
+        ctx.strokeRect(10, 10, W - 20, H - 20)
+
+        // Logo (load icon.png)
+        const logo = new Image()
+        logo.onload = () => {
+            const ls = 64
+            ctx.drawImage(logo, (W - ls) / 2, 50, ls, ls)
+        }
+        logo.src = '/icon.png'
+
+        // Title
+        ctx.fillStyle = isDark ? '#cdd6f4' : '#1a1a2e'
+        ctx.font = 'bold 20px sans-serif'
+        ctx.textAlign = 'center'
+        ctx.fillText('Local Hardware Bridge', W / 2, 145)
+
+        // Subtitle
+        ctx.font = '14px sans-serif'
+        ctx.fillStyle = isDark ? '#a6adc8' : '#666'
+        ctx.fillText('Test Print', W / 2, 170)
+
+        // Divider
+        ctx.strokeStyle = isDark ? '#45475a' : '#ddd'
+        ctx.lineWidth = 1
+        ctx.beginPath()
+        ctx.moveTo(40, 195)
+        ctx.lineTo(W - 40, 195)
+        ctx.stroke()
+
+        // Info
+        ctx.textAlign = 'left'
+        ctx.fillStyle = isDark ? '#bac2de' : '#333'
+        ctx.font = '13px monospace'
+        const now = new Date().toLocaleString()
+        const lines = [
+            'Date:     ' + now,
+            'Printer:  ' + (this.testPrintModal.printerName || 'Unknown'),
+            'Type:     ' + (this.testPrintModal.printer?.type || 'Unknown'),
+            'Version:  ' + (this.health?.version || '?'),
+        ]
+        lines.forEach((line, i) => { ctx.fillText(line, 40, 230 + i * 22) })
+
+        // Description
+        ctx.font = '12px sans-serif'
+        ctx.fillStyle = isDark ? '#a6adc8' : '#888'
+        const desc = [
+            'This test page confirms that your printer is',
+            'correctly configured and receiving jobs from',
+            'the Local Hardware Bridge service.',
+            '',
+            'If you can read this text, printing works!'
+        ]
+        desc.forEach((line, i) => { ctx.fillText(line, 40, 340 + i * 20) })
+
+        // Footer badge
+        ctx.font = 'bold 11px sans-serif'
+        ctx.fillStyle = '#7c3aed'
+        ctx.textAlign = 'center'
+        ctx.fillText(which.toUpperCase() + ' TEST', W / 2, H - 30)
+    },
+
+    sendTestPrint() {
+        const printer = this.testPrintModal.printer
+        if (!printer || !printer.type) return
+        this.testPrintModal.sending = true
+        const id = 'test-' + Date.now()
+
+        if (this.testPrintModal.format === 'txt') {
+            const init = '\x1B\x40'
+            const text = init + this.testPrintModal.txtContent + '\n\n\n'
+            const raw = btoa(text)
+            axios.post('/printer', { type: printer.type, raw_content: raw, id })
+                .then(r => this.handleTestPrintResult(r, printer))
+                .catch(err => this.handleError(err, 'Test print'))
+                .finally(() => { this.testPrintModal.sending = false })
+        } else if (this.testPrintModal.format === 'image') {
+            const canvas = document.getElementById('testCanvas')
+            const dataUrl = canvas.toDataURL('image/png')
+            const b64 = dataUrl.split(',')[1]
+            axios.post('/printer', { type: printer.type, file_content: b64, url: 'test-print.png', id })
+                .then(r => this.handleTestPrintResult(r, printer))
+                .catch(err => this.handleError(err, 'Test print'))
+                .finally(() => { this.testPrintModal.sending = false })
+        } else if (this.testPrintModal.format === 'pdf') {
+            const canvas = document.getElementById('testCanvasPdf')
+            // Generate a minimal PDF wrapping the canvas JPEG
+            const jpegDataUrl = canvas.toDataURL('image/jpeg', 0.92)
+            const pdfB64 = this.generateMinimalPdf(jpegDataUrl, canvas.width, canvas.height)
+            axios.post('/printer', { type: printer.type, file_content: pdfB64, url: 'test-print.pdf', id })
+                .then(r => this.handleTestPrintResult(r, printer))
+                .catch(err => this.handleError(err, 'Test print'))
+                .finally(() => { this.testPrintModal.sending = false })
+        }
+    },
+
+    handleTestPrintResult(response, printer) {
+        const d = response.data || {}
+        if (d.success === false) {
+            this.toast('Print failed: ' + (d.message || 'unknown error'), 'error')
+        } else {
+            this.toast('Test print sent to ' + (d.printerName || printer.name || printer.type), 'success')
+        }
+    },
+
+    generateMinimalPdf(jpegDataUrl, imgW, imgH) {
+        // Convert JPEG data URL to a 1-page PDF (A4 portrait), image scaled to fit
+        const pageW = 595, pageH = 842
+        const scale = Math.min((pageW - 80) / imgW, (pageH - 120) / imgH)
+        const drawW = Math.round(imgW * scale), drawH = Math.round(imgH * scale)
+        const offsetX = Math.round((pageW - drawW) / 2), offsetY = Math.round((pageH - drawH) / 2)
+
+        const jpegB64 = jpegDataUrl.split(',')[1]
+        const jpegBinary = atob(jpegB64)
+        const jpegLen = jpegBinary.length
+
+        const objs = []
+        objs.push('<< /Type /Catalog /Pages 2 0 R >>')
+        objs.push('<< /Type /Pages /Kids [3 0 R] /Count 1 >>')
+        objs.push('<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ' + pageW + ' ' + pageH + '] /Resources << /XObject << /Im1 4 0 R >> /ProcSet [/PDF /ImageC] >> /Contents 5 0 R >>')
+        objs.push('<< /Type /XObject /Subtype /Image /Width ' + imgW + ' /Height ' + imgH + ' /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ' + jpegLen + ' >>\nstream\n' + jpegBinary + '\nendstream')
+        const contentStream = 'q ' + drawW + ' 0 0 ' + drawH + ' ' + offsetX + ' ' + offsetY + ' cm /Im1 Do Q\n'
+        objs.push('<< /Length ' + contentStream.length + ' >>\nstream\n' + contentStream + 'endstream')
+
+        // Build PDF as binary-safe string, then encode with btoa workaround
+        let pdf = '%PDF-1.4\n'
+        const offsets = [0]
+        objs.forEach((obj, i) => {
+            offsets.push(pdf.length)
+            pdf += (i + 1) + ' 0 obj\n' + obj + '\nendobj\n'
+        })
+        const xrefStart = pdf.length
+        pdf += 'xref\n0 ' + (objs.length + 1) + '\n0000000000 65535 f \n'
+        offsets.slice(1).forEach(off => { pdf += String(off).padStart(10, '0') + ' 00000 n \n' })
+        pdf += 'trailer\n<< /Size ' + (objs.length + 1) + ' /Root 1 0 R >>\nstartxref\n' + xrefStart + '\n%%EOF'
+
+        // Encode binary-safe: convert each char to its byte value
+        const bytes = new Uint8Array(pdf.length)
+        for (let i = 0; i < pdf.length; i++) bytes[i] = pdf.charCodeAt(i)
+        let binary = ''
+        for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
+        return btoa(binary)
+    },
+
+    /* old testPrint kept as alias */
+    testPrint(printer) { this.openTestPrint(printer) },
 
     /* ---------------- Test serial write ---------------- */
     testSerial(serial, index) {

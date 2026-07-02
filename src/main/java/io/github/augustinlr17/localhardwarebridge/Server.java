@@ -128,7 +128,10 @@ public class Server implements WebSocketServerInterface {
         // Create Javalin Server
         javalinServer = Javalin.create(cfg -> {
             cfg.showJavalinBanner = false;
-            cfg.staticFiles.add(staticFiles -> staticFiles.directory = "web");
+            cfg.staticFiles.add(staticFiles -> {
+                staticFiles.directory = "web";
+                staticFiles.headers = java.util.Map.of("Cache-Control", "no-cache, no-store, must-revalidate");
+            });
 
             Config.Server.Cors corsConfig = serverConfig.getCors();
             cfg.bundledPlugins.enableCors(cors -> {
