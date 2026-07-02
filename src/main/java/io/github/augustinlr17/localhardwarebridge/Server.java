@@ -68,6 +68,7 @@ public class Server implements WebSocketServerInterface {
     private static final String SERIAL_SERVICE = "Serial";
     private static final String UPDATE_SERVICE = "Update";
     private static final String WARNING_LEVEL = "WARNING";
+    private static final String MASKED_TOKEN = "***";
     private static final String ENABLED_FIELD = "enabled";
 
     private final ConcurrentHashMap<String, ConcurrentLinkedQueue<WsContext>> socketChannelSubscriptions = new ConcurrentHashMap<>();
@@ -327,6 +328,13 @@ public class Server implements WebSocketServerInterface {
                         if (ctx.basicAuthCredentials() != null && constantTimeEquals(ctx.basicAuthCredentials().getPassword(), expectedToken)) {
                             return;
                         }
+
+                        // Query param ?token= (same as WebSocket auth, for REST clients
+                        // that can't set headers — e.g. browser <img> or simple redirects)
+                        String queryToken = ctx.queryParam("token");
+                        if (queryToken != null && constantTimeEquals(queryToken, expectedToken)) {
+                            return;
+                        }
                     } catch (Exception e) {
                         // NOOP
                     }
@@ -343,6 +351,10 @@ public class Server implements WebSocketServerInterface {
                             return;
                         }
                         if (ctx.basicAuthCredentials() != null && constantTimeEquals(ctx.basicAuthCredentials().getPassword(), rule.getPassword())) {
+                            return;
+                        }
+                        String queryToken = ctx.queryParam("token");
+                        if (queryToken != null && constantTimeEquals(queryToken, rule.getPassword())) {
                             return;
                         }
                     } catch (Exception e) {
@@ -366,6 +378,10 @@ public class Server implements WebSocketServerInterface {
                         return;
                     }
                     if (ctx.basicAuthCredentials() != null && constantTimeEquals(ctx.basicAuthCredentials().getPassword(), expectedPassword)) {
+                        return;
+                    }
+                    String queryToken = ctx.queryParam("token");
+                    if (queryToken != null && constantTimeEquals(queryToken, expectedPassword)) {
                         return;
                     }
                 } catch (Exception e) {
@@ -438,6 +454,37 @@ public class Server implements WebSocketServerInterface {
             return null;
         }
         return authorizationHeader.substring("Bearer ".length());
+    }
+
+    /**
+     * Mask the authentication token in a config section before returning it via API.
+     * The Web UI knows the token (it authenticated with it), but exposing it in API
+     * responses means any other client that intercepts the response gets the token.
+     * We replace it with "***" so the UI can detect "token is set" without leaking it.
+     */
+    private static String maskToken(String json) {
+        if (json == null) return json;
+        return json.replaceAll("\"token\"\\s*:\\s*\"[^\"]*\"", "\"token\":\"" + MASKED_TOKEN + "\"");
+    }
+
+    /**
+     * Check whether the caller provided a confirmation parameter for destructive
+     * operations (rollback, apply, restart). This prevents accidental triggers
+     * from automated tools or curious users who just POST to the endpoint.
+     *
+     * Accepts either:
+     * - query param: ?confirm=true
+     * - header: X-Confirm: true
+     *
+     * @param ctx the Javalin context
+     * @return true if confirmation is provided
+     */
+    private static boolean isConfirmed(io.javalin.http.Context ctx) {
+        String confirm = ctx.queryParam("confirm");
+        if (confirm == null) {
+            confirm = ctx.header("X-Confirm");
+        }
+        return "true".equalsIgnoreCase(confirm);
     }
 
     /*
@@ -570,7 +617,7 @@ public class Server implements WebSocketServerInterface {
      */
     private void registerConfigEndpoints() {
         javalinServer.get(CONFIG_PATH, ctx -> {
-            ctx.contentType(ContentType.APPLICATION_JSON).result(configService.getConfig().toJson());
+            ctx.contentType(ContentType.APPLICATION_JSON).result(maskToken(configService.getConfig().toJson()));
         });
 
         javalinServer.put(CONFIG_PATH, ctx -> {
@@ -579,7 +626,18 @@ public class Server implements WebSocketServerInterface {
 
             messageToService(NOTIFICATION_CHANNEL, objectMapper.writeValueAsString(new NotificationDTO("INFO", "Setting", "Setting saved successfully")));
 
-            ctx.contentType(ContentType.APPLICATION_JSON).result(configService.getConfig().toJson());
+            ctx.contentType(ContentType.APPLICATION_JSON).result(maskToken(configService.getConfig().toJson()));
+        });
+
+        // POST /config.json — alias for PUT, so clients that can only send POST
+        // (e.g. HTML forms, some JS frameworks) can also update the config.
+        javalinServer.post(CONFIG_PATH, ctx -> {
+            configService.loadFromJson(ctx.body());
+            configService.save();
+
+            messageToService(NOTIFICATION_CHANNEL, objectMapper.writeValueAsString(new NotificationDTO("INFO", "Setting", "Setting saved successfully")));
+
+            ctx.contentType(ContentType.APPLICATION_JSON).result(maskToken(configService.getConfig().toJson()));
         });
     }
 
@@ -908,8 +966,14 @@ public class Server implements WebSocketServerInterface {
             ctx.contentType(ContentType.APPLICATION_JSON).result(objectMapper.writeValueAsString(dto));
         });
 
-        // Restart
+        // Restart — requires ?confirm=true or X-Confirm: true header
         javalinServer.post("/system/restart.json", ctx -> {
+            if (!isConfirmed(ctx)) {
+                ctx.status(400).contentType(ContentType.APPLICATION_JSON)
+                        .result("{\"error\": \"Confirmation required. Add ?confirm=true or X-Confirm: true header.\"}");
+                return;
+            }
+
             // No-op if a restart is already in progress.
             if (!restarting.compareAndSet(false, true)) {
                 ctx.status(409).contentType(ContentType.APPLICATION_JSON).result(ALREADY_RESTARTING);
@@ -971,10 +1035,22 @@ public class Server implements WebSocketServerInterface {
 
         // Send notification
         javalinServer.post("/system/notification", ctx -> {
-            NotificationDTO notification = objectMapper.readValue(ctx.body(), NotificationDTO.class);
-            messageToService(NOTIFICATION_CHANNEL, objectMapper.writeValueAsString(notification));
+            try {
+                String body = ctx.body();
+                if (body == null || body.isBlank()) {
+                    ctx.status(400).contentType(ContentType.APPLICATION_JSON)
+                            .result("{\"error\": \"Request body is empty\"}");
+                    return;
+                }
+                NotificationDTO notification = objectMapper.readValue(body, NotificationDTO.class);
+                messageToService(NOTIFICATION_CHANNEL, objectMapper.writeValueAsString(notification));
 
-            ctx.contentType(ContentType.APPLICATION_JSON).result("{\"status\": \"sent\"}");
+                ctx.contentType(ContentType.APPLICATION_JSON).result("{\"status\": \"sent\"}");
+            } catch (Exception e) {
+                log.error("Failed to send notification: {}", e.getMessage());
+                ctx.status(400).contentType(ContentType.APPLICATION_JSON)
+                        .result(ERROR_JSON_PREFIX + String.valueOf(e.getMessage()).replace("\"", "'") + "\"}");
+            }
         });
 
         // List all WebSocket connections
@@ -986,12 +1062,13 @@ public class Server implements WebSocketServerInterface {
             ctx.contentType(ContentType.APPLICATION_JSON).result(objectMapper.writeValueAsString(connections));
         });
 
-        // Server config (bind, port, auth, tls)
+        // Server config (bind, port, auth, tls) — token masked in response
         javalinServer.get("/system/server.json", ctx -> {
-            ctx.contentType(ContentType.APPLICATION_JSON).result(objectMapper.writeValueAsString(configService.getConfig().getServer()));
+            ctx.contentType(ContentType.APPLICATION_JSON)
+                    .result(maskToken(objectMapper.writeValueAsString(configService.getConfig().getServer())));
         });
 
-        // Update server config
+        // Update server config — token masked in response
         javalinServer.put("/system/server.json", ctx -> {
             Config.Server updated = objectMapper.readValue(ctx.body(), Config.Server.class);
             configService.getConfig().setServer(updated);
@@ -999,7 +1076,8 @@ public class Server implements WebSocketServerInterface {
 
             messageToService(NOTIFICATION_CHANNEL, objectMapper.writeValueAsString(new NotificationDTO("INFO", "Server", "Server configuration updated. Restart required.")));
 
-            ctx.contentType(ContentType.APPLICATION_JSON).result(objectMapper.writeValueAsString(configService.getConfig().getServer()));
+            ctx.contentType(ContentType.APPLICATION_JSON)
+                    .result(maskToken(objectMapper.writeValueAsString(configService.getConfig().getServer())));
         });
 
         // Downloader config
@@ -1172,9 +1250,15 @@ public class Server implements WebSocketServerInterface {
             }
         });
 
-        // Apply the update: replaces the JAR and triggers a restart
+        // Apply the update: replaces the JAR and triggers a restart — requires ?confirm=true
         javalinServer.post("/system/update/apply", ctx -> {
             try {
+                if (!isConfirmed(ctx)) {
+                    ctx.status(400).contentType(ContentType.APPLICATION_JSON)
+                            .result("{\"error\": \"Confirmation required. Add ?confirm=true or X-Confirm: true header.\"}");
+                    return;
+                }
+
                 java.nio.file.Path pending = updateService.consumePendingUpdate();
                 if (pending == null) {
                     ctx.status(409).json("{\"error\": \"No pending update to apply. Download first.\"}");
@@ -1225,9 +1309,15 @@ public class Server implements WebSocketServerInterface {
             }
         });
 
-        // Rollback to the previous version (if a .bak exists)
+        // Rollback to the previous version (if a .bak exists) — requires ?confirm=true
         javalinServer.post("/system/update/rollback", ctx -> {
             try {
+                if (!isConfirmed(ctx)) {
+                    ctx.status(400).contentType(ContentType.APPLICATION_JSON)
+                            .result("{\"error\": \"Confirmation required. Add ?confirm=true or X-Confirm: true header.\"}");
+                    return;
+                }
+
                 if (!restarting.compareAndSet(false, true)) {
                     ctx.status(409).contentType(ContentType.APPLICATION_JSON).result(ALREADY_RESTARTING);
                     return;

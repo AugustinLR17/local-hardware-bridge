@@ -117,7 +117,7 @@ public class ServerCorsAndEndpointAuthTest {
         int globalAuthIdx = src.indexOf("if (currentAuth.isEnabled())", firstAuthIdx + 1);
         assertTrue("HTTP auth block must exist", globalAuthIdx >= 0);
         String block = src.substring(globalAuthIdx,
-                Math.min(globalAuthIdx + 2500, src.length()));
+                Math.min(globalAuthIdx + 5000, src.length()));
 
         // Find the FIRST occurrence of rule.getPassword() inside the global auth block
         // (this is the fix — the endpoint password check added within the block)
