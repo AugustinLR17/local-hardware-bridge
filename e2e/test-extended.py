@@ -365,6 +365,30 @@ def main():
     s, b, h = request("GET", "/system/health")
     assert_eq("health without auth (exempt)", s, 200)
 
+    # CORS preflight (OPTIONS) must succeed even with auth enabled.
+    # A browser sends the preflight WITHOUT credentials, so it must return 200
+    # with CORS headers — otherwise the actual authenticated request is blocked
+    # by the browser before it's even sent.
+    print("\n--- CORS preflight with auth enabled ---")
+    req = urllib.request.Request(BASE_URL + "/system/printers.json", method="OPTIONS")
+    req.add_header("Origin", "http://example.com")
+    req.add_header("Access-Control-Request-Method", "GET")
+    req.add_header("Access-Control-Request-Headers", "Authorization")
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            preflight_status = resp.status
+            preflight_headers = {k.lower(): v for k, v in resp.headers.items()}
+    except urllib.error.HTTPError as e:
+        preflight_status = e.code
+        preflight_headers = {k.lower(): v for k, v in e.headers.items()}
+    assert_eq("preflight OPTIONS returns 200 with auth enabled", preflight_status, 200)
+    assert_true("preflight has Access-Control-Allow-Origin header",
+                "access-control-allow-origin" in preflight_headers,
+                f"headers={preflight_headers}")
+    assert_true("preflight allows Authorization header",
+                "authorization" in preflight_headers.get("access-control-allow-headers", "").lower(),
+                f"allow-headers={preflight_headers.get('access-control-allow-headers')}")
+
     # Disable auth: get fresh config (with token since auth is active), modify, save, restart
     s, b, h = request("GET", "/config.json", headers={"Authorization": "Bearer basictoken123"})
     config = json.loads(b)

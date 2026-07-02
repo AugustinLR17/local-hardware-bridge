@@ -298,6 +298,13 @@ public class Server implements WebSocketServerInterface {
 
         // Add HTTP Auth & endpoint security
         javalinServer.before(ctx -> {
+            // CORS preflight (OPTIONS) is already handled by the before() above.
+            // Skip auth entirely so the preflight always returns 200 with CORS
+            // headers — otherwise the browser blocks the actual request.
+            if (ctx.method() == HandlerType.OPTIONS) {
+                return;
+            }
+
             Config.Security security = configService.getConfig().getSecurity();
             String path = ctx.path();
 
