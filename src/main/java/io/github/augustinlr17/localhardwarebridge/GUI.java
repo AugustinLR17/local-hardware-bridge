@@ -113,9 +113,8 @@ public class GUI implements WebSocketServiceInterface {
                 if (choice == JOptionPane.YES_OPTION) {
                     log.info("Stopping existing instance on {}:{}", bind, port);
                     String token = serverConfig.getAuthentication().isEnabled() ? serverConfig.getAuthentication().getToken() : null;
-                    SingleInstanceGuard.stopInstance(bind, port, token);
-                    if (!SingleInstanceGuard.waitForPortFree(bind, port, java.time.Duration.ofSeconds(30))) {
-                        log.error("Old instance did not free port {} within timeout", port);
+                    if (!SingleInstanceGuard.stopInstance(bind, port, token)) {
+                        log.error("Could not stop existing instance on port {}", port);
                         JOptionPane.showMessageDialog(
                             null,
                             "Could not stop the existing instance on port " + port + ".\n"

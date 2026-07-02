@@ -1339,7 +1339,7 @@ createApp({
         this.restarting = true
         // Do NOT send the config: the backend ignores the body and a restart
         // does not persist anything.
-        axios.post('/system/restart.json')
+        axios.post('/system/restart.json?confirm=true')
             .then(() => {
                 this.toast('Server is restarting...', 'info')
                 const newScheme = this.savedServer.tls ? 'https' : 'http'

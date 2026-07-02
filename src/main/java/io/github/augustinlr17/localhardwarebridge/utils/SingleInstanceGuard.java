@@ -80,22 +80,60 @@ public final class SingleInstanceGuard {
     }
 
     /**
-     * Sends a shutdown request to the running instance. This causes the old
-     * instance to stop permanently (System.exit(0)) and free the port.
-     * Unlike a restart, the old instance does not come back — the new instance
-     * can then bind the port.
+     * Stops the running instance so the port is freed for the new one.
      *
-     * <p>If the old instance has authentication enabled, the {@code token}
-     * parameter is sent as a Bearer token.
+     * <p>Tries multiple strategies in order:
+     * <ol>
+     *   <li>{@code POST /system/shutdown?confirm=true} — clean exit (2.3.1+).
+     *       systemd's {@code Restart=on-failure} does not restart on exit 0.</li>
+     *   <li>{@code POST /system/restart.json?confirm=true} — for older versions
+     *       that don't have /system/shutdown. The restart does stop→start, so
+     *       we then try to catch the port during the brief stop window.</li>
+     *   <li>{@code systemctl stop local-hardware-bridge.service} on Linux —
+     *       stops the systemd service permanently (requires pkexec for root).</li>
+     * </ol>
      *
      * @param host  the bind host
      * @param port  the port
      * @param token the auth token (may be {@code null})
-     * @return {@code true} if the shutdown request was accepted (200/202)
+     * @return {@code true} if the instance was stopped and the port freed
      */
     public static boolean stopInstance(String host, int port, String token) {
+        // Strategy 1: /system/shutdown (2.3.1+)
+        if (tryHttpPost(host, port, "/system/shutdown?confirm=true", token)) {
+            log.info("Instance stopped via /system/shutdown");
+            return true;
+        }
+
+        // Strategy 2: /system/restart.json (all versions — but systemd may relaunch)
+        if (tryHttpPost(host, port, "/system/restart.json?confirm=true", token)) {
+            log.info("Instance restarting via /system/restart.json — waiting for brief port-free window");
+            // The old instance does stop()→sleep(500ms)→start(). We may catch the
+            // port-free window, but systemd can also relaunch it. Wait briefly.
+            if (waitForPortFree(host, port, Duration.ofSeconds(5))) {
+                return true;
+            }
+            log.warn("Port still busy after restart — likely managed by systemd");
+        }
+
+        // Strategy 3: systemctl stop (Linux only)
+        String osName = System.getProperty("os.name", "").toLowerCase();
+        if (osName.contains("linux")) {
+            log.info("Trying systemctl stop to stop systemd-managed instance");
+            trySystemctlStop();
+            if (waitForPortFree(host, port, Duration.ofSeconds(10))) {
+                log.info("Instance stopped via systemctl");
+                return true;
+            }
+        }
+
+        log.error("Could not stop existing instance at {}:{}", host, port);
+        return false;
+    }
+
+    private static boolean tryHttpPost(String host, int port, String path, String token) {
         try {
-            String url = "http://" + host + ":" + port + "/system/shutdown?confirm=true";
+            String url = "http://" + host + ":" + port + path;
             HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
             conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
             conn.setReadTimeout(READ_TIMEOUT_MS);
@@ -110,8 +148,25 @@ public final class SingleInstanceGuard {
             conn.disconnect();
             return code == 200 || code == 202;
         } catch (Exception e) {
-            log.warn("Failed to stop existing instance at {}:{}: {}", host, port, e.getMessage());
+            log.debug("HTTP stop attempt failed for {}{}: {}", host, path, e.getMessage());
             return false;
+        }
+    }
+
+    private static void trySystemctlStop() {
+        String[] serviceNames = {
+            "local-hardware-bridge.service",
+            Constants.LEGACY_SERVICE_NAME + ".service"
+        };
+        for (String svc : serviceNames) {
+            try {
+                ProcessBuilder pb = new ProcessBuilder("pkexec", "systemctl", "stop", svc);
+                pb.redirectErrorStream(true);
+                Process p = pb.start();
+                p.waitFor(10, java.util.concurrent.TimeUnit.SECONDS);
+            } catch (Exception e) {
+                log.debug("systemctl stop {} failed: {}", svc, e.getMessage());
+            }
         }
     }
 
