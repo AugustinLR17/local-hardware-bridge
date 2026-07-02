@@ -9,8 +9,8 @@
 $ErrorActionPreference = "Stop"
 
 $urls = @(
-    "https://github.com/microsoft/Microsoft-Win32-Content-Prep-Tool/releases/latest/download/IntuneWinAppUtil.exe",
-    "https://github.com/microsoft/Microsoft-Win32-Content-Prep-Tool/releases/download/v1.8.4/IntuneWinAppUtil.exe"
+    "https://raw.githubusercontent.com/microsoft/Microsoft-Win32-Content-Prep-Tool/master/IntuneWinAppUtil.exe",
+    "https://github.com/microsoft/Microsoft-Win32-Content-Prep-Tool/raw/master/IntuneWinAppUtil.exe"
 )
 
 $downloaded = $false
