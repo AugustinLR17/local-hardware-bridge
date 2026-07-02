@@ -21,6 +21,9 @@ The deployment consists of three parts:
 3. **Config template** — a `config.json` with enterprise defaults (auth token,
    serial disabled, printer enabled, auto-update disabled).
 
+For updating the config on already-deployed machines (without redeploying the
+app), see [Updating the Configuration](#updating-the-configuration) below.
+
 ---
 
 ## Prerequisites
@@ -33,6 +36,7 @@ The deployment consists of three parts:
   [latest GitHub release](https://github.com/AugustinLR17/local-hardware-bridge/releases/latest)
 - **Intune scripts** — from `packaging/intune/` in this repository:
   `install.ps1`, `uninstall.ps1`, `config-template.json`
+  (plus `update-config.ps1` and `update-config-api.ps1` for config-only updates)
 
 > The scripts in `packaging/intune/` are **not** attached to GitHub Releases —
 > they are stable across versions. Only `lhb.exe` changes between releases.
@@ -232,9 +236,11 @@ rights. Use this if you deploy in **Device context** (SYSTEM account).
 
 - The script only deploys `config-template.json` if `config.json` does **not**
   already exist. If the user had LHB installed before, their config is kept.
-- To force a config refresh, delete `config.json` from the install directory
-  and re-run the install, or push a separate PowerShell script via Intune that
-  overwrites it.
+- To force a config refresh on all machines, deploy `update-config.ps1` or
+  `update-config-api.ps1` via Intune Scripts (see
+  [Updating the Configuration](#updating-the-configuration)).
+- To force a config refresh on a single machine, delete `config.json` from the
+  install directory and re-run the install.
 
 ### Defender quarantines the app
 
@@ -273,6 +279,119 @@ rights. Use this if you deploy in **Device context** (SYSTEM account).
 
 ---
 
+## Updating the Configuration
+
+There are two scenarios for updating LHB on deployed machines:
+
+### Scenario 1 — New app version (e.g. v2.2.4 → v2.2.5)
+
+Use Intune **app supersedence** (remplacement):
+
+1. Download the new `lhb.exe` from the GitHub release.
+2. Rebuild the `.intunewin` package with the new installer (same `install.ps1`,
+   `uninstall.ps1`, `config-template.json` — these are stable across versions).
+3. Create a **new** Win32 app in Intune for the new version.
+4. In the new app → **Supersedence** → select the old app.
+5. Intune will automatically:
+   - Uninstall the old version (runs `uninstall.ps1` — removes the entire
+     install directory including `config.json`).
+   - Install the new version (runs `install.ps1` — deploys the new
+     `config-template.json` as `config.json`).
+6. Assign to groups (use pilot groups first for progressive rollout).
+
+> **Note:** Because `uninstall.ps1` removes the entire install directory, the
+> old `config.json` is lost. The new `install.ps1` deploys the fresh
+> `config-template.json`. This is by design — the new version's config template
+> is the source of truth.
+
+### Scenario 2 — Config-only update (no new app version)
+
+When you need to push config changes (add printer mappings, change token,
+enable `fallbackToDefault`, set endpoint passwords, etc.) **without** deploying
+a new app version, use one of the update scripts from `packaging/intune/`.
+
+#### Option A — File replacement + restart (`update-config.ps1`)
+
+Best for: token changes, first-time config fixes, or when the app might not be
+running on all machines.
+
+**Deployment via Intune Scripts:**
+
+1. Edit `config-template.json` with the new settings.
+2. Go to **Intune → Devices → Scripts → Add**.
+3. Upload `update-config.ps1` and `config-template.json` (both files must be
+   in the same folder).
+4. Assign to the same groups as the Win32 app.
+5. The script will:
+   - Locate the install directory (via registry or fallback).
+   - Back up the existing `config.json` to `config.json.bak`.
+   - Overwrite `config.json` with the new template.
+   - Restart LHB via the VBS launcher (preserves the WorkingDir fix).
+
+**Intune Scripts configuration:**
+
+| Setting              | Value                    |
+|----------------------|--------------------------|
+| Run script in        | **User context**         |
+| Run with privileges  | No (user-level)          |
+| Script to run        | `update-config.ps1`      |
+
+#### Option B — Live API update (`update-config-api.ps1`)
+
+Best for: adding printer mappings, enabling/disabling endpoints, or any config
+change that does **not** modify the auth token. Zero downtime — no restart
+needed, active print jobs and serial connections are not disrupted.
+
+**Deployment via Intune Scripts:**
+
+1. Edit `config-template.json` with the new settings.
+2. Go to **Intune → Devices → Scripts → Add**.
+3. Upload `update-config-api.ps1` and `config-template.json`.
+4. Assign to the same groups.
+5. The script will:
+   - Check that LHB is running (health check on `127.0.0.1:57212`).
+   - Auto-detect the auth token from the existing `config.json`.
+   - Push the new config via `PUT /config.json`.
+   - The app applies the config immediately (no restart).
+
+> **Warning:** If you are changing the auth token itself, use Option A (file
+> replacement + restart). Option B would fail with 401 because the API request
+> uses the old token while the new config contains the new one.
+
+#### When to use which option?
+
+| Situation                                   | Option A (file + restart) | Option B (API live) |
+|---------------------------------------------|---------------------------|---------------------|
+| Adding a printer mapping (e.g. "pdf")       | ✅ Works                  | ✅ Best (no downtime) |
+| Changing the auth token                     | ✅ Best                   | ❌ Will fail (401)   |
+| Enabling `fallbackToDefault`                | ✅ Works                  | ✅ Best (no downtime) |
+| Setting per-endpoint passwords              | ✅ Works                  | ✅ Best (no downtime) |
+| App might not be running on some machines   | ✅ Best                   | ❌ Will fail        |
+| Need zero downtime (production environment) | ❌ Causes brief restart   | ✅ Best              |
+| First config deployment (no config.json)    | ✅ Best                   | ❌ Will fail        |
+
+#### Example: adding the "pdf" printer mapping
+
+1. Edit `config-template.json`:
+   ```json
+   "printer": {
+     "enabled": true,
+     "autoAddUnknownType": false,
+     "fallbackToDefault": true,
+     "mappings": [
+       {"type": "MAIN", "name": "Lexmark XM3250 (2)", "autoRotate": false, "resetImageableArea": true, "forceDPI": 0},
+       {"type": "pdf",  "name": "Lexmark XM3250 (2)", "autoRotate": false, "resetImageableArea": true, "forceDPI": 0}
+     ]
+   }
+   ```
+2. Deploy via Option B (API live update) — no restart needed on any machine.
+3. Verify on one machine:
+   ```
+   curl -H "Authorization: Bearer lhb002" http://127.0.0.1:57212/printer/mappings
+   ```
+
+---
+
 ## File summary
 
 | Artifact               | Source                         | Changes between versions? |
@@ -281,4 +400,6 @@ rights. Use this if you deploy in **Device context** (SYSTEM account).
 | `install.ps1`          | `packaging/intune/`            | No (stable)               |
 | `uninstall.ps1`        | `packaging/intune/`            | No (stable)               |
 | `config-template.json` | `packaging/intune/`            | No (stable, edit locally) |
+| `update-config.ps1`    | `packaging/intune/`            | No (stable)               |
+| `update-config-api.ps1`| `packaging/intune/`            | No (stable)               |
 | `install.intunewin`    | Built by admin (Windows)       | Rebuild after lhb.exe update |

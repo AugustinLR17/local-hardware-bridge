@@ -701,17 +701,24 @@
                                 <span class="lhb-toggle-slider"></span>
                             </label>
                         </div>
-                        <div class="lhb-row">
-                            <label class="lhb-row-label lhb-form-label" for="tls-cert">Certificate</label>
-                            <div class="lhb-row-value"><input id="tls-cert" class="lhb-form-control" type="text" v-model="config.server.tls.cert"/></div>
+                        <div v-if="!config.server.tls.selfSigned">
+                            <div class="lhb-row">
+                                <label class="lhb-row-label lhb-form-label" for="tls-cert">Certificate</label>
+                                <div class="lhb-row-value"><input id="tls-cert" class="lhb-form-control" type="text" v-model="config.server.tls.cert"/></div>
+                            </div>
+                            <div class="lhb-row">
+                                <label class="lhb-row-label lhb-form-label" for="tls-key">Private Key</label>
+                                <div class="lhb-row-value"><input id="tls-key" class="lhb-form-control" type="text" v-model="config.server.tls.key"/></div>
+                            </div>
+                            <div class="lhb-row">
+                                <label class="lhb-row-label lhb-form-label" for="tls-ca">CA Bundle</label>
+                                <div class="lhb-row-value"><input id="tls-ca" class="lhb-form-control" type="text" v-model="config.server.tls.caBundle"/></div>
+                            </div>
                         </div>
-                        <div class="lhb-row">
-                            <label class="lhb-row-label lhb-form-label" for="tls-key">Private Key</label>
-                            <div class="lhb-row-value"><input id="tls-key" class="lhb-form-control" type="text" v-model="config.server.tls.key"/></div>
-                        </div>
-                        <div class="lhb-row">
-                            <label class="lhb-row-label lhb-form-label" for="tls-ca">CA Bundle</label>
-                            <div class="lhb-row-value"><input id="tls-ca" class="lhb-form-control" type="text" v-model="config.server.tls.caBundle"/></div>
+                        <div v-if="config.server.tls.selfSigned" class="lhb-row">
+                            <div class="lhb-row-value">
+                                <small class="lhb-text-dim">Certificate and key are auto-generated.</small>
+                            </div>
                         </div>
                     </div>
                 </div>

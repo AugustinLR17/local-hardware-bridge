@@ -5,11 +5,13 @@ Microsoft Intune (Endpoint Manager) in a corporate environment.
 
 ## Files
 
-| File                  | Purpose                                                    |
-|-----------------------|------------------------------------------------------------|
-| `install.ps1`         | Intune install wrapper: silent install + config + Defender |
-| `uninstall.ps1`       | Intune uninstall wrapper: cleanup + Defender removal        |
-| `config-template.json`| Enterprise base config (auth, serial off, printer on, ...)  |
+| File                       | Purpose                                                       |
+|----------------------------|---------------------------------------------------------------|
+| `install.ps1`              | Intune install wrapper: silent install + config + Defender    |
+| `uninstall.ps1`            | Intune uninstall wrapper: cleanup + Defender removal          |
+| `config-template.json`     | Enterprise base config (auth, serial off, printer on, ...)   |
+| `update-config.ps1`        | Config-only update: replaces config.json + restarts app       |
+| `update-config-api.ps1`    | Live config update via HTTP API (no restart needed)           |
 
 These files are **stable across versions** — they are NOT attached to GitHub
 Releases. Download the NSIS installer from the latest release and combine it
@@ -33,6 +35,39 @@ with the scripts from this directory.
    [full guide](../../docs/Intune-Deployment.md)).
 5. Upload to Intune as a Win32 app.
 
+## Updating the config (without redeploying the app)
+
+When you need to push config changes (new printer mappings, token change,
+endpoint passwords, `fallbackToDefault`, etc.) to machines that already have
+LHB installed, use one of the update scripts:
+
+### Option A — File replacement + restart (`update-config.ps1`)
+
+Best for: token changes, first-time config deployment, or when the app might
+not be running.
+
+1. Edit `config-template.json` with the new settings.
+2. Go to **Intune → Devices → Scripts → Add**.
+3. Upload `update-config.ps1` and `config-template.json`.
+4. Assign to the same groups as the Win32 app.
+5. The script backs up the old config, deploys the new one, and restarts LHB.
+
+### Option B — Live API update (`update-config-api.ps1`)
+
+Best for: adding printer mappings, enabling endpoints, or any config change
+that doesn't modify the auth token. Zero downtime — no restart needed.
+
+1. Edit `config-template.json` with the new settings.
+2. Go to **Intune → Devices → Scripts → Add**.
+3. Upload `update-config-api.ps1` and `config-template.json`.
+4. Assign to the same groups.
+5. The script pushes the config via `PUT /config.json` — the app applies it
+   immediately. The auth token is auto-detected from the existing config.
+
+> **Warning:** If you're changing the auth token itself, use Option A (file
+> replacement + restart). Option B would fail because the new config changes
+> the token while the API request uses the old one.
+
 For the complete step-by-step guide (Intune upload, detection rules,
-Defender exclusion profile, troubleshooting), see:
+Defender exclusion profile, troubleshooting, update procedures), see:
 **[docs/Intune-Deployment.md](../../docs/Intune-Deployment.md)**

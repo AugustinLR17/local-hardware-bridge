@@ -8,6 +8,7 @@ import com.fazecast.jSerialComm.SerialPort;
 import io.javalin.Javalin;
 import io.javalin.community.ssl.SslPlugin;
 import io.javalin.http.ContentType;
+import io.javalin.http.HandlerType;
 import io.javalin.plugin.bundled.CorsPluginConfig;
 import io.javalin.util.JavalinBindException;
 import io.javalin.websocket.WsContext;
@@ -249,6 +250,30 @@ public class Server implements WebSocketServerInterface {
             });
         }
 
+        // Handle CORS preflight (OPTIONS) requests BEFORE the auth handler.
+        // The bundled CORS plugin should handle this, but in some Javalin versions
+        // the before() auth handler runs before the CORS plugin intercepts OPTIONS,
+        // causing preflight requests to be rejected with 401. This ensures browsers
+        // can always send preflight checks regardless of authentication.
+        javalinServer.before(ctx -> {
+            if (ctx.method() == HandlerType.OPTIONS) {
+                Config.Server.Cors corsConfig = configService.getConfig().getServer().getCors();
+                String origin = ctx.header("Origin");
+                if (corsConfig.isAllowAllOrigins() || corsConfig.getAllowedOrigins() == null || corsConfig.getAllowedOrigins().isEmpty()) {
+                    ctx.header("Access-Control-Allow-Origin", "*");
+                } else if (origin != null && corsConfig.getAllowedOrigins().contains(origin)) {
+                    ctx.header("Access-Control-Allow-Origin", origin);
+                } else {
+                    ctx.header("Access-Control-Allow-Origin", "*");
+                }
+                ctx.header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+                ctx.header("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Requested-With");
+                ctx.header("Access-Control-Max-Age", "3600");
+                ctx.status(200);
+                return;
+            }
+        });
+
         // Add HTTP Auth & endpoint security
         javalinServer.before(ctx -> {
             Config.Security security = configService.getConfig().getSecurity();
@@ -300,6 +325,24 @@ public class Server implements WebSocketServerInterface {
 
                         // Basic Auth
                         if (ctx.basicAuthCredentials() != null && constantTimeEquals(ctx.basicAuthCredentials().getPassword(), expectedToken)) {
+                            return;
+                        }
+                    } catch (Exception e) {
+                        // NOOP
+                    }
+                }
+
+                // If this endpoint has its own password, check it as an alternative
+                // to the global token. This allows per-endpoint passwords to work even
+                // when global auth is enabled (the global token OR the endpoint password
+                // is accepted for that specific endpoint).
+                if (rule != null && rule.getPassword() != null && !rule.getPassword().isEmpty()) {
+                    try {
+                        String bearer = extractBearerToken(ctx.header("Authorization"));
+                        if (bearer != null && constantTimeEquals(bearer, rule.getPassword())) {
+                            return;
+                        }
+                        if (ctx.basicAuthCredentials() != null && constantTimeEquals(ctx.basicAuthCredentials().getPassword(), rule.getPassword())) {
                             return;
                         }
                     } catch (Exception e) {
