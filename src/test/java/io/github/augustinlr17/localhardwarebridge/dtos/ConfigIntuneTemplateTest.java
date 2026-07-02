@@ -111,15 +111,21 @@ public class ConfigIntuneTemplateTest {
     }
 
     @Test
-    public void templateHasUpdateDisabled() throws Exception {
+    public void templateHasUpdateEnabled() throws Exception {
         File template = findTemplateFile();
         assumeTemplateExists(template);
 
         String json = new String(Files.readAllBytes(template.toPath()), StandardCharsets.UTF_8);
         Config config = new ObjectMapper().readValue(json, Config.class);
 
-        assertFalse("Auto-update must be disabled in enterprise template (managed via Intune)",
+        assertTrue("Auto-update must be enabled in enterprise template",
             config.getUpdate().isEnabled());
+        assertTrue("Auto-download must be enabled in enterprise template",
+            config.getUpdate().isAutoDownload());
+        assertTrue("Auto-install must be enabled in enterprise template",
+            config.getUpdate().isAutoInstall());
+        assertEquals("Check interval must be 24h in enterprise template",
+            24, config.getUpdate().getCheckIntervalHours());
     }
 
     @Test
@@ -153,7 +159,7 @@ public class ConfigIntuneTemplateTest {
         assertTrue("Auth enabled round-trip", config2.getServer().getAuthentication().isEnabled());
         assertFalse("Serial disabled round-trip", config2.getSerial().isEnabled());
         assertTrue("Printer enabled round-trip", config2.getPrinter().isEnabled());
-        assertFalse("Update disabled round-trip", config2.getUpdate().isEnabled());
+        assertTrue("Update enabled round-trip", config2.getUpdate().isEnabled());
     }
 
     @Test

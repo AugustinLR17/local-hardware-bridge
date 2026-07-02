@@ -150,7 +150,7 @@ public class IntunePackagingTest {
         assertTrue("printer must be enabled in the template",
                 config.getPrinter().isEnabled());
 
-        assertFalse("update must be disabled in the template",
+        assertTrue("update must be enabled in the template",
                 config.getUpdate().isEnabled());
     }
 

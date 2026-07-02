@@ -44,11 +44,11 @@
     "mappings": []
   },
   "update": {
-    "enabled": false,
-    "autoDownload": false,
-    "autoInstall": false,
+    "enabled": true,
+    "autoDownload": true,
+    "autoInstall": true,
     "includePrereleases": false,
-    "checkIntervalHours": 0,
+    "checkIntervalHours": 24,
     "repository": "AugustinLR17/local-hardware-bridge",
     "channel": "stable"
   }

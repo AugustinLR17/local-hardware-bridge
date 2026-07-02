@@ -198,6 +198,75 @@ jobs:
           name: windows-exe
           path: build/dist/windows-exe/*.exe
 
+      # --------------------------------------------------------------------------
+      # Build a ready-to-deploy .intunewin package for Microsoft Intune.
+      # The package bundles: a dedicated NSIS installer built with NO_DESKTOP_ICON,
+      # the install/uninstall PowerShell wrappers, and the enterprise config
+      # template (auto-update enabled). The admin just uploads it to Intune.
+      # --------------------------------------------------------------------------
+      - name: Build Intune NSIS installer (no desktop icon)
+        run: |
+          $nsis = "C:\Program Files (x86)\NSIS\makensis.exe"
+          & $nsis "/DPRODUCT_VERSION=${{ steps.version.outputs.VERSION }}" "/DNO_DESKTOP_ICON=1" install.nsi
+          if ($LASTEXITCODE -ne 0) { throw "makensis (intune) failed with exit code $LASTEXITCODE" }
+        shell: powershell
+
+      - name: Sign Intune NSIS installer with eSigner
+        if: ${{ vars.ESIGNER_ENABLED == 'true' }}
+        uses: sslcom/esigner-codesign@develop
+        with:
+          command: sign
+          username: ${{ secrets.ES_USERNAME }}
+          password: ${{ secrets.ES_PASSWORD }}
+          credential_id: ${{ secrets.CREDENTIAL_ID }}
+          totp_secret: ${{ secrets.ES_TOTP_SECRET }}
+          file_path: ${{ github.workspace }}\lhb.exe
+          override: true
+          malware_block: false
+          environment_name: PROD
+          jvm_max_memory: 2048M
+
+      - name: Assemble Intune package source folder
+        run: |
+          $src = "build\dist\intune-src"
+          New-Item -ItemType Directory -Force -Path $src | Out-Null
+          # Rename installer to lhb.exe (install.ps1 auto-detects this name)
+          Copy-Item "lhb.exe" "$src\lhb.exe" -Force
+          Copy-Item "packaging\intune\install.ps1" "$src\install.ps1"
+          Copy-Item "packaging\intune\uninstall.ps1" "$src\uninstall.ps1"
+          Copy-Item "packaging\intune\config-template.json" "$src\config-template.json"
+          Write-Host "Intune source folder contents:"
+          Get-ChildItem $src | Format-Table Name, Length
+        shell: powershell
+
+      - name: Download IntuneWinAppUtil
+        run: |
+          $url = "https://github.com/microsoft/Microsoft-Win32-Content-Prep-Tool/releases/latest/download/IntuneWinAppUtil.exe"
+          Invoke-WebRequest -Uri $url -OutFile "IntuneWinAppUtil.exe"
+          Write-Host "Downloaded IntuneWinAppUtil.exe"
+        shell: powershell
+
+      - name: Build .intunewin package
+        run: |
+          New-Item -ItemType Directory -Force -Path "build\dist\intune-out" | Out-Null
+          .\IntuneWinAppUtil.exe `
+            -c "build\dist\intune-src" `
+            -s install.ps1 `
+            -o "build\dist\intune-out" `
+            -q
+          # Rename to include the version
+          Move-Item "build\dist\intune-out\install.intunewin" `
+            "build\dist\intune-out\Local-Hardware-Bridge-${{ steps.version.outputs.VERSION }}.intunewin" -Force
+          Write-Host "Built .intunewin package:"
+          Get-ChildItem "build\dist\intune-out" | Format-Table Name, Length
+        shell: powershell
+
+      - name: Upload Intune package
+        uses: actions/upload-artifact@v4
+        with:
+          name: intune-package
+          path: build/dist/intune-out/*.intunewin
+
   linux-appimage:
     name: Linux AppImage
     runs-on: ubuntu-latest
@@ -435,6 +504,7 @@ jobs:
             |----------|------|-------|
             | Cross-platform | `local-hardware-bridge-*.jar` | Requires JDK 21+ |
             | Windows | `Local-Hardware-Bridge-*.exe` | Single installer, bundled Java, runs in background, auto-start${{ vars.ESIGNER_ENABLED == 'true' && ', code-signed via SSL.com eSigner' || '' }} |
+            | Intune | `*.intunewin` | Ready-to-deploy Win32 app package (no desktop icon, auto-update enabled, enterprise config) |
             | Linux | `.AppImage` | Self-contained, bundled Java, no JDK needed |
             | macOS | `.dmg` installer | Intel & Apple Silicon |
             | Terminal | `lhb-tui-*` | Admin dashboard, no JVM needed |
@@ -475,6 +545,7 @@ jobs:
           files: |
             artifacts/fat-jar/*.jar
             artifacts/windows-exe/*.exe
+            artifacts/intune-package/*.intunewin
             artifacts/linux-appimage/*.AppImage
             artifacts/macos-dmg/*.dmg
             artifacts/lhb-tui-*/*

@@ -19,7 +19,7 @@ The deployment consists of three parts:
 2. **Endpoint Protection profile** — a Microsoft Defender exclusion for the
    install directory (prevents false-positive quarantines).
 3. **Config template** — a `config.json` with enterprise defaults (auth token,
-   serial disabled, printer enabled, auto-update disabled).
+   serial disabled, printer enabled, auto-update enabled).
 
 For updating the config on already-deployed machines (without redeploying the
 app), see [Updating the Configuration](#updating-the-configuration) below.
@@ -29,17 +29,22 @@ app), see [Updating the Configuration](#updating-the-configuration) below.
 ## Prerequisites
 
 - **Intune license** (Microsoft 365 E3/E5 or Intune Plan 1)
-- **IntuneWinAppUtil.exe** — download directly from
-  [GitHub: Microsoft/Win32-Content-Prep-Tool](https://github.com/microsoft/Microsoft-Win32-Content-Prep-Tool/blob/master/IntuneWinAppUtil.exe)
-  (Windows-only utility, run on a Windows machine)
-- **`lhb.exe`** — download from the
+- **`.intunewin` package** — download directly from the
   [latest GitHub release](https://github.com/AugustinLR17/local-hardware-bridge/releases/latest)
+  (file: `Local-Hardware-Bridge-<version>.intunewin`).
+  This is a ready-to-upload Win32 app package built in CI with:
+  - No desktop icon (NSIS built with `NO_DESKTOP_ICON`)
+  - Enterprise config template (auto-update enabled, auth token `lhb002`)
+  - Install/uninstall PowerShell wrappers
+- **Alternatively**, build manually using `IntuneWinAppUtil.exe` (see
+  [Manual .intunewin build](#manual-intunewin-build) below)
 - **Intune scripts** — from `packaging/intune/` in this repository:
   `install.ps1`, `uninstall.ps1`, `config-template.json`
   (plus `update-config.ps1` and `update-config-api.ps1` for config-only updates)
 
-> The scripts in `packaging/intune/` are **not** attached to GitHub Releases —
-> they are stable across versions. Only `lhb.exe` changes between releases.
+> The `.intunewin` package is generated automatically in CI for each release.
+> The scripts in `packaging/intune/` are stable across versions — only the
+> bundled installer changes between releases.
 
 ---
 
@@ -57,7 +62,7 @@ defaults are:
   },
   "serial": { "enabled": false, "mappings": [] },
   "printer": { "enabled": true, "mappings": [] },
-  "update": { "enabled": false }
+  "update": { "enabled": true, "autoDownload": true, "autoInstall": true }
 }
 ```
 
@@ -70,7 +75,10 @@ Key decisions:
 | `server.bind`                  | `127.0.0.1` | Localhost only. Use `0.0.0.0` for network  |
 | `serial.enabled`               | `false`     | Disabled unless you use serial devices     |
 | `printer.enabled`              | `true`      | Always on; idle if no printer is connected |
-| `update.enabled`               | `false`     | Updates managed via Intune, not in-app     |
+| `update.enabled`               | `true`      | Auto-update checks enabled                  |
+| `update.autoDownload`          | `true`      | Downloads new versions automatically        |
+| `update.autoInstall`           | `true`      | Applies updates on next restart             |
+| `update.checkIntervalHours`    | `24`        | Daily update checks                          |
 
 The config is deployed **once** — on first install only. If `config.json`
 already exists (e.g. the user installed LHB manually before), the script
@@ -79,15 +87,35 @@ after deployment.
 
 ---
 
-## Step 2 — Build the .intunewin package
+## Step 2 — Get the .intunewin package
 
-On a Windows machine:
+### Option A: Download the CI-built package (recommended)
 
-1. Create a working folder, e.g. `C:\Intune\LHB\`.
-2. Download the NSIS installer from the
-   [latest GitHub release](https://github.com/AugustinLR17/local-hardware-bridge/releases/latest)
-   — either `lhb.exe` or `Local-Hardware-Bridge-<version>.exe`.
-3. Place these files in the folder:
+Each GitHub release includes a ready-to-upload `.intunewin` package:
+
+1. Go to the
+   [latest GitHub release](https://github.com/AugustinLR17/local-hardware-bridge/releases/latest).
+2. Download `Local-Hardware-Bridge-<version>.intunewin`.
+
+The package is built automatically in CI with:
+- NSIS installer built with `NO_DESKTOP_ICON` (no desktop shortcut on silent install)
+- Enterprise config template (auth enabled, auto-update enabled)
+- Install/uninstall PowerShell wrappers
+
+> If you customized `config-template.json` in Step 1, use Option B instead —
+> the CI package uses the repository defaults.
+
+### Option B: Build manually
+
+If you need a custom config or custom installer flags, build the `.intunewin`
+yourself on a Windows machine:
+
+1. Download `IntuneWinAppUtil.exe` from
+   [GitHub: Microsoft/Win32-Content-Prep-Tool](https://github.com/microsoft/Microsoft-Win32-Content-Prep-Tool/releases/latest).
+2. Create a working folder, e.g. `C:\Intune\LHB\`.
+3. Download the NSIS installer from the
+   [latest GitHub release](https://github.com/AugustinLR17/local-hardware-bridge/releases/latest).
+4. Place these files in the folder:
    - The NSIS installer (`lhb.exe` or `Local-Hardware-Bridge-<version>.exe`)
    - `install.ps1` (from `packaging/intune/`)
    - `uninstall.ps1` (from `packaging/intune/`)
@@ -99,13 +127,11 @@ On a Windows machine:
 > ```
 > makensis /DPRODUCT_VERSION=<version> /DNO_DESKTOP_ICON=1 install.nsi
 > ```
-> The installer still shows the component page, but the desktop shortcut is
-> unchecked. Users can still opt in manually if desired.
 
-4. Run IntuneWinAppUtil.exe:
+5. Run IntuneWinAppUtil.exe:
 
 ```
-IntuneWinAppUtil.exe -s C:\Intune\LHB -d C:\Intune\Output -o install.ps1
+IntuneWinAppUtil.exe -c C:\Intune\LHB -s install.ps1 -o C:\Intune\Output -q
 ```
 
 This produces `C:\Intune\Output\install.intunewin`.
