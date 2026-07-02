@@ -158,7 +158,8 @@ def main():
     # 9. Restart endpoint: returns quickly, and the server becomes healthy again (verifies
     # the async restart fix where stop()/start() run off the request thread). The health
     # endpoint is exempt from auth so polling works regardless of config state.
-    status, body = request("POST", "/system/restart.json")
+    # Since the security fix, restart requires ?confirm=true to prevent accidental triggers.
+    status, body = request("POST", "/system/restart.json?confirm=true")
     assert_true("restart accepted status", status in (200, 202))
     assert_true("restart body mentions restarting", "restarting" in body.lower())
 
