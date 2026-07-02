@@ -51,6 +51,7 @@
 
 ; --------------------------------
 ; Install scope: per-user (default) or per-machine (/DPER_MACHINE=1)
+; Optional: /DNO_DESKTOP_ICON=1 to uncheck desktop shortcut by default
 ; --------------------------------
 !ifdef PER_MACHINE
   !define REG_ROOT HKLM
@@ -222,7 +223,13 @@ LangString DESC_SEC_AUTOSTART ${LANG_ENGLISH} "Automatically start Local Hardwar
 ; Component default selections
 ; --------------------------------
 Function .onInit
-  !insertmacro SetSectionFlag ${SEC_DESKTOP} ${SF_SELECTED}
+  ; Desktop shortcut is selected by default, unless built with /DNO_DESKTOP_ICON=1
+  ; (used for enterprise/Intune deployments where desktop icons are undesirable)
+  !ifdef NO_DESKTOP_ICON
+    !insertmacro UnselectSection ${SEC_DESKTOP}
+  !else
+    !insertmacro SetSectionFlag ${SEC_DESKTOP} ${SF_SELECTED}
+  !endif
   !insertmacro SetSectionFlag ${SEC_STARTMENU} ${SF_SELECTED}
   !insertmacro SetSectionFlag ${SEC_AUTOSTART} ${SF_SELECTED}
 FunctionEnd

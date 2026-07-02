@@ -84,15 +84,25 @@ after deployment.
 On a Windows machine:
 
 1. Create a working folder, e.g. `C:\Intune\LHB\`.
-2. Place these files in the folder:
-   - The NSIS installer from the GitHub release — either `lhb.exe` or
-     `Local-Hardware-Bridge-<version>.exe` (the install script auto-detects
-     both names; no need to rename)
+2. Download the NSIS installer from the
+   [latest GitHub release](https://github.com/AugustinLR17/local-hardware-bridge/releases/latest)
+   — either `lhb.exe` or `Local-Hardware-Bridge-<version>.exe`.
+3. Place these files in the folder:
+   - The NSIS installer (`lhb.exe` or `Local-Hardware-Bridge-<version>.exe`)
    - `install.ps1` (from `packaging/intune/`)
    - `uninstall.ps1` (from `packaging/intune/`)
    - `config-template.json` (from `packaging/intune/`, edited in Step 1)
 
-3. Run IntuneWinAppUtil.exe:
+> **Enterprise build (no desktop icon):** For Intune deployments, desktop icons
+> are usually undesirable. Build the installer with the `NO_DESKTOP_ICON` flag
+> to uncheck the desktop shortcut by default:
+> ```
+> makensis /DPRODUCT_VERSION=<version> /DNO_DESKTOP_ICON=1 install.nsi
+> ```
+> The installer still shows the component page, but the desktop shortcut is
+> unchecked. Users can still opt in manually if desired.
+
+4. Run IntuneWinAppUtil.exe:
 
 ```
 IntuneWinAppUtil.exe -s C:\Intune\LHB -d C:\Intune\Output -o install.ps1

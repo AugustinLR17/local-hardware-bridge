@@ -140,4 +140,38 @@ public class NsisInstallModeTest {
         assertTrue("Auto-start Run key must invoke wscript.exe with the VBS launcher",
             nsi.contains("wscript.exe"));
     }
+
+    // --- NO_DESKTOP_ICON flag for enterprise/Intune deployments ---
+
+    @Test
+    public void nsiHasNoDesktopIconFlag() throws Exception {
+        String nsi = readNsi();
+        assertTrue("install.nsi must support NO_DESKTOP_ICON define",
+            nsi.contains("NO_DESKTOP_ICON"));
+    }
+
+    @Test
+    public void nsiNoDesktopIconUnselectsSection() throws Exception {
+        String nsi = readNsi();
+        assertTrue("NO_DESKTOP_ICON must use UnselectSection for SEC_DESKTOP",
+            nsi.contains("UnselectSection ${SEC_DESKTOP}"));
+    }
+
+    @Test
+    public void nsiNoDesktopIconIsConditional() throws Exception {
+        String nsi = readNsi();
+        assertTrue("NO_DESKTOP_ICON must be in an !ifdef block",
+            nsi.contains("!ifdef NO_DESKTOP_ICON"));
+        assertTrue("Default (no flag) must still select SEC_DESKTOP",
+            nsi.contains("SetSectionFlag ${SEC_DESKTOP} ${SF_SELECTED}"));
+    }
+
+    @Test
+    public void nsiDesktopShortcutSectionExists() throws Exception {
+        String nsi = readNsi();
+        assertTrue("Desktop shortcut section must exist",
+            nsi.contains("SEC_DESKTOP"));
+        assertTrue("Desktop shortcut must create shortcut on $DESKTOP",
+            nsi.contains("$DESKTOP"));
+    }
 }
