@@ -7,6 +7,7 @@ import lombok.extern.log4j.Log4j2;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.io.FilenameUtils;
 import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.printing.PDFPrintable;
 import org.apache.pdfbox.printing.Scaling;
 import io.github.augustinlr17.localhardwarebridge.dtos.Config;
@@ -504,20 +505,11 @@ public class PrinterWebSocketService implements WebSocketServiceInterface {
         PrinterJob job = PrinterJob.getPrinterJob();
         job.setPrintService(printerSearchResult.getDocPrintJob().getPrintService());
 
-        PageFormat pageFormat = getPageFormat(job, printerSearchResult);
-
         try (PDDocument document = PDDocument.load(pdfFile)) {
             Book book = new Book();
             for (int i = 0; i < document.getNumberOfPages(); i++) {
-                PageFormat eachPageFormat = (PageFormat) pageFormat.clone();
-
-                if (printerSearchResult.getMapping().isAutoRotate()) {
-                    if (document.getPage(i).getCropBox().getWidth() > document.getPage(i).getCropBox().getHeight()) {
-                        eachPageFormat.setOrientation(PageFormat.LANDSCAPE);
-                    } else {
-                        eachPageFormat.setOrientation(PageFormat.PORTRAIT);
-                    }
-                }
+                PDRectangle cropBox = document.getPage(i).getCropBox();
+                PageFormat eachPageFormat = getPdfPageFormat(job, printerSearchResult, cropBox);
 
                 PDFPrintable pdfPrintable = new PDFPrintable(document, Scaling.SHRINK_TO_FIT, false, printerSearchResult.getMapping().getForceDPI());
                 AnnotatedPrintable annotatedPrintable = new AnnotatedPrintable(pdfPrintable);
@@ -777,23 +769,13 @@ public class PrinterWebSocketService implements WebSocketServiceInterface {
         PrinterJob job = PrinterJob.getPrinterJob();
         job.setPrintService(docPrintJob.getPrintService());
 
-        PageFormat pageFormat = getPageFormat(job, printerSearchResult);
-
         try (PDDocument document = PDDocument.load(new File(path))) {
             Book book = new Book();
             for (int i = 0; i < document.getNumberOfPages(); i += 1) {
-                // Rotate Page Automatically
-                PageFormat eachPageFormat = (PageFormat) pageFormat.clone();
-
-                if (printerSearchResult.getMapping().isAutoRotate()) {
-                    if (document.getPage(i).getCropBox().getWidth() > document.getPage(i).getCropBox().getHeight()) {
-                        log.debug("Auto rotation result: LANDSCAPE");
-                        eachPageFormat.setOrientation(PageFormat.LANDSCAPE);
-                    } else {
-                        log.debug("Auto rotation result: PORTRAIT");
-                        eachPageFormat.setOrientation(PageFormat.PORTRAIT);
-                    }
-                }
+                // Use the PDF page's own dimensions as paper size so SHRINK_TO_FIT
+                // doesn't scale down when the printer's default paper differs.
+                PDRectangle cropBox = document.getPage(i).getCropBox();
+                PageFormat eachPageFormat = getPdfPageFormat(job, printerSearchResult, cropBox);
 
                 PDFPrintable pdfPrintable = new PDFPrintable(document, Scaling.SHRINK_TO_FIT, false, printerSearchResult.getMapping().getForceDPI());
 
@@ -837,6 +819,56 @@ public class PrinterWebSocketService implements WebSocketServiceInterface {
         log.debug("Final Paper Imageable Size: {} x {}, XY: {}, {}", pageFormat.getPaper().getImageableWidth(), pageFormat.getPaper().getImageableHeight(), pageFormat.getPaper().getImageableX(), pageFormat.getPaper().getImageableY());
 
         return pageFormat;
+    }
+
+    /**
+     * Builds a per-page {@link PageFormat} whose paper matches the actual PDF
+     * page dimensions, preventing {@link Scaling#SHRINK_TO_FIT} from scaling
+     * down content when the printer's default paper size differs from the PDF
+     * (e.g. printer defaults to Letter but the PDF is A4 — content would be
+     * shrunk ~6% and pushed to the top-left corner instead of filling the page).
+     *
+     * <p>The crop box is in PDF points (1/72"), which is the same unit Java's
+     * {@link Paper} uses, so dimensions are used directly.
+     *
+     * @param job           the printer job (used to obtain a default PageFormat)
+     * @param result        the printer search result (mapping config)
+     * @param cropBox       the PDF page crop box
+     * @return a PageFormat matching the PDF page dimensions
+     */
+    private PageFormat getPdfPageFormat(PrinterJob job, PrinterSearchResult result, PDRectangle cropBox) {
+        PageFormat pf = job.defaultPage();
+        Paper paper = pf.getPaper();
+
+        double pdfW = cropBox.getWidth();
+        double pdfH = cropBox.getHeight();
+        boolean isLandscape = pdfW > pdfH;
+
+        // Paper is always stored in portrait orientation (Java convention).
+        // The orientation flag on PageFormat handles the physical rotation.
+        if (isLandscape) {
+            paper.setSize(pdfH, pdfW);
+        } else {
+            paper.setSize(pdfW, pdfH);
+        }
+
+        if (result.getMapping().isResetImageableArea()) {
+            if (isLandscape) {
+                paper.setImageableArea(0, 0, pdfH, pdfW);
+            } else {
+                paper.setImageableArea(0, 0, pdfW, pdfH);
+            }
+        }
+
+        pf.setPaper(paper);
+
+        if (result.getMapping().isAutoRotate() && isLandscape) {
+            pf.setOrientation(PageFormat.LANDSCAPE);
+        } else {
+            pf.setOrientation(PageFormat.PORTRAIT);
+        }
+
+        return pf;
     }
 
     /**
