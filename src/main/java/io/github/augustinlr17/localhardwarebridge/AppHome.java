@@ -40,24 +40,39 @@ public final class AppHome {
                 return;
             }
             File codeSource = new File(location.toURI());
-            if (!codeSource.isFile() || !codeSource.getName().endsWith(".jar")) {
-                return;
-            }
-            File appDir = codeSource.getParentFile();
-            if (appDir != null && appDir.isDirectory()) {
-                // jpackage layout: <install_dir>/app/<jar> — config.json is in <install_dir>
-                if ("app".equals(appDir.getName())) {
-                    File installDir = appDir.getParentFile();
-                    if (installDir != null && installDir.isDirectory()) {
-                        System.setProperty("user.dir", installDir.getAbsolutePath());
-                        return;
-                    }
-                }
-                // Flat layout (shadow JAR, manual java -jar)
-                System.setProperty("user.dir", appDir.getAbsolutePath());
+            File resolved = resolveInstallDir(codeSource);
+            if (resolved != null) {
+                System.setProperty("user.dir", resolved.getAbsolutePath());
             }
         } catch (Exception e) {
             // Best effort: fall back to the launch working directory.
         }
+    }
+
+    /**
+     * Given the code source file (JAR or exploded classes), returns the
+     * directory that should be used as {@code user.dir}.
+     *
+     * <p>For jpackage layout ({@code <install>/app/<jar>}), returns
+     * {@code <install>}. For flat layout ({@code <dir>/<jar>}), returns
+     * {@code <dir>}. Returns {@code null} for exploded classes (no-op).
+     */
+    static File resolveInstallDir(File codeSource) {
+        if (codeSource == null || !codeSource.isFile() || !codeSource.getName().endsWith(".jar")) {
+            return null;
+        }
+        File appDir = codeSource.getParentFile();
+        if (appDir != null && appDir.isDirectory()) {
+            // jpackage layout: <install_dir>/app/<jar> — config.json is in <install_dir>
+            if ("app".equals(appDir.getName())) {
+                File installDir = appDir.getParentFile();
+                if (installDir != null && installDir.isDirectory()) {
+                    return installDir;
+                }
+            }
+            // Flat layout (shadow JAR, manual java -jar)
+            return appDir;
+        }
+        return null;
     }
 }
