@@ -1,0 +1,10 @@
+{
+  "name": "lhb-webui-tests",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Playwright Web UI tests for Local Hardware Bridge",
+  "dependencies": {
+    "playwright": "1.48.0"
+  }
+}

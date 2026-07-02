@@ -52,6 +52,14 @@ if [ $TEST_EXIT -eq 0 ]; then
     TEST_EXT_EXIT=$?
 fi
 
+# Run Playwright Web UI tests (same bridge instance, headless Chromium)
+WEBUI_EXIT=0
+if [ $TEST_EXIT -eq 0 ] && [ $TEST_EXT_EXIT -eq 0 ]; then
+    echo "=== Running Web UI tests (Playwright) ==="
+    cd /app/web-ui && node /app/web-ui-test.mjs http://127.0.0.1:57212 || WEBUI_EXIT=$?
+    cd /app
+fi
+
 # Kill the first bridge so the cross-bridge test can start its own instances
 kill $BRIDGE_PID 2>/dev/null || true
 wait $BRIDGE_PID 2>/dev/null || true
@@ -104,6 +112,9 @@ if [ $TEST_EXIT -ne 0 ]; then
 fi
 if [ $TEST_EXT_EXIT -ne 0 ]; then
     exit $TEST_EXT_EXIT
+fi
+if [ $WEBUI_EXIT -ne 0 ]; then
+    exit $WEBUI_EXIT
 fi
 if [ $CROSS_EXIT -ne 0 ]; then
     exit $CROSS_EXIT
