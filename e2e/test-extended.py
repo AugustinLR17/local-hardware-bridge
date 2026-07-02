@@ -312,7 +312,8 @@ def main():
     assert_eq("non-existent printer trays returns 404", s, 404)
 
     # --- 17. Basic auth (password = token) ---
-    # NOTE: Global auth is captured at server start, so changing it requires a restart.
+    # Auth changes take effect immediately (live config read), so the restart
+    # endpoint already requires the token after the PUT /config.json call.
     print("\n--- Basic auth ---")
     # Get a FRESH config from the server
     s, b, h = request("GET", "/config.json")
@@ -327,8 +328,8 @@ def main():
     s, b, h = request("PUT", "/config.json", body=config)
     assert_eq("enable auth for basic test", s, 200)
 
-    # Restart so the auth change takes effect
-    s, b, h = request("POST", "/system/restart.json")
+    # Restart so the auth change takes effect (token required — auth is now live)
+    s, b, h = request("POST", "/system/restart.json", headers={"Authorization": "Bearer basictoken123"})
     assert_true("restart for auth accepted", s in (200, 202), f"got {s}")
     time.sleep(2)
 
