@@ -149,8 +149,9 @@ public class Server implements WebSocketServerInterface {
 
                 wsConnectContext.enableAutomaticPings(5, TimeUnit.SECONDS);
 
-                if (serverConfig.getAuthentication().isEnabled()) {
-                    String expectedToken = serverConfig.getAuthentication().getToken();
+                Config.Authentication currentAuth = configService.getConfig().getServer().getAuthentication();
+                if (currentAuth.isEnabled()) {
+                    String expectedToken = currentAuth.getToken();
                     String providedToken = wsConnectContext.queryParam("token");
                     if (expectedToken != null && !expectedToken.isBlank() && constantTimeEquals(providedToken, expectedToken)) {
                         return;
@@ -273,9 +274,12 @@ public class Server implements WebSocketServerInterface {
                 return;
             }
 
-            // Check global token if enabled
-            if (serverConfig.getAuthentication().isEnabled()) {
-                String expectedToken = serverConfig.getAuthentication().getToken();
+            // Check global token if enabled — read live from configService so that
+            // changes via PUT /config.json or PUT /system/server.json take effect
+            // immediately without requiring a server restart.
+            Config.Authentication currentAuth = configService.getConfig().getServer().getAuthentication();
+            if (currentAuth.isEnabled()) {
+                String expectedToken = currentAuth.getToken();
                 // A null/empty/blank configured token never auto-passes.
                 if (expectedToken != null && !expectedToken.isBlank()) {
                     try {
