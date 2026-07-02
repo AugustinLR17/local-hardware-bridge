@@ -1385,23 +1385,44 @@ createApp({
             .then(() => {
                 this.toast('Downloaded. Applying update and restarting...', 'info')
                 this.updateDownloading = false
-                // Trigger the apply endpoint (async restart)
-                axios.post('/system/update/apply')
+                axios.post('/system/update/apply?confirm=true')
                     .then(() => {
                         this.toast('Update applying - server restarting...', 'info')
                         this.restarting = true
-                        // Poll health after a delay
-                        setTimeout(() => {
-                            this.loadHealth().catch(() => {})
-                                .then(() => { this.restarting = false })
-                        }, 5000)
+                        this.pollForServerBack()
                     })
-                    .catch(err => this.handleError(err, 'Apply update failed'))
+                    .catch(err => {
+                        this.handleError(err, 'Apply update failed')
+                        this.restarting = false
+                    })
             })
             .catch(err => {
                 this.handleError(err, 'Download failed')
                 this.updateDownloading = false
             })
+    },
+
+    /* Poll /system/health every 2s; once the server is back, reload everything. */
+    pollForServerBack() {
+        let attempts = 0
+        const maxAttempts = 30  // 30 x 2s = 60s max wait
+        const poll = () => {
+            attempts++
+            this.loadHealth().then(() => {
+                this.restarting = false
+                this.toast('Server is back! Reloading...', 'success')
+                this.reloadAll()
+                this.loadUpdateStatus()
+            }).catch(() => {
+                if (attempts < maxAttempts) {
+                    setTimeout(poll, 2000)
+                } else {
+                    this.restarting = false
+                    this.toast('Server did not come back within 60s. Please refresh manually.', 'error')
+                }
+            })
+        }
+        setTimeout(poll, 3000)
     },
 
     /* ---------------- Mappings ---------------- */

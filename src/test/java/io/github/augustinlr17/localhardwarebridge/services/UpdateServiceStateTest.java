@@ -75,7 +75,8 @@ public class UpdateServiceStateTest {
 
     @Test
     public void getStatusReturnsValidDTOWithNoRelease() throws Exception {
-        // Clear latestRelease and pendingUpdate to test the "never checked" state
+        // Clear latestRelease, pendingUpdate, and lastError to test the "never checked" state.
+        // lastError may have been set by another test class sharing the UpdateService singleton.
         Field latestReleaseField = UpdateService.class.getDeclaredField("latestRelease");
         latestReleaseField.setAccessible(true);
         @SuppressWarnings("unchecked")
@@ -85,8 +86,15 @@ public class UpdateServiceStateTest {
         AtomicReference<Path> pending = getPendingUpdateField();
         Path previousPending = pending.get();
 
+        Field lastErrorField = UpdateService.class.getDeclaredField("lastError");
+        lastErrorField.setAccessible(true);
+        @SuppressWarnings("unchecked")
+        AtomicReference<String> lastError = (AtomicReference<String>) lastErrorField.get(UpdateService.getInstance());
+        String previousError = lastError.get();
+
         latestRelease.set(null);
         pending.set(null);
+        lastError.set(null);
 
         try {
             UpdateStatusDTO dto = UpdateService.getInstance().getStatus();
@@ -100,6 +108,7 @@ public class UpdateServiceStateTest {
         } finally {
             latestRelease.set(previousRelease);
             pending.set(previousPending);
+            lastError.set(previousError);
         }
     }
 
