@@ -319,6 +319,8 @@ def main():
         s, b = request(ZONES["C_QUALITY"]["base_url"], "GET", "/config.json",
                        token=ZONES["C_QUALITY"]["token"])
         config_c = json.loads(b)
+        # Restore the real token (GET /config.json masks it as "***")
+        config_c["server"]["authentication"]["token"] = ZONES["C_QUALITY"]["token"]
         config_c["security"]["endpoints"]["/printer"] = {"enabled": False, "password": ""}
         s, _ = request(ZONES["C_QUALITY"]["base_url"], "PUT", "/config.json",
                        body=config_c, token=ZONES["C_QUALITY"]["token"])
@@ -436,6 +438,8 @@ def main():
         s, b = request(ZONES["A_RECEIVING"]["base_url"], "GET", "/config.json",
                        token=ZONES["A_RECEIVING"]["token"])
         config_a = json.loads(b)
+        # Restore the real token (GET /config.json masks it as "***")
+        config_a["server"]["authentication"]["token"] = ZONES["A_RECEIVING"]["token"]
         config_a["printer"]["autoAddUnknownType"] = True
         request(ZONES["A_RECEIVING"]["base_url"], "PUT", "/config.json",
                 body=config_a, token=ZONES["A_RECEIVING"]["token"])
@@ -461,6 +465,8 @@ def main():
         s, b = request(ZONES["B_SHIPPING"]["base_url"], "GET", "/config.json",
                        token=ZONES["B_SHIPPING"]["token"])
         config_b = json.loads(b)
+        # Restore the real token (GET /config.json masks it as "***")
+        config_b["server"]["authentication"]["token"] = ZONES["B_SHIPPING"]["token"]
         config_b["printer"]["fallbackToDefault"] = True
         request(ZONES["B_SHIPPING"]["base_url"], "PUT", "/config.json",
                 body=config_b, token=ZONES["B_SHIPPING"]["token"])
