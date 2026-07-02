@@ -128,7 +128,39 @@ if (Test-Path $configDest) {
 }
 
 # ---------------------------------------------------------------------------
-# 4. Microsoft Defender exclusion (best-effort)
+# 4. Fix auto-start WorkingDir (safety net for HKCU\...\Run key)
+# ---------------------------------------------------------------------------
+# The NSIS installer writes a bare exe path to HKCU\...\Run without a
+# WorkingDir. At boot, Windows uses System32 as CWD, so the app can't
+# find config.json. We rewrite the Run key to use a VBS wrapper that
+# sets the working directory before launching the app.
+$runKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
+$launcherExe = Join-Path $installDir "$ProductName.exe"
+$vbsPath = Join-Path $installDir "lhb-launcher.vbs"
+
+if (Test-Path $runKey) {
+    $existingRun = (Get-ItemProperty -Path $runKey -Name $ProductName -ErrorAction SilentlyContinue).$ProductName
+    if ($existingRun) {
+        Write-Log "Rewriting auto-start Run key with VBS wrapper for correct WorkingDir"
+
+        # Create a VBS launcher that sets the working directory
+        $vbsContent = @"
+Set objShell = CreateObject("WScript.Shell")
+objShell.CurrentDirectory = "$installDir"
+objShell.Run """$launcherExe""", 0, False
+"@
+        Set-Content -Path $vbsPath -Value $vbsContent -Encoding ASCII -Force
+        Write-Log "Created VBS launcher at $vbsPath"
+
+        # Update the Run key to use the VBS launcher
+        $wscriptPath = "$env:SystemRoot\System32\wscript.exe"
+        Set-ItemProperty -Path $runKey -Name $ProductName -Value "`"$wscriptPath`" `"$vbsPath`""
+        Write-Log "Run key updated to use VBS launcher"
+    }
+}
+
+# ---------------------------------------------------------------------------
+# 5. Microsoft Defender exclusion (best-effort)
 # ---------------------------------------------------------------------------
 # In Intune User context, the script typically runs without admin rights, so
 # Add-MpPreference will likely fail. The primary exclusion should be pushed
@@ -146,7 +178,7 @@ try {
 }
 
 # ---------------------------------------------------------------------------
-# 5. Done
+# 6. Done
 # ---------------------------------------------------------------------------
 Write-Log "Install script completed."
 exit 0

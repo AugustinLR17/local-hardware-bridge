@@ -35,18 +35,92 @@ public final class AppHome {
      */
     public static void anchor() {
         try {
-            var location = AppHome.class.getProtectionDomain().getCodeSource().getLocation();
-            if (location == null) {
-                return;
+            // Strategy 1: protection domain code source (works for java -jar)
+            File resolved = resolveViaProtectionDomain();
+            // Strategy 2: java.class.path (works for jpackage — the launcher
+            // sets java.class.path to the app JAR path)
+            if (resolved == null) {
+                resolved = resolveViaClassPath();
             }
-            File codeSource = new File(location.toURI());
-            File resolved = resolveInstallDir(codeSource);
+            // Strategy 3: java.home (jpackage bundles a JRE in <install>/runtime;
+            // derive <install> from java.home as last resort)
+            if (resolved == null) {
+                resolved = resolveViaJavaHome();
+            }
             if (resolved != null) {
                 System.setProperty("user.dir", resolved.getAbsolutePath());
             }
         } catch (Exception e) {
             // Best effort: fall back to the launch working directory.
         }
+    }
+
+    static File resolveViaProtectionDomain() {
+        try {
+            var location = AppHome.class.getProtectionDomain().getCodeSource().getLocation();
+            if (location == null) {
+                return null;
+            }
+            return resolveInstallDir(new File(location.toURI()));
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    static File resolveViaClassPath() {
+        try {
+            String classPath = System.getProperty("java.class.path");
+            if (classPath == null || classPath.isBlank()) {
+                return null;
+            }
+            // jpackage sets java.class.path to ONLY the app JAR path, e.g.
+            // C:\Users\...\Local Hardware Bridge\app\bridge.jar
+            // In other contexts (IDE, gradle test), java.class.path contains
+            // many entries (dependencies, test classes, etc.). We only use
+            // this strategy when there is exactly one classpath entry, which
+            // is the jpackage signature.
+            String[] entries = classPath.split(File.pathSeparator);
+            if (entries.length != 1) {
+                return null;
+            }
+            return resolveInstallDir(new File(entries[0]));
+        } catch (Exception e) {
+            // NOOP
+        }
+        return null;
+    }
+
+    static File resolveViaJavaHome() {
+        try {
+            String javaHome = System.getProperty("java.home");
+            if (javaHome == null || javaHome.isBlank()) {
+                return null;
+            }
+            // jpackage layout: <install>/runtime/bin  (or <install>/runtime)
+            // We need to find <install>, which is 1-2 levels up from java.home.
+            File home = new File(javaHome).getAbsoluteFile();
+            // Walk up: runtime/bin → runtime → <install>
+            // or:     runtime → <install>
+            File runtimeDir = home;
+            // If we're in runtime/bin, go up to runtime
+            if ("bin".equals(runtimeDir.getName())) {
+                runtimeDir = runtimeDir.getParentFile();
+            }
+            // If we're in runtime, go up to <install>
+            if (runtimeDir != null && "runtime".equals(runtimeDir.getName())) {
+                File installDir = runtimeDir.getParentFile();
+                if (installDir != null && installDir.isDirectory()) {
+                    // Verify this looks like the install dir by checking for
+                    // the app/ sub-directory or the launcher exe
+                    if (new File(installDir, "app").isDirectory()) {
+                        return installDir;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            // NOOP
+        }
+        return null;
     }
 
     /**

@@ -191,13 +191,16 @@ SectionEnd
 ; Section: Auto-start on boot (optional)
 ; --------------------------------
 Section "Start automatically when Windows starts" SEC_AUTOSTART
-  ; Point Run key at the windowless launcher with the install dir as
-  ; working directory. Without this, Windows uses System32 as CWD and
-  ; the app cannot find config.json.
-  WriteRegStr ${REG_ROOT} "${RUN_KEY}" "${PRODUCT_NAME}" '"$INSTDIR\${LAUNCHER_EXE}"'
-  ; The Run key does not support a separate WorkingDir value, so the
-  ; app's AppHome.anchor() resolves user.dir from the JAR location
-  ; (jpackage layout: <install>/app/<jar>) to fix this at the JVM level.
+  ; The HKCU\...\Run key does not support a separate WorkingDir value.
+  ; If we write a bare exe path, Windows uses System32 as CWD at boot,
+  ; and the app cannot find config.json. We create a VBS wrapper that
+  ; sets the working directory before launching the app.
+  FileOpen $0 "$INSTDIR\lhb-launcher.vbs" w
+  FileWrite $0 'Set objShell = CreateObject("WScript.Shell")$\r$\n'
+  FileWrite $0 'objShell.CurrentDirectory = "$INSTDIR"$\r$\n'
+  FileWrite $0 'objShell.Run """$INSTDIR\${LAUNCHER_EXE}""", 0, False$\r$\n'
+  FileClose $0
+  WriteRegStr ${REG_ROOT} "${RUN_KEY}" "${PRODUCT_NAME}" '"$SYSDIR\wscript.exe" "$INSTDIR\lhb-launcher.vbs"'
 SectionEnd
 
 ; --------------------------------

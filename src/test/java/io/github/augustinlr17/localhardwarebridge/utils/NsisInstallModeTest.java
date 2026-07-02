@@ -117,4 +117,27 @@ public class NsisInstallModeTest {
         assertTrue("install.nsi must have PRODUCT_VERSION define",
             nsi.contains("!define PRODUCT_VERSION"));
     }
+
+    // --- VBS launcher for auto-start WorkingDir fix ---
+
+    @Test
+    public void nsiAutoStartCreatesVbsLauncher() throws Exception {
+        String nsi = readNsi();
+        assertTrue("Auto-start section must create lhb-launcher.vbs",
+            nsi.contains("lhb-launcher.vbs"));
+    }
+
+    @Test
+    public void nsiVbsLauncherSetsCurrentDirectory() throws Exception {
+        String nsi = readNsi();
+        assertTrue("VBS launcher must set CurrentDirectory to install dir",
+            nsi.contains("CurrentDirectory"));
+    }
+
+    @Test
+    public void nsiAutoStartUsesWscriptWithVbs() throws Exception {
+        String nsi = readNsi();
+        assertTrue("Auto-start Run key must invoke wscript.exe with the VBS launcher",
+            nsi.contains("wscript.exe"));
+    }
 }
