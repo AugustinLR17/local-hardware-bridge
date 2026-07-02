@@ -435,7 +435,9 @@ public class PrinterWebSocketService implements WebSocketServiceInterface {
 
         byte[] rawBytes = Base64.decodeBase64(printDocument.getRawContent());
         String text = decodeRawAsText(rawBytes);
-        BufferedImage image = renderTextToImage(text);
+        // Use wider canvas + larger font for non-thermal printers (inkjet/laser)
+        // so text is not stretched when scaled to A4.
+        BufferedImage image = renderTextToImage(text, 800, 14, 16);
 
         PrinterJob job = PrinterJob.getPrinterJob();
         job.setPrintService(printerSearchResult.getDocPrintJob().getPrintService());
@@ -586,12 +588,22 @@ public class PrinterWebSocketService implements WebSocketServiceInterface {
      * @return a BufferedImage containing the rendered text
      */
     static BufferedImage renderTextToImage(String text) {
+        return renderTextToImage(text, 576, 12, 10);
+    }
+
+    /**
+     * Renders text into a BufferedImage with the given width, font size and margin.
+     *
+     * @param text     the text to render
+     * @param width    image width in pixels
+     * @param fontSize font size in pixels
+     * @param margin   margin in pixels
+     * @return a BufferedImage containing the rendered text
+     */
+    static BufferedImage renderTextToImage(String text, int imageWidth, int font_SIZE, int margin) {
         if (text == null || text.isEmpty()) {
             text = "";
         }
-        int imageWidth = 576;
-        int margin = 10;
-        int font_SIZE = 12;
         int lineSpacing = 4;
 
         Font font = new Font(Font.MONOSPACED, Font.PLAIN, font_SIZE);
@@ -612,7 +624,6 @@ public class PrinterWebSocketService implements WebSocketServiceInterface {
                 lines.add("");
                 continue;
             }
-            // Wrap long lines
             int pos = 0;
             while (pos < line.length()) {
                 int end = Math.min(pos + maxCharsPerLine, line.length());
@@ -627,7 +638,6 @@ public class PrinterWebSocketService implements WebSocketServiceInterface {
 
         g2d.setColor(Color.WHITE);
         g2d.fillRect(0, 0, imageWidth, imageHeight);
-
         g2d.setColor(Color.BLACK);
         g2d.setFont(font);
         g2d.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
