@@ -27,8 +27,10 @@ $m=(Get-Content "$env:LOCALAPPDATA/Local Hardware Bridge/config.json" -Raw|Conve
 if(@($m.printer.mappings).Count -eq 2 -and $m.server.port -eq 57212 -and (Test-Path "$env:LOCALAPPDATA/Local Hardware Bridge/config.json.bak")){Write-Host "PASS 4b.contenu+port57212+bak"}else{Write-Host "FAIL 4b";$global:fails++}
 # 5 re-run apres migration -> idempotent
 Run "5.idempotent" "NOOP" 0
-# 6 sections identiques
-New-Env six | Out-Null; WHB $MAP; LHB $MAP
+# 6 sections identiques — LHB ecrite AVANT WHB pour que la garde "LHB plus
+# recente" ne reponde pas d'abord (les deux gardes donnent NOOP, mais on veut
+# tester specifiquement la branche "identiques")
+New-Env six | Out-Null; LHB $MAP; Start-Sleep 1; WHB $MAP
 Run "6.identiques" "NOOP: section printer deja identique" 0
 Write-Host ("RESULT: " + $(if($global:fails){"$global:fails FAIL"}else{"ALL PASS"}))
 exit $global:fails
