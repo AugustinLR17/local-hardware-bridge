@@ -386,6 +386,39 @@ from the **Intune Management Extension (IME)** while it downloads or unzips the
 
 ---
 
+## Auto-update vs Intune — how they coexist
+
+The enterprise config template ships with auto-update enabled
+(`autoDownload` + `autoInstall`). When a new GitHub release is published, every
+bridge downloads the new JAR within `checkIntervalHours` (default 24 h) and
+applies it on its next restart — **without any Intune action**.
+
+Key fact: the self-updater replaces the **JAR only**. It never touches the
+registry, so `HKCU\SOFTWARE\Local Hardware Bridge\Version` keeps the value
+written by the NSIS installer (the *baseline* version).
+
+Consequences:
+
+| Aspect | Behavior |
+|--------|----------|
+| Intune detection (`Version` **equals** baseline) | Stays satisfied after a self-update → no reinstall, no downgrade loop |
+| Intune console "version" column | Shows the **installed baseline**, not the running version |
+| Actual running version | `GET /system/health` (or your inventory agent, e.g. GLPI) |
+| New Intune package later (supersedence) | Reinstalls over the self-updated app; redundant but converges. `uninstall.ps1` wipes the install dir (incl. `config.json` and any pending `updates/`) — the new template is redeployed. |
+
+> **Do not** make the updater write the registry `Version` value: with an
+> `equals` detection rule, Intune would then see its baseline app as "not
+> installed", reinstall the older version, the updater would upgrade again —
+> an endless downgrade loop. The JAR-only self-update is what keeps both
+> mechanisms compatible.
+
+Recommended roles: GitHub auto-update = fast lane for fixes; the Intune Win32
+package = baseline for new machines + periodic fleet resync. You only need a
+new Intune package when the installer/scripts change or you want the fleet's
+baseline (and config template) refreshed.
+
+---
+
 ## Updating the Configuration
 
 There are two scenarios for updating LHB on deployed machines:
