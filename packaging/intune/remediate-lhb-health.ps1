@@ -51,7 +51,7 @@ $defaults = [ordered]@{
         port = 57212
     }
     serial  = [ordered]@{ enabled = $false; mappings = @() }
-    printer = [ordered]@{ enabled = $true;  mappings = @() }
+    printer = [ordered]@{ enabled = $true; fallbackToDefault = $true; mappings = @() }
     update  = [ordered]@{ enabled = $true; autoDownload = $true; autoInstall = $true }
 }
 

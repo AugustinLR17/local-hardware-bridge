@@ -36,7 +36,7 @@
   "printer": {
     "enabled": true,
     "autoAddUnknownType": false,
-    "fallbackToDefault": false,
+    "fallbackToDefault": true,
     "mappings": []
   },
   "serial": {

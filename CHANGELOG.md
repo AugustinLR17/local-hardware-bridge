@@ -1,6 +1,6 @@
 # Changelogs
 
-## Unreleased
+## 2.3.4
 
 ### Fixes
 - **Auto-update never applied on Windows** — the JVM locks every JAR on its
@@ -15,6 +15,11 @@
   tray GUI. Unit tests added for the promote and relaunch-command helpers.
 
 ### Intune
+- **Enterprise config template now sets `printer.fallbackToDefault: true`** —
+  fresh deployments print to the machine's default Windows printer when no
+  mapping is configured, so a PC prints out of the box without per-machine
+  config. Set a mapping (Web UI or config update scripts) only when a
+  non-default printer is needed.
 - Added **Remediations** scripts `packaging/intune/detect-lhb-health.ps1` /
   `remediate-lhb-health.ps1`: per-device check that LHB is installed, config
   present (migrating printer/serial mappings from a legacy WebApp Hardware
