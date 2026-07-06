@@ -570,7 +570,7 @@
                     </div>
                 </div>
 
-                <div v-for="(printer, index) in config.printer.mappings" class="lhb-card" style="padding:1rem 1.25rem">
+                <div v-for="(printer, index) in config.printer.mappings" :key="printer._uid" class="lhb-card" style="padding:1rem 1.25rem">
                     <div class="lhb-row" style="margin-bottom:0.5rem">
                         <div style="flex:1">
                             <input class="lhb-form-control" type="text" v-model="printer.type" placeholder="Type name (e.g. RECEIPT, INVOICE)" aria-label="Printer mapping type"/>
@@ -624,7 +624,7 @@
                     </div>
                 </div>
 
-                <div v-for="(serial, index) in config.serial.mappings" class="lhb-card" style="padding:1rem 1.25rem">
+                <div v-for="(serial, index) in config.serial.mappings" :key="serial._uid" class="lhb-card" style="padding:1rem 1.25rem">
                     <div class="lhb-row" style="margin-bottom:0.5rem">
                         <div style="display:flex;align-items:center;gap:0.4rem;flex:1">
                             <span class="lhb-status-dot" :class="serialDotClass(serial.name)" :title="serialDotTitle(serial.name)"></span>
@@ -805,7 +805,7 @@
                         </label>
                     </div>
 
-                    <div class="lhb-mapping-card" v-for="(printer, index) in config.printer.mappings">
+                    <div class="lhb-mapping-card" v-for="(printer, index) in config.printer.mappings" :key="printer._uid">
                         <div class="lhb-mapping-header">
                             <span class="lhb-mapping-title">{{ printer.type || 'New Mapping' }}</span>
                             <div style="display:flex;gap:0.4rem">
@@ -866,7 +866,7 @@
                         </label>
                     </div>
 
-                    <div class="lhb-mapping-card" v-for="(serial, index) in config.serial.mappings">
+                    <div class="lhb-mapping-card" v-for="(serial, index) in config.serial.mappings" :key="serial._uid">
                         <div class="lhb-mapping-header">
                             <span class="lhb-mapping-title">
                                 <span class="lhb-status-dot" :class="serialDotClass(serial.name)" :title="serialDotTitle(serial.name)"></span>
@@ -1207,6 +1207,8 @@ createApp({
     savedServer: { port: null, tls: false },
     // Serial test payloads keyed by mapping index
     serialTest: {},
+    // Monotonic counter for stable per-mapping client ids (see tagMappings).
+    _uidSeq: 0,
     // Serial monitor (live WebSocket)
     monitor: { type: '', connected: false, log: [], ws: null },
     // Polling timers
@@ -1327,6 +1329,8 @@ createApp({
     applyLoadedConfig(serverData) {
         const existingEndpoints = this.config?.security?.endpoints || {}
         this.config = serverData
+        this.tagMappings(this.config.printer && this.config.printer.mappings)
+        this.tagMappings(this.config.serial && this.config.serial.mappings)
         if (!this.config.security) this.config.security = { endpoints: {} }
         if (!this.config.security.endpoints) this.config.security.endpoints = {}
 
@@ -1388,11 +1392,13 @@ createApp({
         if (c.downloader && c.downloader.timeout != null && c.downloader.timeout !== '') c.downloader.timeout = Number(c.downloader.timeout)
         if (c.printer && Array.isArray(c.printer.mappings)) {
             c.printer.mappings.forEach(m => {
+                delete m._uid
                 m.forceDPI = (m.forceDPI == null || m.forceDPI === '') ? 0 : Number(m.forceDPI)
             })
         }
         if (c.serial && Array.isArray(c.serial.mappings)) {
             c.serial.mappings.forEach(m => {
+                delete m._uid
                 if (m.baudRate != null && m.baudRate !== '') m.baudRate = Number(m.baudRate)
                 if (m.numDataBits != null && m.numDataBits !== '') m.numDataBits = Number(m.numDataBits)
                 if (m.numStopBits != null && m.numStopBits !== '') m.numStopBits = Number(m.numStopBits)
@@ -1510,14 +1516,25 @@ createApp({
     },
 
     /* ---------------- Mappings ---------------- */
+    nextUid() {
+        return 'm' + (++this._uidSeq)
+    },
+    // Give each mapping a stable client-side id so petite-vue's v-for tracks
+    // rows by identity, not by position. Without it, selecting a printer or
+    // removing one row corrupts the v-model/DOM state of the sibling rows
+    // (rows appear duplicated and Remove deletes the wrong mapping). The id is
+    // stripped again in prepareConfigForSave so it is never persisted.
+    tagMappings(list) {
+        if (Array.isArray(list)) list.forEach(m => { if (m._uid == null) m._uid = this.nextUid() })
+    },
     addPrinter() {
-        this.config.printer.mappings.push({type: '', name: '', autoRotate: false, resetImageableArea: true, forceDPI: 0})
+        this.config.printer.mappings.push({_uid: this.nextUid(), type: '', name: '', autoRotate: false, resetImageableArea: true, forceDPI: 0})
     },
     removePrinter(index) {
         this.config.printer.mappings.splice(index, 1)
     },
     addSerial() {
-        this.config.serial.mappings.push({type: '', name: '', baudRate: 9600, numDataBits: 8, numStopBits: 1, parity: 0, readMultipleBytes: false, readCharset: 'ISO-8859-1'})
+        this.config.serial.mappings.push({_uid: this.nextUid(), type: '', name: '', baudRate: 9600, numDataBits: 8, numStopBits: 1, parity: 0, readMultipleBytes: false, readCharset: 'ISO-8859-1'})
     },
     removeSerial(index) {
         this.config.serial.mappings.splice(index, 1)

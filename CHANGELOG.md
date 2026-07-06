@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### Fixes
+- **Editing/removing a printer or serial mapping corrupted the other rows** — the
+  Web UI rendered mapping lists with keyless `v-for` loops, so petite-vue reused
+  DOM nodes by position. Selecting a printer in one row bled into a sibling row
+  (looked like a phantom mapping appeared and the selection jumped to the last
+  one), and Remove deleted the wrong mapping. Each mapping now carries a stable
+  client-side id used as `:key`, so rows track by identity. The id is stripped
+  before the config is saved, so nothing new is persisted. Verified with a
+  headless-Chrome reconciliation test: after removing the middle mapping, the
+  surviving rows keep their original DOM nodes instead of shifting.
+
 ### Documentation
 - **Intune supersedence detection rule made version-specific** — the deployment
   guide now instructs detecting on `HKCU\SOFTWARE\Local Hardware Bridge\Version`
