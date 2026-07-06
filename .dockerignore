@@ -9,3 +9,8 @@ tui
 demo
 scripts
 docs
+# root-owned at runtime (self-signed certs); unreadable during context send
+tls
+log
+updates
+.crush
