@@ -6,7 +6,7 @@ plugins {
 }
 
 group 'io.github.augustinlr17'
-version '2.3.4'
+version '2.3.5'
 
 java {
     sourceCompatibility = JavaVersion.VERSION_21

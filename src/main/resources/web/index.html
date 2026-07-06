@@ -578,6 +578,7 @@
                         <div style="width:200px">
                             <select class="lhb-form-control" v-model="printer.name" aria-label="Printer">
                                 <option value="" disabled>Select a printer...</option>
+                                <option v-if="printer.name && !printers.some(p => p.name === printer.name)" :value="printer.name">{{ printer.name }} (not detected)</option>
                                 <option :value="p.name" v-for="p in printers">{{ p.name }}{{ (p.state === 'stopped' || p.state === 'processing' || !p.acceptingJobs) ? ' (offline)' : '' }}</option>
                             </select>
                         </div>
@@ -633,6 +634,7 @@
                         <div style="width:200px">
                             <select class="lhb-form-control" v-model="serial.name" aria-label="Serial port">
                                 <option value="" disabled>Select a port...</option>
+                                <option v-if="serial.name && !serials.some(s => s.name === serial.name)" :value="serial.name">{{ serial.name }} (not detected)</option>
                                 <option :value="s.name" v-for="s in serials">{{ s.name }}</option>
                             </select>
                         </div>
@@ -823,6 +825,7 @@
                             <label class="lhb-row-label lhb-form-label" :for="'prn-name-'+index">Printer</label>
                             <div class="lhb-row-value">
                                 <select :id="'prn-name-'+index" class="lhb-form-control" v-model="printer.name">
+                                    <option v-if="printer.name && !printers.some(p => p.name === printer.name)" :value="printer.name">{{ printer.name }} (not detected)</option>
                                     <option :value="p.name" v-for="p in printers">{{ p.name }}{{ (p.state === 'stopped' || p.state === 'processing' || !p.acceptingJobs) ? ' (offline)' : '' }}</option>
                                 </select>
                             </div>
@@ -882,6 +885,7 @@
                             <label class="lhb-row-label lhb-form-label" :for="'ser-name-'+index">Port</label>
                             <div class="lhb-row-value">
                                 <select :id="'ser-name-'+index" class="lhb-form-control" v-model="serial.name">
+                                    <option v-if="serial.name && !serials.some(s => s.name === serial.name)" :value="serial.name">{{ serial.name }} (not detected)</option>
                                     <option :value="s.name" v-for="s in serials">{{ s.name }} &mdash; {{ s.description }}</option>
                                 </select>
                             </div>
@@ -1554,10 +1558,15 @@ createApp({
         return axios.get('/serial/status').then(response => this.serialStatus = response.data)
     },
     reloadAll() {
-        // Decoupled: a single failure must not blank the whole page.
-        this.loadPrinters().catch(err => this.handleError(err, 'Load printers'))
-        this.loadSerials().catch(err => this.handleError(err, 'Load serial ports'))
-        this.loadConfig().catch(err => this.handleError(err, 'Load configuration'))
+        // Printer/serial lists MUST land before the config: mapping rows bind
+        // their <select> at render time, and options arriving after the bind
+        // leave the browser displaying the first option while the model holds
+        // another value (Windows printer enumeration can take seconds).
+        // Failures stay decoupled: config still loads if a list fails.
+        Promise.all([
+            this.loadPrinters().catch(err => this.handleError(err, 'Load printers')),
+            this.loadSerials().catch(err => this.handleError(err, 'Load serial ports'))
+        ]).then(() => this.loadConfig().catch(err => this.handleError(err, 'Load configuration')))
         this.loadHealth().catch(err => this.handleError(err, 'Load health'))
         this.loadSerialStatus().catch(() => {})
         this.loadUpdateStatus().catch(() => {})

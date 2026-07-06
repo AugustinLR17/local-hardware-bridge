@@ -1,5 +1,18 @@
 # Changelogs
 
+## 2.3.5
+
+### Fixes
+- **Mapping rows displayed the wrong printer after load/reload** — on Windows,
+  printer enumeration (network queues) can take seconds; the config rendered
+  first and each row's `<select>` bound before its options existed, so the
+  browser displayed the first printer in the list while the model (and saved
+  config) held another name. The dashboard now loads the printer/serial lists
+  BEFORE the config, and a mapping whose printer/port is absent from the
+  system shows an explicit "(not detected)" option instead of silently
+  displaying the first entry. Verified end-to-end (headless Chromium against
+  a live bridge).
+
 ## 2.3.4
 
 ### Fixes
