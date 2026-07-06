@@ -94,3 +94,16 @@ jobs:
       # Compile-only sanity check so non-Linux build breaks are caught early.
       - name: Compile Java
         run: ./gradlew compileJava
+
+  intune-scripts:
+    name: Intune PowerShell scripts tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Test migrate-whb-config.ps1 (6 fleet scenarios)
+        shell: pwsh
+        run: ./packaging/intune/tests/test-migrate.ps1
+      - name: Test check-lhb / install / uninstall / update-config
+        shell: pwsh
+        run: ./packaging/intune/tests/test-scripts.ps1
