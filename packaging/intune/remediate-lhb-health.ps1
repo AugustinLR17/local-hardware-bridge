@@ -123,6 +123,13 @@ if ($runVal -ne $expectedRun) {
     $actions += "autostart Run key fixed"
 }
 
+# --- 3b. Remove desktop shortcut (enterprise policy: no desktop icons) --------
+$desktopLnk = Join-Path ([Environment]::GetFolderPath("Desktop")) "$ProductName.lnk"
+if (Test-Path $desktopLnk) {
+    Remove-Item $desktopLnk -Force -ErrorAction SilentlyContinue
+    $actions += "desktop shortcut removed"
+}
+
 # --- 4. Running ---------------------------------------------------------------
 $port = 57212
 try { if ($cfg.server.port) { $port = [int]$cfg.server.port } } catch {}
