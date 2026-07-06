@@ -1,6 +1,6 @@
 # Changelogs
 
-## Unreleased
+## 2.3.3
 
 ### Fixes
 - **Print-job type matching is now case-insensitive — no more phantom mappings** —
