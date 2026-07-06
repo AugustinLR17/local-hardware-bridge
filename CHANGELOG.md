@@ -1,5 +1,26 @@
 # Changelogs
 
+## Unreleased
+
+### Documentation
+- **Intune supersedence detection rule made version-specific** — the deployment
+  guide now instructs detecting on `HKCU\SOFTWARE\Local Hardware Bridge\Version`
+  **equals the bundled version** instead of "`Install_Dir` value exists". The old
+  rule matched every version identically, so under supersedence Intune never saw
+  the old app as removed and looped on "Superseded applications are detected" /
+  "A superseded app failed to uninstall". The installer already writes the
+  `Version` value (`install.nsi`), so no installer change is required.
+- **Documented the `0x8007013A` install/uninstall failure** — added a
+  troubleshooting section explaining that `0x8007013A`
+  (`ERROR_DISK_RESOURCES_EXHAUSTED`) originates in the Intune Management
+  Extension unpacking content (most often Defender interfering), not in the
+  install/uninstall scripts, with concrete fixes.
+- **Defender exclusions now cover the IME content cache** — the guide adds
+  `C:\Program Files (x86)\Microsoft Intune Management Extension\Content`
+  alongside `%LOCALAPPDATA%\Local Hardware Bridge`, and documents pushing both
+  via a Defender for Endpoint NGP default policy or an Endpoint Protection
+  profile.
+
 ## 2.3.1
 
 ### Features

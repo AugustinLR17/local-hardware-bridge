@@ -171,15 +171,33 @@ This produces `C:\Intune\Output\install.intunewin`.
 
 ### Detection rules
 
-Use a **Registry** detection rule:
+Use a **version-specific Registry** detection rule. The installer writes the
+product version to `HKCU\SOFTWARE\Local Hardware Bridge\Version` (see
+`install.nsi`), so detect on that value being **equal to the version this app
+package ships**:
 
 | Field           | Value                                                        |
 |-----------------|--------------------------------------------------------------|
 | Rule type       | Registry                                                     |
 | Key path        | `HKEY_CURRENT_USER\SOFTWARE\Local Hardware Bridge`          |
-| Value name      | `Install_Dir`                                                |
-| Detection method| String value exists                                          |
+| Value name      | `Version`                                                    |
+| Detection method| String comparison                                            |
+| Operator        | Equals                                                       |
+| Value           | `2.3.2` (**the exact version bundled in this .intunewin**)   |
 
+> **Why version-specific and not just `Install_Dir` exists?** Both the old and
+> the new app write the same `Install_Dir` key, so a "value exists" rule makes
+> **every** version look identical to Intune. Under supersedence, that means the
+> old app is still "detected" after the new one installs, so Intune keeps
+> retrying its uninstall in a loop and the report shows *"Superseded
+> applications are detected"* / *"A superseded app failed to uninstall"*
+> indefinitely. Detecting on `Version` **equals the target version** makes each
+> package distinguish itself: the old app becomes correctly "not detected" once
+> the new version's `Version` value is written, and the supersedence chain
+> resolves cleanly.
+>
+> **Bump this value on every release** to match the bundled installer version.
+>
 > If you use the per-machine installer (`/DPER_MACHINE=1`), the key is under
 > `HKEY_LOCAL_MACHINE` instead. Adjust accordingly.
 
@@ -191,31 +209,55 @@ Use a **Registry** detection rule:
 
 ---
 
-## Step 4 — Microsoft Defender exclusion profile
+## Step 4 — Microsoft Defender exclusions
 
 To prevent Defender from flagging the bundled JRE or the launcher (common with
-unsigned/signed Java apps), create an Endpoint Protection profile:
+unsigned/signed Java apps) **and** from interfering with the Intune Management
+Extension while it unpacks the `.intunewin` content, exclude **two** paths:
+
+| Type | Value                                                        | Purpose                                         |
+|------|--------------------------------------------------------------|-------------------------------------------------|
+| Path | `%LOCALAPPDATA%\Local Hardware Bridge`                       | The installed app (JRE + launcher)              |
+| Path | `C:\Program Files (x86)\Microsoft Intune Management Extension\Content` | The IME staging/extraction cache — prevents `0x8007013A` during install/uninstall |
+
+> The `%LOCALAPPDATA%` variable is resolved per-user by the Defender client
+> — each user's install directory is excluded automatically. The IME `Content`
+> path is where Intune downloads and unzips every Win32 package before running
+> it; if Defender locks or quarantines a file mid-extraction, the install (or
+> the supersedence uninstall) fails with **`0x8007013A`**
+> (`ERROR_DISK_RESOURCES_EXHAUSTED`). See
+> [Troubleshooting → 0x8007013A](#app-install-or-uninstall-fails-with-0x8007013a).
+
+You can push these exclusions in either of two ways — **use one, not both**:
+
+### Option A — Defender for Endpoint "NGP default policy" (recommended if MDE is deployed)
+
+If your tenant runs Microsoft Defender for Endpoint, the **Next Generation
+Protection (NGP) default policy** already governs every endpoint. Add the two
+paths under **Endpoint security → Antivirus → NGP default policy → Defender →
+Excluded Paths**:
+
+```
+%LOCALAPPDATA%\Local Hardware Bridge, C:\Program Files (x86)\Microsoft Intune Management Extension\Content
+```
+
+> Note: the NGP default policy typically has **Network Protection = block mode**
+> enabled. That does not affect LHB (it binds to `127.0.0.1` only) or the IME
+> content download, so no additional Network Protection exception is needed.
+
+### Option B — Endpoint Protection configuration profile
 
 1. Go to **Devices → Configuration profiles → Create profile**.
 2. Platform: **Windows 10 and later**.
 3. Profile type: **Templates → Endpoint protection**.
 4. Navigate to **Microsoft Defender Antivirus → Antivirus Exclusions**.
-5. Add a path exclusion:
-
-| Field    | Value                                      |
-|----------|--------------------------------------------|
-| Type     | Path                                       |
-| Value    | `%LOCALAPPDATA%\Local Hardware Bridge`     |
-| Excluded | True                                       |
-
-> The `%LOCALAPPDATA%` variable is resolved per-user by the Defender client
-> — each user's install directory is excluded automatically.
-
+5. Add both path exclusions from the table above.
 6. Assign the profile to the same groups as the Win32 app.
 
-The `install.ps1` script also attempts `Add-MpPreference -ExclusionPath` as a
-best-effort fallback, but this only works when the script runs elevated. The
-Intune profile is the reliable method.
+The `install.ps1` script also attempts `Add-MpPreference -ExclusionPath` for the
+app directory as a best-effort fallback, but this only works when the script
+runs elevated and does **not** cover the IME `Content` path. The Intune
+policy/profile is the reliable method.
 
 ---
 
@@ -265,6 +307,38 @@ rights. Use this if you deploy in **Device context** (SYSTEM account).
 - Check that the device is in the target group.
 - Force a sync: **Devices → select device → Sync**.
 - Check `Event Viewer → Applications and Services Logs → Microsoft → Intune → ManagementAgent`.
+
+### App install or uninstall fails with 0x8007013A
+
+`0x8007013A` is Win32 error **314 = `ERROR_DISK_RESOURCES_EXHAUSTED`** ("The
+physical resources of this disk have been exhausted"). In Intune it surfaces as
+**"Failed 0x8007013A"** on an install, or **"Uninstall Failed 0x8007013A"** /
+**"A superseded app failed to uninstall"** during a supersedence migration.
+
+**It is not a fault in `install.ps1` / `uninstall.ps1`** — those scripts only
+return `0`, `1603`, or the NSIS exit code, never `0x8007013A`. The error comes
+from the **Intune Management Extension (IME)** while it downloads or unzips the
+`.intunewin` content, *before* your command runs. Ranked by likelihood:
+
+1. **Microsoft Defender interfering with the IME extraction.** LHB bundles a JRE
+   that Defender frequently false-positives on. If Defender scans/quarantines a
+   file while the IME is unpacking it, the extraction aborts with `0x8007013A`.
+   → **Fix:** ensure the Defender exclusions from
+   [Step 4](#step-4--microsoft-defender-exclusions) are assigned **and applied**
+   to the affected devices — both `%LOCALAPPDATA%\Local Hardware Bridge` **and**
+   `C:\Program Files (x86)\Microsoft Intune Management Extension\Content`.
+   Confirm with `Get-MpPreference | Select-Object -Expand ExclusionPath`.
+2. **Low free disk space.** Check the device; the IME needs room to stage and
+   unzip the package.
+3. **Corrupt/full IME content cache.** Restart the **Microsoft Intune Management
+   Extension** service, or clear
+   `C:\Program Files (x86)\Microsoft Intune Management Extension\Content\Incoming`,
+   then force a **Sync**. `0x8007013A` is often transient and clears on retry.
+
+> **"A superseded app failed to uninstall" but the app shows Installed:** the
+> new version installed and runs fine — only the removal of the old package's
+> content failed. Once the Defender exclusion is in place, the next IME retry
+> clears the old app record. No user-facing impact in the meantime.
 
 ### Config not deployed
 
@@ -323,6 +397,9 @@ There are two scenarios for updating LHB on deployed machines:
 1. Download the new `Local-Hardware-Bridge-<version>.intunewin` from the
    GitHub release.
 2. Create a **new** Win32 app in Intune and upload the new `.intunewin`.
+   Set its [detection rule](#detection-rules) to `Version` **equals the new
+   version** (e.g. `2.3.3`) — this is what lets supersedence resolve cleanly
+   instead of looping on "Superseded applications are detected".
 3. In the new app → **Supersedence** → select the old app.
 4. Intune will automatically:
    - Uninstall the old version (runs `uninstall.ps1` — removes the entire
