@@ -25,6 +25,21 @@ if ($legacyMappings.Count -eq 0) { Write-Output "NOOP: config WHB vide (0 mappin
 try { $cfg = Get-Content $configPath -Raw | ConvertFrom-Json }
 catch { Write-Output "KO: config LHB illisible"; exit 1 }
 
+# --- Garde-fous anti-ecrasement ---
+$lhbMappings = @($cfg.printer.mappings)
+$lhbTime = (Get-Item $configPath).LastWriteTime
+$whbTime = (Get-Item $LegacyConfig).LastWriteTime
+# 1. LHB deja configuree (>=1 mapping) ET plus recente que WHB -> la conf est OK
+if ($lhbMappings.Count -gt 0 -and $lhbTime -gt $whbTime) {
+    Write-Output "NOOP: config LHB non vide et plus recente ($lhbTime > $whbTime)"
+    exit 0
+}
+# 2. Sections identiques -> rien a faire, pas de redemarrage inutile
+if (($cfg.printer | ConvertTo-Json -Depth 10) -eq ($legacy.printer | ConvertTo-Json -Depth 10)) {
+    Write-Output "NOOP: section printer deja identique a WHB"
+    exit 0
+}
+
 # Sauvegarde puis ECRASE la section printer avec celle de WHB
 Copy-Item $configPath "$configPath.bak" -Force
 $cfg.printer = $legacy.printer
