@@ -334,6 +334,64 @@ public class UpdateService {
         return backup;
     }
 
+    /** Exposes the running JAR path (null when running from exploded classes). */
+    public Path currentJarPath() {
+        return getCurrentJarPath();
+    }
+
+    /**
+     * Promote step of the two-hop (Windows-safe) update: copies the update JAR
+     * over the original JAR, keeping a {@code .bak} backup of the original.
+     *
+     * <p>On Windows the JVM locks every JAR on its classpath, so
+     * {@link #applyUpdate} cannot replace the JAR it is running from. The
+     * fallback ({@link #relaunchFromJar}) starts a new JVM <em>from the
+     * downloaded JAR</em> with {@code -Dlhb.promote.target=&lt;original&gt;};
+     * by the time that process calls this method, the original JAR is no
+     * longer locked and the copy succeeds.
+     */
+    public static void promoteJar(Path source, Path target) throws IOException {
+        Path backup = target.resolveSibling(target.getFileName() + ".bak");
+        Files.copy(target, backup, StandardCopyOption.REPLACE_EXISTING);
+        Files.copy(source, target, StandardCopyOption.REPLACE_EXISTING);
+    }
+
+    /** Builds the relaunch command line (extracted for testability). */
+    static java.util.List<String> buildRelaunchCommand(String javaExec, boolean serverMode, Path jar, Path promoteTarget) {
+        java.util.List<String> cmd = new java.util.ArrayList<>();
+        cmd.add(javaExec);
+        if (serverMode) {
+            cmd.add("-Dlhb.server=true");
+        }
+        if (promoteTarget != null) {
+            cmd.add("-Dlhb.promote.target=" + promoteTarget);
+        }
+        cmd.add("-cp");
+        cmd.add(jar.toString());
+        cmd.add("io.github.augustinlr17.localhardwarebridge.Launcher");
+        return cmd;
+    }
+
+    /**
+     * Relaunches the application from the given JAR and exits this JVM.
+     * With a non-null {@code promoteTarget}, the new process performs the
+     * promote step (see {@link #promoteJar}) before starting normally.
+     * This is the Windows path of the auto-update: the running JAR is locked
+     * by this JVM, so the file swap must happen from another process.
+     */
+    public void relaunchFromJar(Path jar, Path promoteTarget) throws IOException {
+        boolean windows = System.getProperty("os.name", "").toLowerCase().contains("win");
+        String javaExec = System.getProperty("java.home") + File.separator + "bin"
+                + File.separator + (windows ? "java.exe" : "java");
+        ProcessBuilder pb = new ProcessBuilder(
+                buildRelaunchCommand(javaExec, Boolean.getBoolean("lhb.server"), jar, promoteTarget));
+        pb.directory(new File(System.getProperty("user.dir")));
+        pb.inheritIO();
+        log.info("Relaunching from {} (promoteTarget={})", jar, promoteTarget);
+        pb.start();
+        System.exit(0);
+    }
+
     /**
      * Rolls back to the backup JAR (if one exists next to the current JAR).
      *

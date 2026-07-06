@@ -1372,6 +1372,19 @@ public class Server implements WebSocketServerInterface {
                                 "INFO", UPDATE_SERVICE, "Update applied and server restarted successfully")));
                     } catch (Exception e) {
                         log.error("Failed to apply update", e);
+                        // Windows: the running JAR is locked by this JVM and cannot be
+                        // replaced in-place. Complete the update by relaunching FROM the
+                        // downloaded JAR (promote mode) — this exits the JVM.
+                        try {
+                            java.nio.file.Path cur = updateService.currentJarPath();
+                            if (cur != null && java.nio.file.Files.isRegularFile(pending)) {
+                                messageToService(NOTIFICATION_CHANNEL, objectMapper.writeValueAsString(new NotificationDTO(
+                                        WARNING_LEVEL, UPDATE_SERVICE, "Restarting to complete the update...")));
+                                updateService.relaunchFromJar(pending, cur); // exits the JVM
+                            }
+                        } catch (Exception relaunchEx) {
+                            log.error("Relaunch-based update also failed", relaunchEx);
+                        }
                         try {
                             updateService.rollback();
                         } catch (Exception rollbackEx) {

@@ -1,5 +1,26 @@
 # Changelogs
 
+## Unreleased
+
+### Fixes
+- **Auto-update never applied on Windows** — the JVM locks every JAR on its
+  classpath, so `applyUpdate()` could not replace the JAR it was running from:
+  every apply failed with a sharing violation (silently, on the windowless
+  launcher) and machines stayed on the old version forever. The update now
+  falls back to a **two-hop relaunch**: the app relaunches *from the downloaded
+  JAR* with `-Dlhb.promote.target=<original>`; the new process (original JAR no
+  longer locked) copies itself over it with a `.bak` backup and relaunches from
+  the final location. Linux/macOS keep the direct in-place replace. Applies to
+  all three paths: startup auto-install, `POST /system/update/apply`, and the
+  tray GUI. Unit tests added for the promote and relaunch-command helpers.
+
+### Intune
+- Added **Remediations** scripts `packaging/intune/detect-lhb-health.ps1` /
+  `remediate-lhb-health.ps1`: per-device check that LHB is installed, config
+  present (migrating printer/serial mappings from a legacy WebApp Hardware
+  Bridge `config.json` when empty), auto-start registered, and the app running
+  (started/restarted if not).
+
 ## 2.3.3
 
 ### Fixes

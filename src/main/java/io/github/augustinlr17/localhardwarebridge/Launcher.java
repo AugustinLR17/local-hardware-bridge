@@ -35,9 +35,19 @@ public final class Launcher {
     public static void main(String[] args) throws Exception {
         AppHome.anchor();
 
+        // Two-hop update, second hop (Windows): we were relaunched FROM the
+        // downloaded JAR with -Dlhb.promote.target=<original jar>. The original
+        // JAR is no longer locked by a JVM, so copy ourselves over it and
+        // relaunch from the final location. On failure we keep running from
+        // the downloaded JAR (still the new version).
+        String promoteTarget = System.getProperty("lhb.promote.target");
+        if (promoteTarget != null && !Boolean.getBoolean("lhb.no-update")) {
+            promoteSelf(promoteTarget); // exits the JVM on success
+        }
+
         // Apply a pending auto-update before starting the app (if enabled).
         // -Dlhb.no-update=true is an emergency bypass for a broken update.
-        if (!Boolean.getBoolean("lhb.no-update")) {
+        if (!Boolean.getBoolean("lhb.no-update") && promoteTarget == null) {
             try {
                 applyPendingAutoUpdate();
             } catch (Exception e) {
@@ -50,6 +60,34 @@ public final class Launcher {
             Server.main(args);
         } else {
             GUI.main(args);
+        }
+    }
+
+    /**
+     * Second hop of the Windows-safe update: this JVM runs FROM the downloaded
+     * JAR; the original JAR (given by {@code -Dlhb.promote.target}) is no
+     * longer locked. Copy ourselves over it (with a .bak backup) and relaunch
+     * from the final location. On any failure, log to stderr and return — the
+     * app then starts normally from the downloaded JAR, which is already the
+     * new version, and the promote is retried on the next update cycle.
+     */
+    private static void promoteSelf(String targetStr) {
+        try {
+            var location = Launcher.class.getProtectionDomain().getCodeSource().getLocation();
+            if (location == null) {
+                return;
+            }
+            Path self = Path.of(location.toURI());
+            if (!self.toString().endsWith(".jar")) {
+                return; // dev mode — nothing to promote
+            }
+            Path target = Path.of(targetStr);
+            System.err.println("[Launcher] Promoting update: " + self + " -> " + target);
+            UpdateService.promoteJar(self, target);
+            UpdateService.getInstance().relaunchFromJar(target, null); // exits the JVM
+        } catch (Exception e) {
+            System.err.println("[Launcher] Promote failed: " + e.getMessage()
+                    + " — continuing on the updated version");
         }
     }
 
@@ -81,7 +119,22 @@ public final class Launcher {
 
         // Log4j isn't initialized yet — stderr is the only channel available.
         System.err.println("[Launcher] Applying pending auto-update: " + pending);
-        UpdateService.getInstance().applyUpdate(pending);
+        try {
+            UpdateService.getInstance().applyUpdate(pending);
+        } catch (java.io.IOException e) {
+            // Windows: this JVM has the running JAR locked, so it cannot be
+            // replaced in-place. Relaunch FROM the downloaded JAR in promote
+            // mode: the new process copies itself over the (then unlocked)
+            // original JAR and relaunches from there. See Launcher.promoteSelf.
+            Path current = UpdateService.getInstance().currentJarPath();
+            if (current == null) {
+                throw e;
+            }
+            System.err.println("[Launcher] In-place replace failed (" + e.getMessage()
+                    + "), relaunching from the downloaded JAR to complete the update");
+            UpdateService.getInstance().relaunchFromJar(pending, current); // exits the JVM
+            return;
+        }
         UpdateService.getInstance().cleanupOldUpdates();
 
         // Re-launch the updated JAR with the same args and system properties

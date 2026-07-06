@@ -333,6 +333,17 @@ public class GUI implements WebSocketServiceInterface {
                             notify(Constants.APP_NAME, "Update applied successfully! Now running v" + Constants.VERSION, TrayIcon.MessageType.INFO);
                         } catch (Exception e) {
                             log.error("Failed to apply update", e);
+                            // Windows: the running JAR is locked by this JVM — complete the
+                            // update by relaunching FROM the downloaded JAR (promote mode).
+                            try {
+                                java.nio.file.Path cur = UpdateService.getInstance().currentJarPath();
+                                if (cur != null && java.nio.file.Files.isRegularFile(pending)) {
+                                    notify(Constants.APP_NAME, "Restarting to complete the update...", TrayIcon.MessageType.INFO);
+                                    UpdateService.getInstance().relaunchFromJar(pending, cur); // exits the JVM
+                                }
+                            } catch (Exception relaunchEx) {
+                                log.error("Relaunch-based update also failed", relaunchEx);
+                            }
                             notify(Constants.APP_NAME, "Update failed: " + e.getMessage() + ". Attempting rollback...", TrayIcon.MessageType.ERROR);
                             try {
                                 UpdateService.getInstance().rollback();
