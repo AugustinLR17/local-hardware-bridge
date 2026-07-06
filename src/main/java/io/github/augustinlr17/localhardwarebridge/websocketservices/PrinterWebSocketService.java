@@ -941,7 +941,11 @@ public class PrinterWebSocketService implements WebSocketServiceInterface {
     private PrinterSearchResult searchPrinterForType(String type) throws PrinterException {
         PrintService[] printServices = PrintServiceLookup.lookupPrintServices(null, null);
 
-        Optional<Config.PrinterMapping> printerMappingOptional = configService.getConfig().getPrinter().getMappings().stream().filter(it -> it.getType().equals(type)).findFirst();
+        // Type match is case-insensitive: clients send e.g. "Main" while the
+        // config says "MAIN". A case-sensitive miss here used to fall through
+        // to autoAddUnknownType, which created a duplicate phantom mapping
+        // ("Main" next to "MAIN") with an empty printer name.
+        Optional<Config.PrinterMapping> printerMappingOptional = configService.getConfig().getPrinter().getMappings().stream().filter(it -> it.getType() != null && it.getType().equalsIgnoreCase(type)).findFirst();
 
         if (printerMappingOptional.isPresent()) {
             Config.PrinterMapping printerMapping = printerMappingOptional.get();
@@ -958,8 +962,9 @@ public class PrinterWebSocketService implements WebSocketServiceInterface {
         }
 
          if (configService.getConfig().getPrinter().isAutoAddUnknownType()) {
-             // Add unknown type does not already exist
-             if (configService.getConfig().getPrinter().getMappings().stream().noneMatch(it -> it.getType().equals(type))) {
+             // Add unknown type if it does not already exist (case-insensitive,
+             // so "Main" is never added next to an existing "MAIN")
+             if (configService.getConfig().getPrinter().getMappings().stream().noneMatch(it -> it.getType() != null && it.getType().equalsIgnoreCase(type))) {
                  configService.addPrintTypeToList(type);
              }
         }

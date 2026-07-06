@@ -102,6 +102,58 @@ public class PrinterWebSocketServiceSearchTest {
         }
     }
 
+    @Test
+    public void searchMatchesTypeCaseInsensitively() throws Throwable {
+        Config config = ConfigService.getInstance().getConfig();
+        config.getPrinter().setAutoAddUnknownType(false);
+        config.getPrinter().setFallbackToDefault(false);
+
+        config.getPrinter().getMappings().removeIf(m -> "CASE_TEST".equalsIgnoreCase(m.getType()));
+        config.getPrinter().getMappings().add(
+                new Config.PrinterMapping("CASE_TEST", "NonExistentPrinterXYZ999", false, true, 0));
+
+        try {
+            // "case_test" must match the "CASE_TEST" mapping: the error must be
+            // "Printer not found on system" (mapping matched, printer missing),
+            // NOT "No printer mapping found" (mapping missed).
+            searchPrinterForType.invoke(service, "case_test");
+            fail("expected PrinterException for ghost printer");
+        } catch (java.lang.reflect.InvocationTargetException e) {
+            Throwable cause = e.getCause();
+            assertTrue(cause instanceof PrinterException);
+            assertTrue("case-insensitive type match should reach the mapped printer: " + cause.getMessage(),
+                    cause.getMessage().contains("Printer not found on system"));
+        } finally {
+            config.getPrinter().getMappings().removeIf(m -> "CASE_TEST".equalsIgnoreCase(m.getType()));
+        }
+    }
+
+    @Test
+    public void autoAddDoesNotCreateCaseVariantDuplicate() throws Throwable {
+        Config config = ConfigService.getInstance().getConfig();
+        config.getPrinter().setAutoAddUnknownType(true);
+        config.getPrinter().setFallbackToDefault(false);
+
+        config.getPrinter().getMappings().removeIf(m -> "DUP_CASE".equalsIgnoreCase(m.getType()));
+        config.getPrinter().getMappings().add(
+                new Config.PrinterMapping("DUP_CASE", "NonExistentPrinterXYZ999", false, true, 0));
+
+        try {
+            searchPrinterForType.invoke(service, "dup_case");
+            fail("expected PrinterException for ghost printer");
+        } catch (java.lang.reflect.InvocationTargetException e) {
+            // Regression: the case-sensitive miss used to fall through to
+            // autoAddUnknownType and add a phantom "dup_case" mapping with an
+            // empty printer name next to the existing "DUP_CASE".
+            long count = config.getPrinter().getMappings().stream()
+                    .filter(m -> "DUP_CASE".equalsIgnoreCase(m.getType())).count();
+            assertEquals("no case-variant duplicate mapping must be auto-added", 1, count);
+        } finally {
+            config.getPrinter().setAutoAddUnknownType(false);
+            config.getPrinter().getMappings().removeIf(m -> "DUP_CASE".equalsIgnoreCase(m.getType()));
+        }
+    }
+
     // --- printDocument error flow ---
 
     @Test

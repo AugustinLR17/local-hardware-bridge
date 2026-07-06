@@ -3,6 +3,16 @@
 ## Unreleased
 
 ### Fixes
+- **Print-job type matching is now case-insensitive — no more phantom mappings** —
+  a print job with type `Main` did not match a configured `MAIN` mapping
+  (case-sensitive compare), so with `autoAddUnknownType` enabled the bridge
+  silently added a duplicate `Main` mapping with an empty printer name to
+  `config.json`. The phantom then surfaced in the Web UI on the next save/reload,
+  looking like saving had created a weird extra printer. Type lookup, the
+  auto-add guard, and the `PUT`/`DELETE /printer/mappings/{type}` and
+  `/serial/mappings/{type}` endpoints now all match the type case-insensitively
+  (`DELETE` also sweeps up existing case-variant duplicates). Regression tests
+  added for the case-insensitive lookup and the no-duplicate auto-add.
 - **Editing/removing a printer or serial mapping corrupted the other rows** — the
   Web UI rendered mapping lists with keyless `v-for` loops, so petite-vue reused
   DOM nodes by position. Selecting a printer in one row bled into a sibling row

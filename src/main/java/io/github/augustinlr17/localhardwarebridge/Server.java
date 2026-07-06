@@ -803,7 +803,9 @@ public class Server implements WebSocketServerInterface {
             ArrayList<Config.PrinterMapping> mappings = configService.getConfig().getPrinter().getMappings();
             boolean found = false;
             for (int i = 0; i < mappings.size(); i++) {
-                if (type.equals(mappings.get(i).getType())) {
+                // Case-insensitive: type is the mapping's key and print-job
+                // dispatch matches it case-insensitively too
+                if (type.equalsIgnoreCase(mappings.get(i).getType())) {
                     mappings.set(i, updated);
                     found = true;
                     break;
@@ -826,7 +828,9 @@ public class Server implements WebSocketServerInterface {
         javalinServer.delete("/printer/mappings/{type}", ctx -> {
             String type = ctx.pathParam("type");
             ArrayList<Config.PrinterMapping> mappings = configService.getConfig().getPrinter().getMappings();
-            boolean removed = mappings.removeIf(m -> type.equals(m.getType()));
+            // Case-insensitive: also sweeps up case-variant duplicates
+            // ("Main" + "MAIN") left behind by the old auto-add behavior
+            boolean removed = mappings.removeIf(m -> type.equalsIgnoreCase(m.getType()));
 
             if (!removed) {
                 ctx.status(404).json("{\"error\": \"Printer mapping not found: " + type + "\"}");
@@ -890,7 +894,8 @@ public class Server implements WebSocketServerInterface {
             ArrayList<Config.SerialMapping> mappings = configService.getConfig().getSerial().getMappings();
             boolean found = false;
             for (int i = 0; i < mappings.size(); i++) {
-                if (type.equals(mappings.get(i).getType())) {
+                // Case-insensitive, consistent with the printer mapping endpoints
+                if (type.equalsIgnoreCase(mappings.get(i).getType())) {
                     mappings.set(i, updated);
                     found = true;
                     break;
@@ -913,7 +918,8 @@ public class Server implements WebSocketServerInterface {
         javalinServer.delete("/serial/mappings/{type}", ctx -> {
             String type = ctx.pathParam("type");
             ArrayList<Config.SerialMapping> mappings = configService.getConfig().getSerial().getMappings();
-            boolean removed = mappings.removeIf(m -> type.equals(m.getType()));
+            // Case-insensitive, consistent with the printer mapping endpoints
+            boolean removed = mappings.removeIf(m -> type.equalsIgnoreCase(m.getType()));
 
             if (!removed) {
                 ctx.status(404).json("{\"error\": \"Serial mapping not found: " + type + "\"}");
