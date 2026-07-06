@@ -383,6 +383,16 @@ public class UpdateService {
         boolean windows = System.getProperty("os.name", "").toLowerCase().contains("win");
         String javaExec = System.getProperty("java.home") + File.separator + "bin"
                 + File.separator + (windows ? "java.exe" : "java");
+        // jpackage runtimes ship NO java launcher (only the native app exe).
+        // In that layout, stage the new JAR next to the old one, repoint the
+        // launcher .cfg, and restart the native exe instead.
+        if (!new File(javaExec).isFile()) {
+            if (promoteTarget != null && applyStagedViaCfg(jar, promoteTarget)) {
+                return; // unreachable: applyStagedViaCfg exits the JVM
+            }
+            throw new IOException("No java launcher at " + javaExec
+                    + " and launcher cfg staging not applicable — cannot complete update");
+        }
         ProcessBuilder pb = new ProcessBuilder(
                 buildRelaunchCommand(javaExec, Boolean.getBoolean("lhb.server"), jar, promoteTarget));
         pb.directory(new File(System.getProperty("user.dir")));
@@ -390,6 +400,50 @@ public class UpdateService {
         log.info("Relaunching from {} (promoteTarget={})", jar, promoteTarget);
         pb.start();
         System.exit(0);
+    }
+
+    /**
+     * jpackage staged apply: copies the new JAR next to the (locked) current
+     * one inside {@code app/}, rewrites the launcher {@code .cfg} so the
+     * native exe loads the new JAR on its next start, then relaunches the exe
+     * and exits this JVM. The old JAR stays in place as an implicit backup —
+     * repointing the cfg back to it is the rollback.
+     *
+     * @return false when the layout is not a jpackage app-image (caller
+     *         should fall back to another strategy); on success this method
+     *         does not return (the JVM exits).
+     */
+    private boolean applyStagedViaCfg(Path pending, Path currentJar) {
+        try {
+            Path appDir = currentJar.toAbsolutePath().getParent();
+            Path installDir = (appDir == null) ? null : appDir.getParent();
+            if (appDir == null || installDir == null) return false;
+            Path cfg = appDir.resolve(Constants.APP_NAME + ".cfg");
+            Path exe = installDir.resolve(Constants.APP_NAME + ".exe");
+            if (!Files.isRegularFile(cfg) || !Files.isRegularFile(exe)) return false;
+
+            Path newJar = appDir.resolve(pending.getFileName().toString());
+            Files.copy(pending, newJar, StandardCopyOption.REPLACE_EXISTING);
+            String text = Files.readString(cfg);
+            String updated = text.replace(currentJar.getFileName().toString(), newJar.getFileName().toString());
+            if (updated.equals(text)) {
+                // cfg does not reference the running JAR — unknown layout, bail out
+                Files.deleteIfExists(newJar);
+                return false;
+            }
+            Files.writeString(cfg, updated);
+            log.info("Staged update: {} installed, launcher cfg repointed, relaunching {}", newJar.getFileName(), exe);
+
+            ProcessBuilder pb = new ProcessBuilder(exe.toString());
+            pb.directory(installDir.toFile());
+            pb.inheritIO();
+            pb.start();
+            System.exit(0);
+            return true; // unreachable
+        } catch (Exception e) {
+            log.error("Staged cfg update failed", e);
+            return false;
+        }
     }
 
     /**

@@ -1,5 +1,17 @@
 # Changelogs
 
+## 2.3.6
+
+### Fixes
+- **Auto-update on Windows (packaged app): stage via launcher cfg** — the
+  jpackage runtime ships no `bin\java.exe`, so the 2.3.4 relaunch fallback
+  failed with `CreateProcess error=2`. In the jpackage layout the update is now
+  applied by copying the new JAR into `app/`, repointing the launcher `.cfg`,
+  and restarting the native `Local Hardware Bridge.exe` — no JVM launcher
+  needed, no file lock involved. The old JAR stays as implicit backup
+  (repointing the cfg back is the rollback). Plain-JAR installs keep the
+  java-based two-hop relaunch.
+
 ## 2.3.5
 
 ### Fixes

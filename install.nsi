@@ -33,7 +33,7 @@
 ; --------------------------------
 !define PRODUCT_NAME "Local Hardware Bridge"
 !ifndef PRODUCT_VERSION
-  !define PRODUCT_VERSION "2.3.5"
+  !define PRODUCT_VERSION "2.3.6"
 !endif
 !define PRODUCT_PUBLISHER "AugustinLR17"
 !define PRODUCT_URL "https://github.com/AugustinLR17/local-hardware-bridge"
