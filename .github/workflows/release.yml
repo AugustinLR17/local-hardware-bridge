@@ -130,10 +130,12 @@ jobs:
                 *)     SUFFIX="9$(printf '%03d' "$NUM")" ;;
               esac
               echo "VERSION=${BASE}.${SUFFIX}" >> $GITHUB_OUTPUT
+              echo "MAC_VERSION=${BASE}" >> $GITHUB_OUTPUT
               ;;
             *)
               # Plain release (X.Y.Z) — no suffix
               echo "VERSION=$V" >> $GITHUB_OUTPUT
+              echo "MAC_VERSION=$V" >> $GITHUB_OUTPUT
               ;;
           esac
 
@@ -364,9 +366,11 @@ jobs:
                 *)     SUFFIX="9$(printf '%03d' "$NUM")" ;;
               esac
               echo "VERSION=${BASE}.${SUFFIX}" >> $GITHUB_OUTPUT
+              echo "MAC_VERSION=${BASE}" >> $GITHUB_OUTPUT
               ;;
             *)
               echo "VERSION=$V" >> $GITHUB_OUTPUT
+              echo "MAC_VERSION=$V" >> $GITHUB_OUTPUT
               ;;
           esac
 
@@ -498,9 +502,11 @@ jobs:
                 *)     SUFFIX="9$(printf '%03d' "$NUM")" ;;
               esac
               echo "VERSION=${BASE}.${SUFFIX}" >> $GITHUB_OUTPUT
+              echo "MAC_VERSION=${BASE}" >> $GITHUB_OUTPUT
               ;;
             *)
               echo "VERSION=$V" >> $GITHUB_OUTPUT
+              echo "MAC_VERSION=$V" >> $GITHUB_OUTPUT
               ;;
           esac
 
@@ -533,7 +539,7 @@ jobs:
           jpackage \
             --type dmg \
             --name "Local Hardware Bridge" \
-            --app-version "${{ steps.numeric-version.outputs.VERSION }}" \
+            --app-version "${{ steps.numeric-version.outputs.MAC_VERSION }}" \
             --input build/libs/ \
             --main-jar "local-hardware-bridge-${{ steps.version.outputs.VERSION }}.jar" \
             --main-class io.github.augustinlr17.localhardwarebridge.Launcher \
