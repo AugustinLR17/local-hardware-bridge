@@ -82,7 +82,7 @@ public class UpdateService {
     /** Path to a fully-downloaded JAR awaiting application on next restart. */
     private final AtomicReference<Path> pendingUpdate = new AtomicReference<>();
 
-    private ScheduledExecutorService scheduler;
+    private volatile ScheduledExecutorService scheduler;
 
     private UpdateService() {
         // Detect a previously-downloaded update from a prior run.

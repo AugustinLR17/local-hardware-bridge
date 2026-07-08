@@ -932,9 +932,10 @@ public class ServerEndpointAuthMatrixTest {
     }
 
     @Test
-    public void bearerExtraction_caseSensitiveBearer() throws Exception {
-        // "bearer " (lowercase) is NOT a valid Bearer header
-        assertNull((String) extractBearerToken.invoke(null, "bearer my-token"));
+    public void bearerExtraction_caseInsensitiveBearer() throws Exception {
+        // RFC 7235: "bearer" (lowercase) IS a valid Bearer scheme — case-insensitive
+        assertEquals("my-token", (String) extractBearerToken.invoke(null, "bearer my-token"));
+        assertEquals("my-token", (String) extractBearerToken.invoke(null, "BEARER my-token"));
     }
 
     @Test

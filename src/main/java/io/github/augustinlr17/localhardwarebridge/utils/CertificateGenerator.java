@@ -51,11 +51,9 @@ public class CertificateGenerator {
         boolean needGenerate = !isCertificateAndKeyExist(certificatePath, keyPath);
 
         if (!needGenerate) {
-            try {
-                FileInputStream fis = new FileInputStream(certificatePath);
+            try (FileInputStream fis = new FileInputStream(certificatePath)) {
                 CertificateFactory cf = CertificateFactory.getInstance("X.509");
                 X509Certificate existingCert = (X509Certificate) cf.generateCertificate(fis);
-                fis.close();
 
                 String existingCN = existingCert.getSubjectX500Principal().getName();
                 if (!existingCN.equals(subjectName)) {

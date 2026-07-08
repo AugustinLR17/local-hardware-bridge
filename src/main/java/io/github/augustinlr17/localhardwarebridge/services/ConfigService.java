@@ -13,7 +13,9 @@ import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Consumer;
 
 @Log4j2
 public class ConfigService {
@@ -88,6 +90,52 @@ public class ConfigService {
 
     public synchronized void addPrintTypeToList(String printType) {
         config.get().getPrinter().getMappings().add(new Config.PrinterMapping(printType, PRINTER_PLACEHOLDER, false, true, 0));
+        save();
+    }
+
+    // --- Thread-safe mutation helpers ---
+    // All config mutations from HTTP handlers MUST go through these synchronized
+    // methods. Direct in-place mutation of the Config object's nested ArrayLists
+    // (e.g. config.getPrinter().getMappings().add(...)) is a data race because the
+    // AtomicReference only guards the reference swap, not concurrent in-place edits.
+
+    public synchronized void mutatePrinterMappings(Consumer<ArrayList<Config.PrinterMapping>> mutator) {
+        mutator.accept(config.get().getPrinter().getMappings());
+        save();
+    }
+
+    public synchronized void mutateSerialMappings(Consumer<ArrayList<Config.SerialMapping>> mutator) {
+        mutator.accept(config.get().getSerial().getMappings());
+        save();
+    }
+
+    public synchronized void setPrinterEnabled(boolean enabled) {
+        config.get().getPrinter().setEnabled(enabled);
+        save();
+    }
+
+    public synchronized void setSerialEnabled(boolean enabled) {
+        config.get().getSerial().setEnabled(enabled);
+        save();
+    }
+
+    public synchronized void setServerConfig(Config.Server updated) {
+        config.get().setServer(updated);
+        save();
+    }
+
+    public synchronized void setDownloaderConfig(Config.Downloader updated) {
+        config.get().setDownloader(updated);
+        save();
+    }
+
+    public synchronized void setGuiConfig(Config.GUI updated) {
+        config.get().setGui(updated);
+        save();
+    }
+
+    public synchronized void setUpdateConfig(Config.Update updated) {
+        config.get().setUpdate(updated);
         save();
     }
 }

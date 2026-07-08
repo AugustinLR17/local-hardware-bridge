@@ -109,6 +109,13 @@ public class DocumentService {
 
         URLConnection urlConnection = url.openConnection();
 
+        // Disable auto-redirect following so that a 302 from a public URL to an
+        // internal address (127.0.0.1, 169.254.169.254, etc.) cannot bypass the
+        // SSRF host check above. Print jobs should not redirect.
+        if (urlConnection instanceof HttpURLConnection) {
+            ((HttpURLConnection) urlConnection).setInstanceFollowRedirects(false);
+        }
+
         // Trust-all is scoped to THIS connection only; never mutate the JVM-wide default.
         // This is an opt-in feature (config.downloader.ignoreTLSCertificateError) for POS/WMS
         // environments that use self-signed certificates. It is off by default.
@@ -140,28 +147,50 @@ public class DocumentService {
 
         urlConnection.setConnectTimeout((int) downloaderConfig.getTimeout() * 1000);
         urlConnection.setReadTimeout((int) downloaderConfig.getTimeout() * 1000);
-        urlConnection.connect();
 
-        int contentLength = urlConnection.getContentLength();
-        int responseCode;
-        if (urlConnection instanceof HttpsURLConnection) {
-            responseCode = ((HttpsURLConnection) urlConnection).getResponseCode();
-        } else {
-            responseCode = ((HttpURLConnection) urlConnection).getResponseCode();
+        try {
+            urlConnection.connect();
+
+            int contentLength = urlConnection.getContentLength();
+            int responseCode;
+            if (urlConnection instanceof HttpsURLConnection) {
+                responseCode = ((HttpsURLConnection) urlConnection).getResponseCode();
+            } else {
+                responseCode = ((HttpURLConnection) urlConnection).getResponseCode();
+            }
+
+            log.trace("Content Length: {}", contentLength);
+            log.trace("Response Code: {}", responseCode);
+
+            // Reject redirects explicitly — print jobs should not redirect, and following
+            // them would bypass the SSRF host check on the redirect target.
+            if (responseCode == HttpURLConnection.HTTP_MOVED_PERM
+                    || responseCode == HttpURLConnection.HTTP_MOVED_TEMP
+                    || responseCode == HttpURLConnection.HTTP_SEE_OTHER
+                    || responseCode == 307 /* TEMP_REDIRECT */
+                    || responseCode == 308 /* PERM_REDIRECT */) {
+                throw new IOException("HTTP redirect (" + responseCode + ") not followed for security — original URL: " + url);
+            }
+
+            // Status code mismatch
+            if (responseCode != 200) {
+                throw new IOException("HTTP Status Code: " + responseCode);
+            }
+
+            try (var in = urlConnection.getInputStream()) {
+                FileUtils.copyInputStreamToFile(in, outputFile);
+            }
+
+            long timeFinish = System.currentTimeMillis();
+            log.info("File {} downloaded in {} ms", outputFile.getName(), timeFinish - timeStart);
+        } finally {
+            // Always disconnect to release the underlying socket — without this, a failed
+            // download leaks a file descriptor (socket FD). Over time on a busy POS this
+            // exhausts the process FD limit.
+            if (urlConnection instanceof HttpURLConnection) {
+                ((HttpURLConnection) urlConnection).disconnect();
+            }
         }
-
-        log.trace("Content Length: {}", contentLength);
-        log.trace("Response Code: {}", responseCode);
-
-        // Status code mismatch
-        if (responseCode != 200) {
-            throw new IOException("HTTP Status Code: " + responseCode);
-        }
-
-        FileUtils.copyInputStreamToFile(urlConnection.getInputStream(), outputFile);
-
-        long timeFinish = System.currentTimeMillis();
-        log.info("File {} downloaded in {} ms", outputFile.getName(), timeFinish - timeStart);
     }
 
     /**

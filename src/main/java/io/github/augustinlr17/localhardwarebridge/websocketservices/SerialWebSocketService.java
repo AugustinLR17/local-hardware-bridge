@@ -93,7 +93,8 @@ public class SerialWebSocketService implements WebSocketServiceInterface {
             }
 
             log.debug("Serial Read Thread stopped for {}", mapping.getName());
-        });
+        }, "serial-read-" + mapping.getName());
+        readThread.setDaemon(true);
 
         writeThread = new Thread(() -> {
             log.debug("Serial Write Thread started for {}", mapping.getName());
@@ -125,7 +126,8 @@ public class SerialWebSocketService implements WebSocketServiceInterface {
             }
 
             log.debug("Serial Write Thread stopped for {}", mapping.getName());
-        });
+        }, "serial-write-" + mapping.getName());
+        writeThread.setDaemon(true);
 
         monitorThread = new Thread(() -> {
             log.debug("Serial Monitor Thread started for {}", mapping.getName());
@@ -144,7 +146,8 @@ public class SerialWebSocketService implements WebSocketServiceInterface {
             }
 
             log.debug("Serial Monitor Thread stopped for {}", mapping.getName());
-        });
+        }, "serial-monitor-" + mapping.getName());
+        monitorThread.setDaemon(true);
 
         readThread.start();
         writeThread.start();
@@ -160,6 +163,17 @@ public class SerialWebSocketService implements WebSocketServiceInterface {
         readThread.interrupt();
         writeThread.interrupt();
         monitorThread.interrupt();
+
+        // Wait for threads to actually terminate so they don't race with a
+        // subsequent start() (which would reuse the same SerialPort handle).
+        try {
+            readThread.join(2000);
+            writeThread.join(2000);
+            monitorThread.join(2000);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            log.warn("Interrupted while waiting for serial threads to stop");
+        }
 
         serialPort.closePort();
 

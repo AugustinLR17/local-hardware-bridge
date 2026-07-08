@@ -321,6 +321,9 @@ public class Server implements WebSocketServerInterface {
                 // Try prefix match for dynamic paths like /serial/SCALE → /serial/{type}
                 if (path.startsWith(SERIAL_PREFIX)) {
                     rule = security.getEndpoints().get("/serial/{type}");
+                } else if (path.startsWith("/printer/mappings/")) {
+                    // /printer/mappings/{type} → /printer/{type}
+                    rule = security.getEndpoints().get("/printer/{type}");
                 }
             }
 
@@ -485,10 +488,16 @@ public class Server implements WebSocketServerInterface {
      * Returns null if the header is missing or not a Bearer credential.
      */
     private static String extractBearerToken(String authorizationHeader) {
-        if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) {
+        if (authorizationHeader == null) {
             return null;
         }
-        return authorizationHeader.substring("Bearer ".length());
+        // RFC 7235: the auth scheme is case-insensitive ("Bearer", "bearer", "BEARER" are all valid).
+        String trimmed = authorizationHeader.trim();
+        String lower = trimmed.toLowerCase(java.util.Locale.ROOT);
+        if (!lower.startsWith("bearer ")) {
+            return null;
+        }
+        return trimmed.substring("bearer ".length());
     }
 
     /**
@@ -794,8 +803,7 @@ public class Server implements WebSocketServerInterface {
         // Add printer mapping
         javalinServer.post("/printer/mappings", ctx -> {
             Config.PrinterMapping mapping = objectMapper.readValue(ctx.body(), Config.PrinterMapping.class);
-            configService.getConfig().getPrinter().getMappings().add(mapping);
-            configService.save();
+            configService.mutatePrinterMappings(m -> m.add(mapping));
 
             messageToService(NOTIFICATION_CHANNEL, objectMapper.writeValueAsString(new NotificationDTO("INFO", PRINTER_SERVICE, "Printer mapping added: " + mapping.getType())));
 
@@ -807,24 +815,21 @@ public class Server implements WebSocketServerInterface {
             String type = ctx.pathParam("type");
             Config.PrinterMapping updated = objectMapper.readValue(ctx.body(), Config.PrinterMapping.class);
 
-            ArrayList<Config.PrinterMapping> mappings = configService.getConfig().getPrinter().getMappings();
-            boolean found = false;
-            for (int i = 0; i < mappings.size(); i++) {
-                // Case-insensitive: type is the mapping's key and print-job
-                // dispatch matches it case-insensitively too
-                if (type.equalsIgnoreCase(mappings.get(i).getType())) {
-                    mappings.set(i, updated);
-                    found = true;
-                    break;
+            final boolean[] found = {false};
+            configService.mutatePrinterMappings(mappings -> {
+                for (int i = 0; i < mappings.size(); i++) {
+                    if (type.equalsIgnoreCase(mappings.get(i).getType())) {
+                        mappings.set(i, updated);
+                        found[0] = true;
+                        break;
+                    }
                 }
-            }
+            });
 
-            if (!found) {
+            if (!found[0]) {
                 ctx.status(404).json("{\"error\": \"Printer mapping not found: " + type + "\"}");
                 return;
             }
-
-            configService.save();
 
             messageToService(NOTIFICATION_CHANNEL, objectMapper.writeValueAsString(new NotificationDTO("INFO", PRINTER_SERVICE, "Printer mapping updated: " + type)));
 
@@ -834,17 +839,15 @@ public class Server implements WebSocketServerInterface {
         // Delete printer mapping by type
         javalinServer.delete("/printer/mappings/{type}", ctx -> {
             String type = ctx.pathParam("type");
-            ArrayList<Config.PrinterMapping> mappings = configService.getConfig().getPrinter().getMappings();
-            // Case-insensitive: also sweeps up case-variant duplicates
-            // ("Main" + "MAIN") left behind by the old auto-add behavior
-            boolean removed = mappings.removeIf(m -> type.equalsIgnoreCase(m.getType()));
+            final boolean[] removed = {false};
+            configService.mutatePrinterMappings(mappings -> {
+                removed[0] = mappings.removeIf(m -> type.equalsIgnoreCase(m.getType()));
+            });
 
-            if (!removed) {
+            if (!removed[0]) {
                 ctx.status(404).json("{\"error\": \"Printer mapping not found: " + type + "\"}");
                 return;
             }
-
-            configService.save();
 
             messageToService(NOTIFICATION_CHANNEL, objectMapper.writeValueAsString(new NotificationDTO("INFO", PRINTER_SERVICE, "Printer mapping deleted: " + type)));
 
@@ -854,8 +857,8 @@ public class Server implements WebSocketServerInterface {
         // Enable/disable printer service
         javalinServer.put("/printer/enabled", ctx -> {
             JsonNode node = objectMapper.readTree(ctx.body());
-            configService.getConfig().getPrinter().setEnabled(node.get(ENABLED_FIELD).asBoolean());
-            configService.save();
+            boolean enabled = node.get(ENABLED_FIELD).asBoolean();
+            configService.setPrinterEnabled(enabled);
 
             messageToService(NOTIFICATION_CHANNEL, objectMapper.writeValueAsString(new NotificationDTO("INFO", PRINTER_SERVICE, "Printer service " + (node.get(ENABLED_FIELD).asBoolean() ? ENABLED_FIELD : "disabled"))));
 
@@ -885,8 +888,7 @@ public class Server implements WebSocketServerInterface {
         // Add serial mapping
         javalinServer.post("/serial/mappings", ctx -> {
             Config.SerialMapping mapping = objectMapper.readValue(ctx.body(), Config.SerialMapping.class);
-            configService.getConfig().getSerial().getMappings().add(mapping);
-            configService.save();
+            configService.mutateSerialMappings(m -> m.add(mapping));
 
             messageToService(NOTIFICATION_CHANNEL, objectMapper.writeValueAsString(new NotificationDTO("INFO", SERIAL_SERVICE, "Serial mapping added: " + mapping.getType())));
 
@@ -898,23 +900,21 @@ public class Server implements WebSocketServerInterface {
             String type = ctx.pathParam("type");
             Config.SerialMapping updated = objectMapper.readValue(ctx.body(), Config.SerialMapping.class);
 
-            ArrayList<Config.SerialMapping> mappings = configService.getConfig().getSerial().getMappings();
-            boolean found = false;
-            for (int i = 0; i < mappings.size(); i++) {
-                // Case-insensitive, consistent with the printer mapping endpoints
-                if (type.equalsIgnoreCase(mappings.get(i).getType())) {
-                    mappings.set(i, updated);
-                    found = true;
-                    break;
+            final boolean[] found = {false};
+            configService.mutateSerialMappings(mappings -> {
+                for (int i = 0; i < mappings.size(); i++) {
+                    if (type.equalsIgnoreCase(mappings.get(i).getType())) {
+                        mappings.set(i, updated);
+                        found[0] = true;
+                        break;
+                    }
                 }
-            }
+            });
 
-            if (!found) {
+            if (!found[0]) {
                 ctx.status(404).json("{\"error\": \"Serial mapping not found: " + type + "\"}");
                 return;
             }
-
-            configService.save();
 
             messageToService(NOTIFICATION_CHANNEL, objectMapper.writeValueAsString(new NotificationDTO("INFO", SERIAL_SERVICE, "Serial mapping updated: " + type)));
 
@@ -924,16 +924,15 @@ public class Server implements WebSocketServerInterface {
         // Delete serial mapping by type
         javalinServer.delete("/serial/mappings/{type}", ctx -> {
             String type = ctx.pathParam("type");
-            ArrayList<Config.SerialMapping> mappings = configService.getConfig().getSerial().getMappings();
-            // Case-insensitive, consistent with the printer mapping endpoints
-            boolean removed = mappings.removeIf(m -> type.equalsIgnoreCase(m.getType()));
+            final boolean[] removed = {false};
+            configService.mutateSerialMappings(mappings -> {
+                removed[0] = mappings.removeIf(m -> type.equalsIgnoreCase(m.getType()));
+            });
 
-            if (!removed) {
+            if (!removed[0]) {
                 ctx.status(404).json("{\"error\": \"Serial mapping not found: " + type + "\"}");
                 return;
             }
-
-            configService.save();
 
             messageToService(NOTIFICATION_CHANNEL, objectMapper.writeValueAsString(new NotificationDTO("INFO", SERIAL_SERVICE, "Serial mapping deleted: " + type)));
 
@@ -943,8 +942,8 @@ public class Server implements WebSocketServerInterface {
         // Enable/disable serial service
         javalinServer.put("/serial/enabled", ctx -> {
             JsonNode node = objectMapper.readTree(ctx.body());
-            configService.getConfig().getSerial().setEnabled(node.get(ENABLED_FIELD).asBoolean());
-            configService.save();
+            boolean enabled = node.get(ENABLED_FIELD).asBoolean();
+            configService.setSerialEnabled(enabled);
 
             messageToService(NOTIFICATION_CHANNEL, objectMapper.writeValueAsString(new NotificationDTO("INFO", SERIAL_SERVICE, "Serial service " + (node.get(ENABLED_FIELD).asBoolean() ? ENABLED_FIELD : "disabled"))));
 
@@ -1161,8 +1160,7 @@ public class Server implements WebSocketServerInterface {
         // Update server config — token masked in response
         javalinServer.put("/system/server.json", ctx -> {
             Config.Server updated = objectMapper.readValue(ctx.body(), Config.Server.class);
-            configService.getConfig().setServer(updated);
-            configService.save();
+            configService.setServerConfig(updated);
 
             messageToService(NOTIFICATION_CHANNEL, objectMapper.writeValueAsString(new NotificationDTO("INFO", "Server", "Server configuration updated. Restart required.")));
 
@@ -1178,8 +1176,7 @@ public class Server implements WebSocketServerInterface {
         // Update downloader config
         javalinServer.put("/system/downloader.json", ctx -> {
             Config.Downloader updated = objectMapper.readValue(ctx.body(), Config.Downloader.class);
-            configService.getConfig().setDownloader(updated);
-            configService.save();
+            configService.setDownloaderConfig(updated);
 
             ctx.contentType(ContentType.APPLICATION_JSON).result(objectMapper.writeValueAsString(configService.getConfig().getDownloader()));
         });
@@ -1192,8 +1189,7 @@ public class Server implements WebSocketServerInterface {
         // Update GUI config
         javalinServer.put("/system/gui.json", ctx -> {
             Config.GUI updated = objectMapper.readValue(ctx.body(), Config.GUI.class);
-            configService.getConfig().setGui(updated);
-            configService.save();
+            configService.setGuiConfig(updated);
 
             ctx.contentType(ContentType.APPLICATION_JSON).result(objectMapper.writeValueAsString(configService.getConfig().getGui()));
         });
@@ -1467,8 +1463,7 @@ public class Server implements WebSocketServerInterface {
 
         javalinServer.put("/system/update.json", ctx -> {
             Config.Update updated = objectMapper.readValue(ctx.body(), Config.Update.class);
-            configService.getConfig().setUpdate(updated);
-            configService.save();
+            configService.setUpdateConfig(updated);
 
             // Restart the scheduler if settings changed
             updateService.stopScheduledChecks();

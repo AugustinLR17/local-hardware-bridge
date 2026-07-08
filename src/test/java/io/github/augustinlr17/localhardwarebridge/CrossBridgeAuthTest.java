@@ -188,9 +188,11 @@ public class CrossBridgeAuthTest {
     }
 
     @Test
-    public void bearerExtractionIsCaseSensitive() throws Exception {
-        // "bearer " (lowercase) is NOT a valid Bearer header
-        assertNull(bearerFromHeader("bearer " + TOKEN_A_FRANCE));
+    public void bearerExtractionIsCaseInsensitive() throws Exception {
+        // RFC 7235: "bearer" (lowercase) IS a valid Bearer scheme — case-insensitive
+        assertEquals(TOKEN_A_FRANCE, bearerFromHeader("bearer " + TOKEN_A_FRANCE));
+        assertEquals(TOKEN_A_FRANCE, bearerFromHeader("BEARER " + TOKEN_A_FRANCE));
+        assertEquals(TOKEN_A_FRANCE, bearerFromHeader("Bearer " + TOKEN_A_FRANCE));
     }
 
     @Test
