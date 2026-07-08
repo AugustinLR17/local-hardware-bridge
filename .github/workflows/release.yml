@@ -108,31 +108,34 @@ jobs:
 
       # jpackage --app-version requires a numeric version (1.2.3.4).
       # Convert semver pre-release suffixes like -alpha.1, -rc.2 into a
-      # 4th numeric component: 2.4.0-alpha.1 → 2.4.0.1, 2.4.0-rc.2 → 2.4.0.1002
+      # 4th numeric component: 2.4.0-alpha.1 → 2.4.0.1001, 2.4.0-rc.2 → 2.4.0.3002
       # Full releases stay as-is: 2.4.0 → 2.4.0
+      # Uses only POSIX sh parameter expansion — no grep -P or sed -r (macOS lacks them).
       - name: Compute numeric version for jpackage
         id: numeric-version
         shell: bash
         run: |
           V="${{ steps.version.outputs.VERSION }}"
-          if echo "$V" | grep -qP '^\d+\.\d+\.\d+$'; then
-            echo "VERSION=$V" >> $GITHUB_OUTPUT
-          elif echo "$V" | grep -qP '^\d+\.\d+\.\d+-([a-zA-Z]+)\.(\d+)$'; then
-            # 4th component: alpha=1xxx, beta=2xxx, rc=3xxx
-            PRE=$(echo "$V" | sed -r 's/.*-([a-zA-Z]+)\.([0-9]+)/\1/')
-            NUM=$(echo "$V" | sed -r 's/.*-([a-zA-Z]+)\.([0-9]+)/\2/')
-            case "$PRE" in
-              alpha) SUFFIX="1$(printf '%03d' $NUM)" ;;
-              beta)  SUFFIX="2$(printf '%03d' $NUM)" ;;
-              rc)    SUFFIX="3$(printf '%03d' $NUM)" ;;
-              *)     SUFFIX="9$(printf '%03d' $NUM)" ;;
-            esac
-            BASE=$(echo "$V" | sed -r 's/-[a-zA-Z]+\.[0-9]+$//')
-            echo "VERSION=${BASE}.${SUFFIX}" >> $GITHUB_OUTPUT
-          else
-            echo "::error::Unrecognized version format: $V"
-            exit 1
-          fi
+          case "$V" in
+            *-*)
+              # Pre-release: extract base (X.Y.Z) and suffix (alpha.1, rc.2, etc.)
+              BASE="${V%%-*}"
+              REST="${V#*-}"
+              PRE="${REST%%.*}"
+              NUM="${REST#*.}"
+              case "$PRE" in
+                alpha) SUFFIX="1$(printf '%03d' "$NUM")" ;;
+                beta)  SUFFIX="2$(printf '%03d' "$NUM")" ;;
+                rc)    SUFFIX="3$(printf '%03d' "$NUM")" ;;
+                *)     SUFFIX="9$(printf '%03d' "$NUM")" ;;
+              esac
+              echo "VERSION=${BASE}.${SUFFIX}" >> $GITHUB_OUTPUT
+              ;;
+            *)
+              # Plain release (X.Y.Z) — no suffix
+              echo "VERSION=$V" >> $GITHUB_OUTPUT
+              ;;
+          esac
 
       - name: Verify tag matches build.gradle version
         shell: bash
@@ -348,23 +351,24 @@ jobs:
         shell: bash
         run: |
           V="${{ steps.version.outputs.VERSION }}"
-          if echo "$V" | grep -qP '^\d+\.\d+\.\d+$'; then
-            echo "VERSION=$V" >> $GITHUB_OUTPUT
-          elif echo "$V" | grep -qP '^\d+\.\d+\.\d+-([a-zA-Z]+)\.(\d+)$'; then
-            PRE=$(echo "$V" | sed -r 's/.*-([a-zA-Z]+)\.([0-9]+)/\1/')
-            NUM=$(echo "$V" | sed -r 's/.*-([a-zA-Z]+)\.([0-9]+)/\2/')
-            case "$PRE" in
-              alpha) SUFFIX="1$(printf '%03d' $NUM)" ;;
-              beta)  SUFFIX="2$(printf '%03d' $NUM)" ;;
-              rc)    SUFFIX="3$(printf '%03d' $NUM)" ;;
-              *)     SUFFIX="9$(printf '%03d' $NUM)" ;;
-            esac
-            BASE=$(echo "$V" | sed -r 's/-[a-zA-Z]+\.[0-9]+$//')
-            echo "VERSION=${BASE}.${SUFFIX}" >> $GITHUB_OUTPUT
-          else
-            echo "::error::Unrecognized version format: $V"
-            exit 1
-          fi
+          case "$V" in
+            *-*)
+              BASE="${V%%-*}"
+              REST="${V#*-}"
+              PRE="${REST%%.*}"
+              NUM="${REST#*.}"
+              case "$PRE" in
+                alpha) SUFFIX="1$(printf '%03d' "$NUM")" ;;
+                beta)  SUFFIX="2$(printf '%03d' "$NUM")" ;;
+                rc)    SUFFIX="3$(printf '%03d' "$NUM")" ;;
+                *)     SUFFIX="9$(printf '%03d' "$NUM")" ;;
+              esac
+              echo "VERSION=${BASE}.${SUFFIX}" >> $GITHUB_OUTPUT
+              ;;
+            *)
+              echo "VERSION=$V" >> $GITHUB_OUTPUT
+              ;;
+          esac
 
       - name: Verify tag matches build.gradle version
         run: |
@@ -481,23 +485,24 @@ jobs:
         shell: bash
         run: |
           V="${{ steps.version.outputs.VERSION }}"
-          if echo "$V" | grep -qP '^\d+\.\d+\.\d+$'; then
-            echo "VERSION=$V" >> $GITHUB_OUTPUT
-          elif echo "$V" | grep -qP '^\d+\.\d+\.\d+-([a-zA-Z]+)\.(\d+)$'; then
-            PRE=$(echo "$V" | sed -r 's/.*-([a-zA-Z]+)\.([0-9]+)/\1/')
-            NUM=$(echo "$V" | sed -r 's/.*-([a-zA-Z]+)\.([0-9]+)/\2/')
-            case "$PRE" in
-              alpha) SUFFIX="1$(printf '%03d' $NUM)" ;;
-              beta)  SUFFIX="2$(printf '%03d' $NUM)" ;;
-              rc)    SUFFIX="3$(printf '%03d' $NUM)" ;;
-              *)     SUFFIX="9$(printf '%03d' $NUM)" ;;
-            esac
-            BASE=$(echo "$V" | sed -r 's/-[a-zA-Z]+\.[0-9]+$//')
-            echo "VERSION=${BASE}.${SUFFIX}" >> $GITHUB_OUTPUT
-          else
-            echo "::error::Unrecognized version format: $V"
-            exit 1
-          fi
+          case "$V" in
+            *-*)
+              BASE="${V%%-*}"
+              REST="${V#*-}"
+              PRE="${REST%%.*}"
+              NUM="${REST#*.}"
+              case "$PRE" in
+                alpha) SUFFIX="1$(printf '%03d' "$NUM")" ;;
+                beta)  SUFFIX="2$(printf '%03d' "$NUM")" ;;
+                rc)    SUFFIX="3$(printf '%03d' "$NUM")" ;;
+                *)     SUFFIX="9$(printf '%03d' "$NUM")" ;;
+              esac
+              echo "VERSION=${BASE}.${SUFFIX}" >> $GITHUB_OUTPUT
+              ;;
+            *)
+              echo "VERSION=$V" >> $GITHUB_OUTPUT
+              ;;
+          esac
 
       - name: Verify tag matches build.gradle version
         run: |
