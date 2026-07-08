@@ -1,5 +1,13 @@
 # Changelogs
 
+## 2.4.0-alpha.3
+
+### CI / Code Signing
+- **Switch eSigner signing steps to PowerShell** — Git Bash/MSYS2 on Windows
+  runners mangles the `|` separator and special chars (`#`, `!`) in the
+  storepass. PowerShell handles credentials natively via `$env:` without
+  any shell escaping issues.
+
 ## 2.4.0-alpha.2
 
 ### CI / Code Signing

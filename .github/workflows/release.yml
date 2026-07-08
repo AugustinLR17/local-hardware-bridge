@@ -203,14 +203,10 @@ jobs:
           ES_CRED: ${{ secrets.CREDENTIAL_ID }}
           ES_TOTP: ${{ secrets.ES_TOTP_SECRET }}
         run: |
-          chmod +w "${{ github.workspace }}\build\dist\appimage\Local Hardware Bridge\Local Hardware Bridge.exe"
-          java -jar jsign.jar \
-            --storetype ESIGNER \
-            --storepass "$ES_USER|$ES_PASS" \
-            --alias "$ES_CRED" \
-            --keypass "$ES_TOTP" \
-            "${{ github.workspace }}\build\dist\appimage\Local Hardware Bridge\Local Hardware Bridge.exe"
-        shell: bash
+          $exe = "${{ github.workspace }}\build\dist\appimage\Local Hardware Bridge\Local Hardware Bridge.exe"
+          attrib -r "$exe"
+          java -jar jsign.jar --storetype ESIGNER --storepass "$env:ES_USER|$env:ES_PASS" --alias "$env:ES_CRED" --keypass "$env:ES_TOTP" "$exe"
+        shell: powershell
 
       - name: Install NSIS
         run: choco install nsis -y
@@ -233,14 +229,10 @@ jobs:
           ES_CRED: ${{ secrets.CREDENTIAL_ID }}
           ES_TOTP: ${{ secrets.ES_TOTP_SECRET }}
         run: |
-          chmod +w "${{ github.workspace }}\build\dist\windows-exe\Local-Hardware-Bridge-${{ steps.version.outputs.VERSION }}.exe"
-          java -jar jsign.jar \
-            --storetype ESIGNER \
-            --storepass "$ES_USER|$ES_PASS" \
-            --alias "$ES_CRED" \
-            --keypass "$ES_TOTP" \
-            "${{ github.workspace }}\build\dist\windows-exe\Local-Hardware-Bridge-${{ steps.version.outputs.VERSION }}.exe"
-        shell: bash
+          $exe = "${{ github.workspace }}\build\dist\windows-exe\Local-Hardware-Bridge-${{ steps.version.outputs.VERSION }}.exe"
+          attrib -r "$exe"
+          java -jar jsign.jar --storetype ESIGNER --storepass "$env:ES_USER|$env:ES_PASS" --alias "$env:ES_CRED" --keypass "$env:ES_TOTP" "$exe"
+        shell: powershell
 
       - name: Upload Windows EXE
         uses: actions/upload-artifact@v4
@@ -269,14 +261,10 @@ jobs:
           ES_CRED: ${{ secrets.CREDENTIAL_ID }}
           ES_TOTP: ${{ secrets.ES_TOTP_SECRET }}
         run: |
-          chmod +w "${{ github.workspace }}\lhb.exe"
-          java -jar jsign.jar \
-            --storetype ESIGNER \
-            --storepass "$ES_USER|$ES_PASS" \
-            --alias "$ES_CRED" \
-            --keypass "$ES_TOTP" \
-            "${{ github.workspace }}\lhb.exe"
-        shell: bash
+          $exe = "${{ github.workspace }}\lhb.exe"
+          attrib -r "$exe"
+          java -jar jsign.jar --storetype ESIGNER --storepass "$env:ES_USER|$env:ES_PASS" --alias "$env:ES_CRED" --keypass "$env:ES_TOTP" "$exe"
+        shell: powershell
 
       - name: Assemble Intune package source folder
         run: |
