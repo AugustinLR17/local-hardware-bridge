@@ -156,13 +156,18 @@ jobs:
 
       - name: Sign jpackage launcher with eSigner
         if: ${{ vars.ESIGNER_ENABLED == 'true' }}
+        env:
+          ES_USER: ${{ secrets.ES_USERNAME }}
+          ES_PASS: ${{ secrets.ES_PASSWORD }}
+          ES_CRED: ${{ secrets.CREDENTIAL_ID }}
+          ES_TOTP: ${{ secrets.ES_TOTP_SECRET }}
         run: |
           chmod +w "${{ github.workspace }}\build\dist\appimage\Local Hardware Bridge\Local Hardware Bridge.exe"
           java -jar jsign.jar \
             --storetype ESIGNER \
-            --storepass "${{ secrets.ES_USERNAME }}|${{ secrets.ES_PASSWORD }}" \
-            --alias "${{ secrets.CREDENTIAL_ID }}" \
-            --keypass "${{ secrets.ES_TOTP_SECRET }}" \
+            --storepass "$ES_USER|$ES_PASS" \
+            --alias "$ES_CRED" \
+            --keypass "$ES_TOTP" \
             "${{ github.workspace }}\build\dist\appimage\Local Hardware Bridge\Local Hardware Bridge.exe"
         shell: bash
 
@@ -181,13 +186,18 @@ jobs:
 
       - name: Sign NSIS installer with eSigner
         if: ${{ vars.ESIGNER_ENABLED == 'true' }}
+        env:
+          ES_USER: ${{ secrets.ES_USERNAME }}
+          ES_PASS: ${{ secrets.ES_PASSWORD }}
+          ES_CRED: ${{ secrets.CREDENTIAL_ID }}
+          ES_TOTP: ${{ secrets.ES_TOTP_SECRET }}
         run: |
           chmod +w "${{ github.workspace }}\build\dist\windows-exe\Local-Hardware-Bridge-${{ steps.version.outputs.VERSION }}.exe"
           java -jar jsign.jar \
             --storetype ESIGNER \
-            --storepass "${{ secrets.ES_USERNAME }}|${{ secrets.ES_PASSWORD }}" \
-            --alias "${{ secrets.CREDENTIAL_ID }}" \
-            --keypass "${{ secrets.ES_TOTP_SECRET }}" \
+            --storepass "$ES_USER|$ES_PASS" \
+            --alias "$ES_CRED" \
+            --keypass "$ES_TOTP" \
             "${{ github.workspace }}\build\dist\windows-exe\Local-Hardware-Bridge-${{ steps.version.outputs.VERSION }}.exe"
         shell: bash
 
@@ -212,13 +222,18 @@ jobs:
 
       - name: Sign Intune NSIS installer with eSigner
         if: ${{ vars.ESIGNER_ENABLED == 'true' }}
+        env:
+          ES_USER: ${{ secrets.ES_USERNAME }}
+          ES_PASS: ${{ secrets.ES_PASSWORD }}
+          ES_CRED: ${{ secrets.CREDENTIAL_ID }}
+          ES_TOTP: ${{ secrets.ES_TOTP_SECRET }}
         run: |
           chmod +w "${{ github.workspace }}\lhb.exe"
           java -jar jsign.jar \
             --storetype ESIGNER \
-            --storepass "${{ secrets.ES_USERNAME }}|${{ secrets.ES_PASSWORD }}" \
-            --alias "${{ secrets.CREDENTIAL_ID }}" \
-            --keypass "${{ secrets.ES_TOTP_SECRET }}" \
+            --storepass "$ES_USER|$ES_PASS" \
+            --alias "$ES_CRED" \
+            --keypass "$ES_TOTP" \
             "${{ github.workspace }}\lhb.exe"
         shell: bash
 
