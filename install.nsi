@@ -35,6 +35,12 @@
 !ifndef PRODUCT_VERSION
   !define PRODUCT_VERSION "2.4.0-alpha.1"
 !endif
+; NUMERIC_VERSION is used for VIProductVersion which requires X.X.X.X format.
+; The CI passes it via /DNUMERIC_VERSION=2.4.0.1001; fallback strips the
+; pre-release suffix and appends .0 (e.g. 2.4.0-alpha.1 → 2.4.0.0).
+!ifndef NUMERIC_VERSION
+  !define NUMERIC_VERSION "${PRODUCT_VERSION}"
+!endif
 !define PRODUCT_PUBLISHER "AugustinLR17"
 !define PRODUCT_URL "https://github.com/AugustinLR17/local-hardware-bridge"
 !define PRODUCT_UNINST_KEY "Software\Microsoft\Windows\CurrentVersion\Uninstall\Local Hardware Bridge"
@@ -71,7 +77,7 @@ OutFile "lhb.exe"
 InstallDirRegKey ${REG_ROOT} "${PRODUCT_REGKEY}" "Install_Dir"
 
 ; Version info embedded in the EXE
-VIProductVersion "${PRODUCT_VERSION}.0"
+VIProductVersion "${NUMERIC_VERSION}"
 VIAddVersionKey "ProductName" "${PRODUCT_NAME}"
 VIAddVersionKey "CompanyName" "${PRODUCT_PUBLISHER}"
 VIAddVersionKey "FileDescription" "${PRODUCT_NAME} Installer"
