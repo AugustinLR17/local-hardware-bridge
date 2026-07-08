@@ -183,9 +183,7 @@ jobs:
       #   3. ES_TOTP_SECRET is in BASE64 format (not base32 — Jsign uses base64)
       #   4. CREDENTIAL_ID matches the eSigner certificate in the SSL.com dashboard
       #
-      # Signing steps use continue-on-error so the release proceeds even if
-      # code signing fails (unsigned binaries are still functional, just unsigned).
-      # Fix credentials and re-release to sign.
+      # Signing failures fail the build — we do not ship unsigned binaries silently.
       #
       # Gated on the ESIGNER_ENABLED repo variable. Secrets required:
       #   ES_USERNAME     — SSL.com account email
@@ -199,7 +197,6 @@ jobs:
 
       - name: Sign jpackage launcher with eSigner
         if: ${{ vars.ESIGNER_ENABLED == 'true' }}
-        continue-on-error: true
         env:
           ES_USER: ${{ secrets.ES_USERNAME }}
           ES_PASS: ${{ secrets.ES_PASSWORD }}
@@ -230,7 +227,6 @@ jobs:
 
       - name: Sign NSIS installer with eSigner
         if: ${{ vars.ESIGNER_ENABLED == 'true' }}
-        continue-on-error: true
         env:
           ES_USER: ${{ secrets.ES_USERNAME }}
           ES_PASS: ${{ secrets.ES_PASSWORD }}
@@ -267,7 +263,6 @@ jobs:
 
       - name: Sign Intune NSIS installer with eSigner
         if: ${{ vars.ESIGNER_ENABLED == 'true' }}
-        continue-on-error: true
         env:
           ES_USER: ${{ secrets.ES_USERNAME }}
           ES_PASS: ${{ secrets.ES_PASSWORD }}

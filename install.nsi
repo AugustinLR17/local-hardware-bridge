@@ -33,7 +33,7 @@
 ; --------------------------------
 !define PRODUCT_NAME "Local Hardware Bridge"
 !ifndef PRODUCT_VERSION
-  !define PRODUCT_VERSION "2.4.0-alpha.1"
+  !define PRODUCT_VERSION "2.4.0-alpha.2"
 !endif
 ; NUMERIC_VERSION is used for VIProductVersion which requires X.X.X.X format.
 ; The CI passes it via /DNUMERIC_VERSION=2.4.0.1001; fallback strips the

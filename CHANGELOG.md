@@ -1,5 +1,12 @@
 # Changelogs
 
+## 2.4.0-alpha.2
+
+### CI / Code Signing
+- **Removed continue-on-error from eSigner steps** — signing failures now
+  fail the build so we can see the real error instead of silently shipping
+  unsigned binaries.
+
 ## 2.4.0-alpha.1
 
 ### Performance
