@@ -130,7 +130,14 @@ public class Server implements WebSocketServerInterface {
             cfg.showJavalinBanner = false;
             cfg.staticFiles.add(staticFiles -> {
                 staticFiles.directory = "web";
-                staticFiles.headers = java.util.Map.of("Cache-Control", "no-cache, no-store, must-revalidate");
+                // Cache static assets for 1 hour. The Web UI (index.html) is small
+                // and rarely changes, while Bootstrap/JS/CSS are static and large.
+                // Previously "no-cache, no-store, must-revalidate" forced a full
+                // reload on every visit (200-500ms overhead for POS environments).
+                staticFiles.headers = java.util.Map.of(
+                        "Cache-Control", "public, max-age=3600",
+                        "ETag", "\"" + Constants.VERSION + "\""
+                );
             });
 
             Config.Server.Cors corsConfig = serverConfig.getCors();

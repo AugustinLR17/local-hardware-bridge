@@ -34,6 +34,8 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 import org.apache.commons.io.FileUtils;
 
 @Log4j2
@@ -47,6 +49,23 @@ public class PrinterWebSocketService implements WebSocketServiceInterface {
     // Per-type lock so prints to different printers/types don't serialize globally.
     private final ConcurrentHashMap<String, Object> printLocks = new ConcurrentHashMap<>();
     private static final String DEFAULT_LOCK_KEY = "__default__";
+
+    // --- Performance caches ---
+    // PrintServiceLookup.lookupPrintServices() enumerates OS printers on every call
+    // (100-500ms on Windows). Cache the result with a TTL so repeated prints don't
+    // re-enumerate. The cache is invalidated when printers are added/removed.
+    private static volatile PrintService[] cachedPrintServices;
+    private static volatile long printServicesCacheTime;
+    private static final long PRINT_SERVICES_TTL_MS = TimeUnit.SECONDS.toMillis(30);
+
+    // detectPrinterCapabilities probes getSupportedDocFlavors() per printer — cache
+    // by printer name since capabilities rarely change during a session.
+    private static final ConcurrentHashMap<String, PrinterCapabilities> capabilitiesCache = new ConcurrentHashMap<>();
+
+    // Pre-compiled regex patterns (String.matches() recompiles every call).
+    private static final Pattern IMAGE_EXT_PATTERN = Pattern.compile("^.*\\.(jpg|jpeg|png|gif)$");
+    private static final Pattern PDF_EXT_PATTERN = Pattern.compile("^.*\\.(pdf)$");
+    private static final Pattern HAS_EXT_PATTERN = Pattern.compile("^.*\\.[a-z0-9]{1,10}$");
 
     public PrinterWebSocketService() {
         log.info("Starting PrinterWebSocketService");
@@ -171,6 +190,9 @@ public class PrinterWebSocketService implements WebSocketServiceInterface {
     /**
      * Decode the first bytes of {@code file_content} (Base64) to sniff the file signature.
      *
+     * <p>Optimisation: only decodes the minimal Base64 prefix needed for 16 bytes
+     * instead of decoding the entire file content (which can be several MB).
+     *
      * @return the decoded leading bytes (up to 16), or {@code null} if file_content is
      *         absent or cannot be decoded.
      */
@@ -180,7 +202,10 @@ public class PrinterWebSocketService implements WebSocketServiceInterface {
             return null;
         }
         try {
-            byte[] decoded = Base64.decodeBase64(b64);
+            // 16 decoded bytes need at most ceil(16/3)*4 = 24 base64 chars.
+            // Take a bit more to handle padding safely.
+            int prefixLen = Math.min(b64.length(), 32);
+            byte[] decoded = Base64.decodeBase64(b64.substring(0, prefixLen));
             int len = Math.min(decoded.length, 16);
             byte[] head = new byte[len];
             System.arraycopy(decoded, 0, head, 0, len);
@@ -240,11 +265,11 @@ public class PrinterWebSocketService implements WebSocketServiceInterface {
         String filename = urlFilename(printDocument);
         String lowerFilename = filename.toLowerCase();
 
-        if (lowerFilename.matches("^.*\\.(jpg|jpeg|png|gif)$")) {
+        if (IMAGE_EXT_PATTERN.matcher(lowerFilename).matches()) {
             return true;
         }
         // Only fall back to content sniffing if the URL has no usable extension.
-        if (lowerFilename.matches("^.*\\.[a-z0-9]{1,10}$")) {
+        if (HAS_EXT_PATTERN.matcher(lowerFilename).matches()) {
             return false;
         }
         return isImageByContent(printDocument);
@@ -259,11 +284,11 @@ public class PrinterWebSocketService implements WebSocketServiceInterface {
         String filename = urlFilename(printDocument);
         String lowerFilename = filename.toLowerCase();
 
-        if (lowerFilename.matches("^.*\\.(pdf)$")) {
+        if (PDF_EXT_PATTERN.matcher(lowerFilename).matches()) {
             return true;
         }
         // Only fall back to content sniffing if the URL has no usable extension.
-        if (lowerFilename.matches("^.*\\.[a-z0-9]{1,10}$")) {
+        if (HAS_EXT_PATTERN.matcher(lowerFilename).matches()) {
             return false;
         }
         return isPDFByContent(printDocument);
@@ -283,6 +308,14 @@ public class PrinterWebSocketService implements WebSocketServiceInterface {
      * @return a {@link PrinterCapabilities} describing what the printer supports
      */
     PrinterCapabilities detectPrinterCapabilities(PrintService printService) {
+        String printerName = printService.getName();
+        PrinterCapabilities cached = capabilitiesCache.get(printerName);
+        if (cached != null) {
+            log.debug("Printer capabilities for '{}' (cached): raw={}, image={}, pdf={}",
+                    printerName, cached.supportsRaw, cached.supportsImage, cached.supportsPDF);
+            return cached;
+        }
+
         boolean supportsRaw = false;
         boolean supportsImage = false;
         boolean supportsPDF = false;
@@ -314,8 +347,9 @@ public class PrinterWebSocketService implements WebSocketServiceInterface {
         }
 
         PrinterCapabilities caps = new PrinterCapabilities(supportsRaw, supportsImage, supportsPDF);
+        capabilitiesCache.put(printerName, caps);
         log.info("Printer capabilities for '{}': raw={}, image={}, pdf={}",
-                printService.getName(), caps.supportsRaw, caps.supportsImage, caps.supportsPDF);
+                printerName, caps.supportsRaw, caps.supportsImage, caps.supportsPDF);
         return caps;
     }
 
@@ -936,10 +970,29 @@ public class PrinterWebSocketService implements WebSocketServiceInterface {
     }
 
     /**
+     * Returns the list of OS print services, cached with a TTL to avoid
+     * re-enumerating printers (100-500ms on Windows) on every print job.
+     * The cache refreshes every {@value #PRINT_SERVICES_TTL_MS}ms.
+     */
+    private PrintService[] getPrintServices() {
+        long now = System.currentTimeMillis();
+        PrintService[] services = cachedPrintServices;
+        if (services == null || (now - printServicesCacheTime) > PRINT_SERVICES_TTL_MS) {
+            services = PrintServiceLookup.lookupPrintServices(null, null);
+            cachedPrintServices = services;
+            printServicesCacheTime = now;
+            // Invalidate capability cache when printer list refreshes — a printer
+            // may have been removed or its driver changed.
+            capabilitiesCache.clear();
+        }
+        return services;
+    }
+
+    /**
      * Get PrinterSearchResult for specified type
      */
     private PrinterSearchResult searchPrinterForType(String type) throws PrinterException {
-        PrintService[] printServices = PrintServiceLookup.lookupPrintServices(null, null);
+        PrintService[] printServices = getPrintServices();
 
         // Type match is case-insensitive: clients send e.g. "Main" while the
         // config says "MAIN". A case-sensitive miss here used to fall through

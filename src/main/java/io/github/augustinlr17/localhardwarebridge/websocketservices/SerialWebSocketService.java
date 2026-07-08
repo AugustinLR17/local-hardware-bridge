@@ -15,6 +15,7 @@ import java.nio.charset.Charset;
 import java.util.Objects;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 
 @Log4j2
 public class SerialWebSocketService implements WebSocketServiceInterface {
@@ -100,14 +101,23 @@ public class SerialWebSocketService implements WebSocketServiceInterface {
             while (isRunning) {
                 if (serialPort.isOpen()) {
                     // Drain everything queued since the last cycle (no last-write-wins loss).
+                    // Use blocking poll with timeout so the thread wakes immediately when
+                    // data is available instead of sleeping a fixed 10ms — reduces write
+                    // latency from up to 10ms to near-zero.
                     byte[] data;
-                    while ((data = writeQueue.poll()) != null) {
+                    try {
+                        data = writeQueue.poll(10, TimeUnit.MILLISECONDS);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
+                    while (data != null) {
                         if (data.length > 0) {
                             log.trace("Bytes: {}", Hex.encodeHexString(data));
                             serialPort.writeBytes(data, data.length);
                         }
+                        data = writeQueue.poll(); // drain remaining without waiting
                     }
-                    ThreadUtil.silentSleep(10);
                 } else {
                     // Port closed: avoid busy-spinning at 100% CPU.
                     ThreadUtil.silentSleep(100);
