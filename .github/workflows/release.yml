@@ -134,35 +134,36 @@ jobs:
         shell: powershell
 
       # --------------------------------------------------------------------------
-      # Code signing via SSL.com eSigner (cloud code signing)
+      # Code signing via Jsign + SSL.com eSigner (cloud code signing)
       # --------------------------------------------------------------------------
       # Signs the jpackage native launcher ("Local Hardware Bridge.exe") so
       # Microsoft Defender doesn't flag the auto-start registry entry as
       # persistence (ASEP) and SmartScreen doesn't warn.
       #
-      # Gated on the ESIGNER_ENABLED repo variable so the build still produces
-      # an unsigned installer when the certificate isn't ready yet. To enable:
-      #   Repository Settings → Secrets and variables → Actions → Variables
-      #   ESIGNER_ENABLED = true
-      # And add these secrets (Actions → Secrets):
+      # Uses Jsign instead of sslcom/esigner-codesign because CodeSignTool v1.3.0
+      # doesn't URL-encode special characters (#, !) in the OAuth2 password,
+      # causing "invalid_grant" errors. Jsign handles this correctly.
+      #
+      # Gated on the ESIGNER_ENABLED repo variable. Secrets required:
       #   ES_USERNAME     — SSL.com account email
       #   ES_PASSWORD     — SSL.com account password
       #   CREDENTIAL_ID   — eSigner credential ID (from SSL.com dashboard)
-      #   ES_TOTP_SECRET  — TOTP secret for eSigner OAuth (see SSL.com docs)
+      #   ES_TOTP_SECRET  — TOTP secret in BASE64 (not base32 — Jsign uses base64)
+      - name: Download Jsign
+        if: ${{ vars.ESIGNER_ENABLED == 'true' }}
+        run: curl -sL https://github.com/ebourg/jsign/releases/download/7.4/jsign-7.4.jar -o jsign.jar
+        shell: bash
+
       - name: Sign jpackage launcher with eSigner
         if: ${{ vars.ESIGNER_ENABLED == 'true' }}
-        uses: sslcom/esigner-codesign@develop
-        with:
-          command: sign
-          username: ${{ secrets.ES_USERNAME }}
-          password: ${{ secrets.ES_PASSWORD }}
-          credential_id: ${{ secrets.CREDENTIAL_ID }}
-          totp_secret: ${{ secrets.ES_TOTP_SECRET }}
-          file_path: ${{ github.workspace }}\build\dist\appimage\Local Hardware Bridge\Local Hardware Bridge.exe
-          override: true
-          malware_block: false
-          environment_name: PROD
-          jvm_max_memory: 2048M
+        run: |
+          java -jar jsign.jar \
+            --storetype ESIGNER \
+            --storepass "${{ secrets.ES_USERNAME }}|${{ secrets.ES_PASSWORD }}" \
+            --alias "${{ secrets.CREDENTIAL_ID }}" \
+            --keypass "${{ secrets.ES_TOTP_SECRET }}" \
+            "${{ github.workspace }}\build\dist\appimage\Local Hardware Bridge\Local Hardware Bridge.exe"
+        shell: bash
 
       - name: Install NSIS
         run: choco install nsis -y
@@ -179,18 +180,14 @@ jobs:
 
       - name: Sign NSIS installer with eSigner
         if: ${{ vars.ESIGNER_ENABLED == 'true' }}
-        uses: sslcom/esigner-codesign@develop
-        with:
-          command: sign
-          username: ${{ secrets.ES_USERNAME }}
-          password: ${{ secrets.ES_PASSWORD }}
-          credential_id: ${{ secrets.CREDENTIAL_ID }}
-          totp_secret: ${{ secrets.ES_TOTP_SECRET }}
-          file_path: ${{ github.workspace }}\build\dist\windows-exe\Local-Hardware-Bridge-${{ steps.version.outputs.VERSION }}.exe
-          override: true
-          malware_block: false
-          environment_name: PROD
-          jvm_max_memory: 2048M
+        run: |
+          java -jar jsign.jar \
+            --storetype ESIGNER \
+            --storepass "${{ secrets.ES_USERNAME }}|${{ secrets.ES_PASSWORD }}" \
+            --alias "${{ secrets.CREDENTIAL_ID }}" \
+            --keypass "${{ secrets.ES_TOTP_SECRET }}" \
+            "${{ github.workspace }}\build\dist\windows-exe\Local-Hardware-Bridge-${{ steps.version.outputs.VERSION }}.exe"
+        shell: bash
 
       - name: Upload Windows EXE
         uses: actions/upload-artifact@v4
@@ -213,18 +210,14 @@ jobs:
 
       - name: Sign Intune NSIS installer with eSigner
         if: ${{ vars.ESIGNER_ENABLED == 'true' }}
-        uses: sslcom/esigner-codesign@develop
-        with:
-          command: sign
-          username: ${{ secrets.ES_USERNAME }}
-          password: ${{ secrets.ES_PASSWORD }}
-          credential_id: ${{ secrets.CREDENTIAL_ID }}
-          totp_secret: ${{ secrets.ES_TOTP_SECRET }}
-          file_path: ${{ github.workspace }}\lhb.exe
-          override: true
-          malware_block: false
-          environment_name: PROD
-          jvm_max_memory: 2048M
+        run: |
+          java -jar jsign.jar \
+            --storetype ESIGNER \
+            --storepass "${{ secrets.ES_USERNAME }}|${{ secrets.ES_PASSWORD }}" \
+            --alias "${{ secrets.CREDENTIAL_ID }}" \
+            --keypass "${{ secrets.ES_TOTP_SECRET }}" \
+            "${{ github.workspace }}\lhb.exe"
+        shell: bash
 
       - name: Assemble Intune package source folder
         run: |
