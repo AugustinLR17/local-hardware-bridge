@@ -205,7 +205,11 @@ jobs:
         run: |
           $exe = "${{ github.workspace }}\build\dist\appimage\Local Hardware Bridge\Local Hardware Bridge.exe"
           attrib -r "$exe"
-          java -jar jsign.jar --storetype ESIGNER --storepass "$env:ES_USER|$env:ES_PASS" --alias "$env:ES_CRED" --keypass "$env:ES_TOTP" "$exe"
+          Write-Host "ES_USER length: $($env:ES_USER.Length)"
+          Write-Host "ES_PASS length: $($env:ES_PASS.Length)"
+          Write-Host "ES_CRED length: $($env:ES_CRED.Length)"
+          Write-Host "ES_TOTP length: $($env:ES_TOTP.Length)"
+          java -jar jsign.jar --storetype ESIGNER --storepass "$env:ES_USER|$env:ES_PASS" --alias "$env:ES_CRED" --keypass "$env:ES_TOTP" --debug "$exe"
         shell: powershell
 
       - name: Install NSIS
