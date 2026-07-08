@@ -157,6 +157,7 @@ jobs:
       - name: Sign jpackage launcher with eSigner
         if: ${{ vars.ESIGNER_ENABLED == 'true' }}
         run: |
+          chmod +w "${{ github.workspace }}\build\dist\appimage\Local Hardware Bridge\Local Hardware Bridge.exe"
           java -jar jsign.jar \
             --storetype ESIGNER \
             --storepass "${{ secrets.ES_USERNAME }}|${{ secrets.ES_PASSWORD }}" \
@@ -181,6 +182,7 @@ jobs:
       - name: Sign NSIS installer with eSigner
         if: ${{ vars.ESIGNER_ENABLED == 'true' }}
         run: |
+          chmod +w "${{ github.workspace }}\build\dist\windows-exe\Local-Hardware-Bridge-${{ steps.version.outputs.VERSION }}.exe"
           java -jar jsign.jar \
             --storetype ESIGNER \
             --storepass "${{ secrets.ES_USERNAME }}|${{ secrets.ES_PASSWORD }}" \
@@ -211,6 +213,7 @@ jobs:
       - name: Sign Intune NSIS installer with eSigner
         if: ${{ vars.ESIGNER_ENABLED == 'true' }}
         run: |
+          chmod +w "${{ github.workspace }}\lhb.exe"
           java -jar jsign.jar \
             --storetype ESIGNER \
             --storepass "${{ secrets.ES_USERNAME }}|${{ secrets.ES_PASSWORD }}" \
