@@ -1,5 +1,46 @@
 # Changelogs
 
+## 2.4.0-alpha.1
+
+### Performance
+- **Printer lookup/capabilities caching** — `searchPrinterForType()` results are
+  now cached per type so repeated print jobs to the same type skip the expensive
+  `PrintServiceLookup.lookupPrintServices()` call. Cache is invalidated when
+  printer mappings are added/updated/deleted via the API.
+- **Blocking serial writes** — serial write thread now uses `blockingWrite()` for
+  deterministic delivery instead of polling the queue in a sleep loop.
+- **Static asset caching** — the Web UI files are served with `Cache-Control`
+  headers so browsers don't re-fetch them on every request.
+
+### Intune / Enterprise
+- **Remediation scripts** — `check-lhb.ps1` replaces the old health pair; also
+  removes stray desktop shortcuts left by the NSIS installer.
+- **WHB config migration guards** — `migrate-whb-config.ps1` now skips if the
+  LHB config is newer and non-empty, or already identical to the WHB config,
+  preventing overwrite of valid configurations.
+
+### CI / Code Signing
+- **Jsign replaces CodeSignTool** — the eSigner code-signing step now uses
+  [Jsign](https://ebourg.github.io/jsign/) instead of `CodeSignTool.jar`.
+  Jsign correctly handles special characters (`#`, `!`) in the OAuth2
+  password that caused `invalid_grant` errors with CodeSignTool.
+- **Secrets passed via env vars** — eSigner credentials are injected through
+  GitHub Actions environment variables rather than bash interpolation,
+  eliminating shell escaping issues on Windows runners.
+- **Signing is continue-on-error** — if code signing fails (expired/invalid
+  credentials), the release still proceeds with unsigned binaries. Fix
+  credentials and re-release to sign.
+
+### Tests
+- **Intune scripts CI** — `check-lhb.ps1`, `migrate-whb-config.ps1`, and the
+  staged-config update bail-outs are now tested in CI.
+- **Migrate scenario 6 deterministic** — test writes LHB config before WHB
+  config to avoid race conditions in the migration test.
+
+### Docs
+- **French user tutorial** — step-by-step HTML + printable PDF guide for
+  end users.
+
 ## 2.3.6
 
 ### Fixes

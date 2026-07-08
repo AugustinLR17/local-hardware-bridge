@@ -144,11 +144,21 @@ jobs:
       # doesn't URL-encode special characters (#, !) in the OAuth2 password,
       # causing "invalid_grant" errors. Jsign handles this correctly.
       #
+      # IMPORTANT: if you get "invalid_grant" errors, check:
+      #   1. ES_USERNAME / ES_PASSWORD are correct in GitHub Secrets
+      #   2. The SSL.com account is active (not expired/suspended)
+      #   3. ES_TOTP_SECRET is in BASE64 format (not base32 — Jsign uses base64)
+      #   4. CREDENTIAL_ID matches the eSigner certificate in the SSL.com dashboard
+      #
+      # Signing steps use continue-on-error so the release proceeds even if
+      # code signing fails (unsigned binaries are still functional, just unsigned).
+      # Fix credentials and re-release to sign.
+      #
       # Gated on the ESIGNER_ENABLED repo variable. Secrets required:
       #   ES_USERNAME     — SSL.com account email
       #   ES_PASSWORD     — SSL.com account password
-      #   CREDENTIAL_ID   — eSigner credential ID (from SSL.com dashboard)
-      #   ES_TOTP_SECRET  — TOTP secret in BASE64 (not base32 — Jsign uses base64)
+      #   CREDENTIAL_ID  — eSigner credential ID (from SSL.com dashboard)
+      #   ES_TOTP_SECRET — TOTP secret in BASE64 (not base32 — Jsign uses base64)
       - name: Download Jsign
         if: ${{ vars.ESIGNER_ENABLED == 'true' }}
         run: curl -sL https://github.com/ebourg/jsign/releases/download/7.4/jsign-7.4.jar -o jsign.jar
@@ -156,6 +166,7 @@ jobs:
 
       - name: Sign jpackage launcher with eSigner
         if: ${{ vars.ESIGNER_ENABLED == 'true' }}
+        continue-on-error: true
         env:
           ES_USER: ${{ secrets.ES_USERNAME }}
           ES_PASS: ${{ secrets.ES_PASSWORD }}
@@ -186,6 +197,7 @@ jobs:
 
       - name: Sign NSIS installer with eSigner
         if: ${{ vars.ESIGNER_ENABLED == 'true' }}
+        continue-on-error: true
         env:
           ES_USER: ${{ secrets.ES_USERNAME }}
           ES_PASS: ${{ secrets.ES_PASSWORD }}
@@ -222,6 +234,7 @@ jobs:
 
       - name: Sign Intune NSIS installer with eSigner
         if: ${{ vars.ESIGNER_ENABLED == 'true' }}
+        continue-on-error: true
         env:
           ES_USER: ${{ secrets.ES_USERNAME }}
           ES_PASS: ${{ secrets.ES_PASSWORD }}
