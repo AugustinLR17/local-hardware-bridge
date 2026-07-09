@@ -138,41 +138,25 @@ public class CertificateGeneratorEdgeCasesTest {
 
     @Test
     public void tlsDirectoryCreatedWithRestrictedPermissions() throws Exception {
-        java.nio.file.Path dir = Files.createTempDirectory("lhb-cert-tlsdir");
-        String certPath = dir.resolve("cert.pem").toString();
-        String keyPath = dir.resolve("key.pem").toString();
+        // The cert directory is the parent of the (absolute) cert path. When it
+        // does not already exist, CertificateGenerator creates it and locks it
+        // down to rwx------. Point the cert into a fresh subdirectory so that
+        // create-and-restrict path is exercised.
+        java.nio.file.Path base = Files.createTempDirectory("lhb-cert-tlsdir");
+        java.nio.file.Path tlsDir = base.resolve("tls");
+        String certPath = tlsDir.resolve("cert.pem").toString();
+        String keyPath = tlsDir.resolve("key.pem").toString();
 
-        String originalDir = System.getProperty("user.dir");
-        System.setProperty("user.dir", dir.toString());
+        CertificateGenerator.generateSelfSignedCertificate("127.0.0.1", certPath, keyPath);
+
+        assertTrue("tls directory must exist", Files.isDirectory(tlsDir));
 
         try {
-            CertificateGenerator.generateSelfSignedCertificate("127.0.0.1", certPath, keyPath);
-
-            // The "tls" directory should have been created with rwx------ permissions
-            File tlsDir = new File("tls");
-            assertTrue("tls directory must exist", tlsDir.exists());
-            assertTrue("tls must be a directory", tlsDir.isDirectory());
-
-            try {
-                var perms = Files.getPosixFilePermissions(tlsDir.toPath());
-                String permString = java.nio.file.attribute.PosixFilePermissions.toString(perms);
-                assertEquals("tls directory must have rwx------ permissions", "rwx------", permString);
-            } catch (UnsupportedOperationException e) {
-                // Non-POSIX (Windows) — skip
-            }
-        } finally {
-            // Clean up the tls dir in the temp working directory
-            File tlsDir = new File("tls");
-            if (tlsDir.exists() && tlsDir.isDirectory()) {
-                File[] files = tlsDir.listFiles();
-                if (files != null) {
-                    for (File f : files) {
-                        f.delete();
-                    }
-                }
-                tlsDir.delete();
-            }
-            System.setProperty("user.dir", originalDir);
+            var perms = Files.getPosixFilePermissions(tlsDir);
+            String permString = java.nio.file.attribute.PosixFilePermissions.toString(perms);
+            assertEquals("tls directory must have rwx------ permissions", "rwx------", permString);
+        } catch (UnsupportedOperationException e) {
+            // Non-POSIX (Windows) — skip
         }
     }
 }

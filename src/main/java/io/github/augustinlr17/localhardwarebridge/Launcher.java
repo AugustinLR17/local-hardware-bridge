@@ -150,7 +150,7 @@ public final class Launcher {
         System.err.println("[Launcher] Update applied, re-launching...");
         String javaExec = System.getProperty("java.home") + "/bin/java";
         String classpath = System.getProperty("java.class.path");
-        String workingDir = System.getProperty("user.dir");
+        String workingDir = AppHome.dir().getAbsolutePath();
 
         java.util.List<String> cmd = new java.util.ArrayList<>();
         cmd.add(javaExec);

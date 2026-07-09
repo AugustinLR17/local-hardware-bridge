@@ -69,7 +69,7 @@ public class UpdateServiceTest {
         clearLatestRelease();
         clearLastError();
         // Clean up updates/ dir created by tests
-        Path updatesDir = Path.of("updates");
+        Path updatesDir = Path.of("updates").toAbsolutePath();
         if (Files.isDirectory(updatesDir)) {
             Files.list(updatesDir).forEach(p -> {
                 try { Files.deleteIfExists(p); } catch (IOException e) { /* noop */ }
@@ -650,7 +650,7 @@ public class UpdateServiceTest {
     @Test
     public void detectPendingUpdateDoesNotThrowWhenNoUpdatesDir() throws Exception {
         // Ensure no updates/ dir exists (tearDown cleans it)
-        Path updatesDir = Path.of("updates");
+        Path updatesDir = Path.of("updates").toAbsolutePath();
         if (Files.exists(updatesDir)) {
             Files.list(updatesDir).forEach(p -> {
                 try { Files.deleteIfExists(p); } catch (IOException e) { /* noop */ }
@@ -665,7 +665,7 @@ public class UpdateServiceTest {
 
     @Test
     public void detectPendingUpdateFindsNewerJarInUpdatesDir() throws Exception {
-        Path updatesDir = Path.of("updates");
+        Path updatesDir = Path.of("updates").toAbsolutePath();
         Files.createDirectories(updatesDir);
 
         // Create a JAR with a version way higher than current
@@ -687,7 +687,7 @@ public class UpdateServiceTest {
 
     @Test
     public void detectPendingUpdateIgnoresOlderJarInUpdatesDir() throws Exception {
-        Path updatesDir = Path.of("updates");
+        Path updatesDir = Path.of("updates").toAbsolutePath();
         Files.createDirectories(updatesDir);
 
         // Create a JAR with a version LOWER than current
@@ -706,7 +706,7 @@ public class UpdateServiceTest {
 
     @Test
     public void detectPendingUpdateIgnoresSameVersionJarInUpdatesDir() throws Exception {
-        Path updatesDir = Path.of("updates");
+        Path updatesDir = Path.of("updates").toAbsolutePath();
         Files.createDirectories(updatesDir);
 
         Path jar = updatesDir.resolve("local-hardware-bridge-" + Constants.VERSION + ".jar");
@@ -722,7 +722,7 @@ public class UpdateServiceTest {
 
     @Test
     public void detectPendingUpdatePicksHighestVersionFromMultiple() throws Exception {
-        Path updatesDir = Path.of("updates");
+        Path updatesDir = Path.of("updates").toAbsolutePath();
         Files.createDirectories(updatesDir);
 
         Path jar1 = updatesDir.resolve("local-hardware-bridge-98.0.0.jar");
@@ -746,7 +746,7 @@ public class UpdateServiceTest {
 
     @Test
     public void detectPendingUpdateIgnoresNonMatchingFiles() throws Exception {
-        Path updatesDir = Path.of("updates");
+        Path updatesDir = Path.of("updates").toAbsolutePath();
         Files.createDirectories(updatesDir);
 
         // Files that don't match the pattern
@@ -776,7 +776,7 @@ public class UpdateServiceTest {
 
     @Test
     public void cleanupOldUpdatesRemovesPartFiles() throws Exception {
-        Path updatesDir = Path.of("updates");
+        Path updatesDir = Path.of("updates").toAbsolutePath();
         Files.createDirectories(updatesDir);
         Path partFile = updatesDir.resolve("test.jar.part");
         Files.writeString(partFile, "partial download");
@@ -788,7 +788,7 @@ public class UpdateServiceTest {
 
     @Test
     public void cleanupOldUpdatesRemovesJarFiles() throws Exception {
-        Path updatesDir = Path.of("updates");
+        Path updatesDir = Path.of("updates").toAbsolutePath();
         Files.createDirectories(updatesDir);
         Path oldJar = updatesDir.resolve("local-hardware-bridge-0.0.1.jar");
         Files.writeString(oldJar, "old jar");
@@ -800,7 +800,7 @@ public class UpdateServiceTest {
 
     @Test
     public void cleanupOldUpdatesPreservesPendingJar() throws Exception {
-        Path updatesDir = Path.of("updates");
+        Path updatesDir = Path.of("updates").toAbsolutePath();
         Files.createDirectories(updatesDir);
         Path pendingJar = updatesDir.resolve("local-hardware-bridge-99.99.99.jar");
         Files.writeString(pendingJar, "pending");
@@ -813,7 +813,7 @@ public class UpdateServiceTest {
 
     @Test
     public void cleanupOldUpdatesRemovesNonPendingJars() throws Exception {
-        Path updatesDir = Path.of("updates");
+        Path updatesDir = Path.of("updates").toAbsolutePath();
         Files.createDirectories(updatesDir);
         Path pendingJar = updatesDir.resolve("local-hardware-bridge-99.99.99.jar");
         Path oldJar = updatesDir.resolve("local-hardware-bridge-1.0.0.jar");
@@ -829,7 +829,7 @@ public class UpdateServiceTest {
 
     @Test
     public void cleanupOldUpdatesPreservesNonJarNonPartFiles() throws Exception {
-        Path updatesDir = Path.of("updates");
+        Path updatesDir = Path.of("updates").toAbsolutePath();
         Files.createDirectories(updatesDir);
         Path txtFile = updatesDir.resolve("readme.txt");
         Files.writeString(txtFile, "not a jar or part file");

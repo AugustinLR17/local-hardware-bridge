@@ -132,7 +132,7 @@ public class UpdateServiceSchedulerTest {
 
     @Test
     public void cleanupOldUpdatesCleansPartAndJarFiles() throws Exception {
-        Path updatesDir = Path.of("updates");
+        Path updatesDir = Path.of("updates").toAbsolutePath();
         try {
             Files.createDirectories(updatesDir);
             Path partFile = updatesDir.resolve("test.part");
@@ -161,7 +161,7 @@ public class UpdateServiceSchedulerTest {
 
     @Test
     public void cleanupOldUpdatesPreservesPendingUpdate() throws Exception {
-        Path updatesDir = Path.of("updates");
+        Path updatesDir = Path.of("updates").toAbsolutePath();
         try {
             Files.createDirectories(updatesDir);
             Path pendingJar = updatesDir.resolve("local-hardware-bridge-9.9.9.jar");

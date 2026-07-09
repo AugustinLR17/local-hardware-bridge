@@ -153,10 +153,14 @@ public class Server implements WebSocketServerInterface {
             });
 
             if (serverConfig.getTls().isEnabled()) {
+                // Resolve cert/key against the absolute app home so TLS works
+                // regardless of the launch working directory (see AppHome).
+                String certPath = AppHome.resolve(serverConfig.getTls().getCert()).getAbsolutePath();
+                String keyPath = AppHome.resolve(serverConfig.getTls().getKey()).getAbsolutePath();
                 if (serverConfig.getTls().isSelfSigned()) {
                     log.info("TLS Enabled with self-signed certificate");
 
-                    CertificateGenerator.generateSelfSignedCertificate(serverConfig.getAddress(), serverConfig.getTls().getCert(), serverConfig.getTls().getKey());
+                    CertificateGenerator.generateSelfSignedCertificate(serverConfig.getAddress(), certPath, keyPath);
 
                     log.info("For first time setup, open in browser and trust the certificate: {}", serverConfig.getUri());
                 }
@@ -164,7 +168,7 @@ public class Server implements WebSocketServerInterface {
                 SslPlugin plugin = new SslPlugin(conf -> {
                     conf.insecure = false;
                     conf.securePort = serverConfig.getPort();
-                    conf.pemFromPath(serverConfig.getTls().getCert(), serverConfig.getTls().getKey());
+                    conf.pemFromPath(certPath, keyPath);
                     conf.sniHostCheck = !serverConfig.getTls().isSelfSigned();
                 });
                 cfg.registerPlugin(plugin);

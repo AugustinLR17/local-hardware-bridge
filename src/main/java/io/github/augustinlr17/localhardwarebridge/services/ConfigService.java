@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.Getter;
 import lombok.extern.log4j.Log4j2;
+import io.github.augustinlr17.localhardwarebridge.AppHome;
 import io.github.augustinlr17.localhardwarebridge.dtos.Config;
 
 import java.io.File;
@@ -37,7 +38,7 @@ public class ConfigService {
 
     private ConfigService() {
         try {
-            loadFromFile(CONFIG_FILENAME);
+            loadFromFile(AppHome.resolve(CONFIG_FILENAME).getAbsolutePath());
         } catch (Exception e) {
             log.warn("Failed loading config, creating new file");
             save();
@@ -55,7 +56,7 @@ public class ConfigService {
     }
 
     public synchronized void save() {
-        File target = new File(CONFIG_FILENAME);
+        File target = AppHome.resolve(CONFIG_FILENAME);
         try {
             // Write to a temp file in the same directory, then atomically move into place
             // so a crash mid-write cannot corrupt the existing config.

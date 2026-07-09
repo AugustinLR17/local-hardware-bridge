@@ -216,8 +216,21 @@ jobs:
         shell: powershell
 
       - name: Install NSIS (>= 3.08 for !uninstfinalize uninstaller signing)
-        run: choco install nsis --version=3.10 -y
+        # The chocolatey community feed intermittently returns 503/504 gateway
+        # errors, which failed otherwise-green release runs. Retry with backoff
+        # so a transient feed outage no longer breaks a release.
         shell: powershell
+        run: |
+          $ErrorActionPreference = 'Continue'
+          $installed = $false
+          for ($i = 1; $i -le 6; $i++) {
+            Write-Host "NSIS install attempt $i/6"
+            choco install nsis --version=3.10 -y --no-progress
+            if ($LASTEXITCODE -eq 0) { $installed = $true; break }
+            Write-Host "choco install failed (exit $LASTEXITCODE); retrying in 30s..."
+            Start-Sleep -Seconds 30
+          }
+          if (-not $installed) { throw "NSIS install failed after 6 attempts (chocolatey feed unavailable)" }
 
       - name: Build single .exe installer with NSIS
         env:

@@ -111,11 +111,14 @@ public class CertificateGenerator {
 
                 log.info("Certificate and private key generated.");
 
-                File directory = new File("tls");
-                if (!directory.isDirectory()) {
-                    directory.mkdir();
+                // The tls directory is the parent of the (absolute) cert path,
+                // resolved by the caller against AppHome. Create it if missing and
+                // lock it down ONLY when we create it — never touch the perms of a
+                // pre-existing directory (e.g. a shared temp dir).
+                File directory = new File(certificatePath).getAbsoluteFile().getParentFile();
+                if (directory != null && !directory.isDirectory() && directory.mkdirs()) {
+                    restrictToOwner(directory, "rwx------");
                 }
-                restrictToOwner(directory, "rwx------");
 
                 saveCert(cert, certificatePath);
                 saveKey(keyPair.getPrivate(), keyPath);

@@ -2,6 +2,7 @@ package io.github.augustinlr17.localhardwarebridge.services;
 
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.github.augustinlr17.localhardwarebridge.AppHome;
 import io.github.augustinlr17.localhardwarebridge.Constants;
 import io.github.augustinlr17.localhardwarebridge.dtos.Config;
 import io.github.augustinlr17.localhardwarebridge.dtos.ReleaseInfo;
@@ -404,7 +405,7 @@ public class UpdateService {
         }
         ProcessBuilder pb = new ProcessBuilder(
                 buildRelaunchCommand(javaExec, Boolean.getBoolean("lhb.server"), jar, promoteTarget));
-        pb.directory(new File(System.getProperty("user.dir")));
+        pb.directory(AppHome.dir());
         pb.inheritIO();
         log.info("Relaunching from {} (promoteTarget={})", jar, promoteTarget);
         pb.start();
@@ -645,11 +646,12 @@ public class UpdateService {
     }
 
     private Path downloadAsset(ReleaseInfo.Asset asset, String newVersion) throws Exception {
-        Files.createDirectories(Path.of(UPDATES_DIR));
+        Path updatesDir = AppHome.resolvePath(UPDATES_DIR);
+        Files.createDirectories(updatesDir);
 
         String fileName = JAR_NAME_PREFIX + newVersion + ".jar";
-        Path target = Path.of(UPDATES_DIR, fileName);
-        Path partFile = Path.of(UPDATES_DIR, fileName + ".part");
+        Path target = updatesDir.resolve(fileName);
+        Path partFile = updatesDir.resolve(fileName + ".part");
 
         log.info("Downloading update from {} to {}", asset.getBrowserDownloadUrl(), target);
 
@@ -700,7 +702,7 @@ public class UpdateService {
      */
     private void detectPendingUpdate() {
         try {
-            Path updatesDir = Path.of(UPDATES_DIR);
+            Path updatesDir = AppHome.resolvePath(UPDATES_DIR);
             if (!Files.isDirectory(updatesDir)) {
                 return;
             }
@@ -805,7 +807,7 @@ public class UpdateService {
                     if (cfg.getParent() != null) {
                         Files.deleteIfExists(cfg.getParent().resolve(newJar));
                     }
-                    Files.deleteIfExists(Path.of(UPDATES_DIR, newJar));
+                    Files.deleteIfExists(AppHome.resolvePath(UPDATES_DIR).resolve(newJar));
                 }
                 Files.deleteIfExists(marker);
                 if (exe != null) {
@@ -905,7 +907,7 @@ public class UpdateService {
             return false;
         }
         try {
-            Path f = Path.of(REJECTED_FILE);
+            Path f = AppHome.resolvePath(REJECTED_FILE);
             if (!Files.isRegularFile(f)) {
                 return false;
             }
@@ -926,7 +928,7 @@ public class UpdateService {
             return;
         }
         try {
-            Files.writeString(Path.of(REJECTED_FILE), version + System.lineSeparator(),
+            Files.writeString(AppHome.resolvePath(REJECTED_FILE), version + System.lineSeparator(),
                     StandardOpenOption.CREATE, StandardOpenOption.APPEND);
             log.warn("Quarantined update version {} — it will not be auto-applied again", version);
         } catch (Exception e) {
@@ -963,7 +965,7 @@ public class UpdateService {
      */
     public void cleanupOldUpdates() {
         try {
-            Path updatesDir = Path.of(UPDATES_DIR);
+            Path updatesDir = AppHome.resolvePath(UPDATES_DIR);
             if (!Files.isDirectory(updatesDir)) {
                 return;
             }

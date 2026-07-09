@@ -35,7 +35,6 @@ public class GUI implements WebSocketServiceInterface {
     // System property keys (avoid duplicated literals — java:S1192)
     private static final String OS_NAME_PROP = "os.name";
     private static final String JAVA_HOME_PROP = "java.home";
-    private static final String USER_DIR_PROP = "user.dir";
     private static final String PKEXEC = "pkexec";
     private static final String SYSTEMCTL = "systemctl";
 
@@ -71,13 +70,12 @@ public class GUI implements WebSocketServiceInterface {
                 String javawExe = System.getProperty(JAVA_HOME_PROP) + "\\bin\\javaw.exe";
                 if (new File(javawExe).exists()) {
                     String classpath = System.getProperty("java.class.path");
-                    String workingDir = System.getProperty(USER_DIR_PROP);
                     ProcessBuilder pb = new ProcessBuilder(
                         javawExe,
                         "-cp", classpath,
                         "io.github.augustinlr17.localhardwarebridge.GUI"
                     );
-                    pb.directory(new File(workingDir));
+                    pb.directory(AppHome.dir());
                     // Discard all output — javaw process runs silently in background
                     pb.redirectOutput(ProcessBuilder.Redirect.DISCARD);
                     pb.redirectError(ProcessBuilder.Redirect.DISCARD);
@@ -195,7 +193,7 @@ public class GUI implements WebSocketServiceInterface {
         appDirectoryItem.addActionListener(e -> {
             try {
                 if (desktop != null && desktop.isSupported(Desktop.Action.OPEN)) {
-                    desktop.open(new File("."));
+                    desktop.open(AppHome.dir());
                 }
             } catch (Exception ex) {
                 log.error("Failed to open app directory", ex);
@@ -206,7 +204,7 @@ public class GUI implements WebSocketServiceInterface {
         logDirectoryItem.addActionListener(e -> {
             try {
                 if (desktop != null && desktop.isSupported(Desktop.Action.OPEN)) {
-                    desktop.open(new File("log"));
+                    desktop.open(AppHome.resolve("log"));
                 }
             } catch (Exception ex) {
                 log.error("Failed to open log folder", ex);
@@ -459,7 +457,7 @@ public class GUI implements WebSocketServiceInterface {
             if (choice == JOptionPane.YES_OPTION) {
                 String classpath = System.getProperty("java.class.path");
                 String javaHome = System.getProperty(JAVA_HOME_PROP);
-                String workingDir = System.getProperty(USER_DIR_PROP);
+                String workingDir = AppHome.dir().getAbsolutePath();
                 String javaExec = javaHome + "/bin/java";
 
                 String plistContent = LaunchdPlistGenerator.generatePlist(

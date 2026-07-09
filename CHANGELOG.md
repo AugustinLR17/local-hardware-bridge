@@ -14,6 +14,16 @@ First stable release of the 2.4.0 line (consolidates alpha.1 → alpha.5).
 - **App starts immediately after deploy.** `install.ps1` launches the app at the
   end of a silent install, so the bridge answers on `127.0.0.1` without waiting
   for the next logon.
+- **Config & downloads now survive a PC restart (working-directory-independent
+  paths).** With the VBS wrapper gone, a `Run`-key auto-start launches with
+  `C:\Windows\System32` as the working directory, and the JVM caches that CWD
+  before `user.dir` can be re-pointed — so on the first boot after a restart
+  `config.json`, `log/`, `tls/`, `downloads/` and `updates/` were resolved in the
+  wrong place: the config looked "lost" (a fresh default was loaded) and downloads
+  failed with *"cannot create directory"*. All mutable state is now resolved
+  against an absolute app-home (`AppHome.dir()`) — the install directory, or
+  `%APPDATA%` when it is not writable — fully independent of the launch working
+  directory. Fixes the regression introduced when the VBS launcher was removed.
 
 ### Auto-update safety
 - **Startup auto-rollback.** After a staged auto-update, the first boots of the

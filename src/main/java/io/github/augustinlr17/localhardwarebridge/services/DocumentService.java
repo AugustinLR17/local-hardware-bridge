@@ -4,6 +4,7 @@ import lombok.Getter;
 import lombok.extern.log4j.Log4j2;
 import org.apache.commons.io.FileUtils;
 import org.apache.commons.io.FilenameUtils;
+import io.github.augustinlr17.localhardwarebridge.AppHome;
 import io.github.augustinlr17.localhardwarebridge.dtos.Config;
 import io.github.augustinlr17.localhardwarebridge.responses.PrintDocument;
 
@@ -30,7 +31,7 @@ public class DocumentService {
 
     public File prepareDocument(PrintDocument printDocument) throws Exception {
         Config.Downloader downloaderConfig = ConfigService.getInstance().getConfig().getDownloader();
-        FileUtils.forceMkdir(new File(downloaderConfig.getPath()));
+        FileUtils.forceMkdir(AppHome.resolve(downloaderConfig.getPath()));
 
         if (printDocument.getUrl() == null && printDocument.getFileContent() == null) {
             throw new Exception("Both URL and File Content are null");
@@ -54,7 +55,7 @@ public class DocumentService {
 
     private File getOutputFile(PrintDocument printDocument) throws IOException {
         Config.Downloader downloaderConfig = ConfigService.getInstance().getConfig().getDownloader();
-        File baseDir = new File(downloaderConfig.getPath());
+        File baseDir = AppHome.resolve(downloaderConfig.getPath());
 
         String rawName;
         if (printDocument.getFileContent() != null) {
