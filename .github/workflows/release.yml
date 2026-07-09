@@ -109,7 +109,8 @@ jobs:
       # jpackage --app-version requires a numeric version (1.2.3.4).
       # Convert semver pre-release suffixes like -alpha.1, -rc.2 into a
       # 4th numeric component: 2.4.0-alpha.1 → 2.4.0.1001, 2.4.0-rc.2 → 2.4.0.3002
-      # Full releases stay as-is: 2.4.0 → 2.4.0
+      # Full releases pad a 4th component: 2.4.0 → 2.4.0.0 (NSIS VIProductVersion
+      # requires X.X.X.X; the 3-part display version stays in PRODUCT_VERSION).
       # Uses only POSIX sh parameter expansion — no grep -P or sed -r (macOS lacks them).
       - name: Compute numeric version for jpackage
         id: numeric-version
@@ -133,8 +134,10 @@ jobs:
               echo "MAC_VERSION=${BASE}" >> $GITHUB_OUTPUT
               ;;
             *)
-              # Plain release (X.Y.Z) — no suffix
-              echo "VERSION=$V" >> $GITHUB_OUTPUT
+              # Plain release (X.Y.Z): pad a 4th component so NSIS VIProductVersion
+              # (X.X.X.X) is satisfied. jpackage accepts 4 parts too; the
+              # human-readable FileVersion/ProductVersion use the 3-part PRODUCT_VERSION.
+              echo "VERSION=${V}.0" >> $GITHUB_OUTPUT
               echo "MAC_VERSION=$V" >> $GITHUB_OUTPUT
               ;;
           esac
