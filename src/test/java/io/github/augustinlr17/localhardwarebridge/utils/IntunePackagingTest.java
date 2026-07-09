@@ -214,10 +214,10 @@ public class IntunePackagingTest {
         String script = readIntuneFile("update-config.ps1");
         assertTrue("update-config.ps1 must stop the running app",
                 script.contains("Stop-Process"));
-        assertTrue("update-config.ps1 must restart via VBS launcher",
+        assertTrue("update-config.ps1 must restart by launching the exe directly",
+                script.contains("Start-Process"));
+        assertFalse("update-config.ps1 must not restart via a wscript/VBS wrapper",
                 script.contains("wscript.exe"));
-        assertTrue("update-config.ps1 must reference the VBS launcher path",
-                script.contains("lhb-launcher.vbs"));
     }
 
     @Test
@@ -248,12 +248,13 @@ public class IntunePackagingTest {
     }
 
     @Test
-    public void updateConfigPs1CreatesVbsLauncherIfMissing() throws IOException {
+    public void updateConfigPs1LaunchesExeDirectly() throws IOException {
         String script = readIntuneFile("update-config.ps1");
-        assertTrue("update-config.ps1 must create VBS launcher as fallback",
-                script.contains("Set-Content"));
-        assertTrue("update-config.ps1 VBS must set CurrentDirectory",
+        // No VBS creation anymore — the app anchors its own working directory.
+        assertFalse("update-config.ps1 must not create a VBS that sets CurrentDirectory",
                 script.contains("CurrentDirectory"));
+        assertTrue("update-config.ps1 must launch the exe with an explicit working dir",
+                script.contains("-WorkingDirectory"));
     }
 
     // --- update-config-api.ps1 -------------------------------------------

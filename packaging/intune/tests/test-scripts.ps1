@@ -13,7 +13,7 @@ New-Env; $ld="$env:LOCALAPPDATA/Local Hardware Bridge"
 Set-Content "$ld/Local Hardware Bridge.exe" "stub"
 '{"server":{"port":57391}}' | Set-Content "$ld/config.json"
 Run "check.installee-pas-lancee" "check-lhb.ps1" "KO:" 1
-if(Test-Path "$ld/lhb-launcher.vbs"){Write-Host "PASS check.vbs-recree"}else{Write-Host "FAIL check.vbs";$global:fails++}
+if(-not (Test-Path "$ld/lhb-launcher.vbs")){Write-Host "PASS check.pas-de-vbs"}else{Write-Host "FAIL check.vbs-ne-doit-plus-exister";$global:fails++}
 $j=Start-Job { $l=[System.Net.HttpListener]::new(); $l.Prefixes.Add("http://127.0.0.1:57391/"); $l.Start()
   while($true){ $c=$l.GetContext(); $b=[Text.Encoding]::UTF8.GetBytes('{"status":"UP"}'); $c.Response.OutputStream.Write($b,0,$b.Length); $c.Response.Close() } }
 Start-Sleep 2

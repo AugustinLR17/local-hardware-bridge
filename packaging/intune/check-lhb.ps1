@@ -17,18 +17,13 @@ if (-not (Test-Path $exePath)) {
     exit 1
 }
 
-# --- 2. Auto-start (lanceur VBS + cle Run) ---
-$vbsPath = Join-Path $installDir "lhb-launcher.vbs"
-if (-not (Test-Path $vbsPath)) {
-    Set-Content -Path $vbsPath -Encoding ASCII -Force -Value @"
-Set objShell = CreateObject("WScript.Shell")
-objShell.CurrentDirectory = "$installDir"
-objShell.Run """$exePath""", 0, False
-"@
-    $actions += "VBS recree"
-}
-$wscript = "$env:SystemRoot\System32\wscript.exe"
-$expected = "`"$wscript`" `"$vbsPath`""
+# --- 2. Auto-start (cle Run pointant directement sur l'exe signe) ---
+# Plus de lanceur VBS/wscript : l'app reancre son dossier de travail au
+# demarrage (AppHome), donc pointer Run sur l'exe suffit et evite les regles
+# Defender ASR qui bloquent les scripts lancant des executables.
+$staleVbs = Join-Path $installDir "lhb-launcher.vbs"
+if (Test-Path $staleVbs) { Remove-Item $staleVbs -Force -ErrorAction SilentlyContinue; $actions += "VBS obsolete supprime" }
+$expected = "`"$exePath`""
 $runVal = (Get-ItemProperty $RunKey -Name $ProductName -ErrorAction SilentlyContinue).$ProductName
 if ($runVal -ne $expected) {
     Set-ItemProperty -Path $RunKey -Name $ProductName -Value $expected
@@ -46,7 +41,7 @@ function Test-Health {
     catch { $false }
 }
 if (-not ((Get-Process -Name $ProductName -ErrorAction SilentlyContinue) -or (Test-Health))) {
-    Start-Process $wscript -ArgumentList "`"$vbsPath`""
+    Start-Process -FilePath $exePath -WorkingDirectory $installDir
     $actions += "app demarree"
     Start-Sleep -Seconds 8
 }

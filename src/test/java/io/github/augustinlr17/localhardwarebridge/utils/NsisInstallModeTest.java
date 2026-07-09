@@ -97,11 +97,15 @@ public class NsisInstallModeTest {
     }
 
     @Test
-    public void nsiLegacyCleanupStaysHKCU() throws Exception {
+    public void nsiDoesNotTouchWhbFork() throws Exception {
         String nsi = readNsi();
-        // Legacy TigerWorkshop cleanup should always be HKCU (per-user legacy)
-        assertTrue("Legacy TigerWorkshop cleanup must stay HKCU",
-            nsi.contains("DeleteRegKey HKCU") && nsi.contains("WebApp Hardware Bridge"));
+        // The installer must NOT remove the old "WebApp Hardware Bridge" (WHB)
+        // fork — no registry deletion, no shortcut deletion. (A NOTE comment
+        // may still mention WHB, which is fine.)
+        assertFalse("installer must not delete WHB registry keys",
+            nsi.contains("DeleteRegKey HKCU \"SOFTWARE\\WebApp Hardware Bridge\""));
+        assertFalse("installer must not delete WHB shortcuts",
+            nsi.contains("Delete \"$DESKTOP\\WebApp Hardware Bridge"));
     }
 
     @Test
@@ -118,27 +122,23 @@ public class NsisInstallModeTest {
             nsi.contains("!define PRODUCT_VERSION"));
     }
 
-    // --- VBS launcher for auto-start WorkingDir fix ---
+    // --- Auto-start points the Run key directly at the signed exe (no VBS) ---
 
     @Test
-    public void nsiAutoStartCreatesVbsLauncher() throws Exception {
+    public void nsiAutoStartPointsRunKeyAtExe() throws Exception {
         String nsi = readNsi();
-        assertTrue("Auto-start section must create lhb-launcher.vbs",
-            nsi.contains("lhb-launcher.vbs"));
+        assertTrue("Auto-start Run key must launch the exe directly",
+            nsi.contains("WriteRegStr ${REG_ROOT} \"${RUN_KEY}\" \"${PRODUCT_NAME}\" '\"$INSTDIR\\${LAUNCHER_EXE}\"'"));
     }
 
     @Test
-    public void nsiVbsLauncherSetsCurrentDirectory() throws Exception {
+    public void nsiAutoStartHasNoVbsWrapper() throws Exception {
         String nsi = readNsi();
-        assertTrue("VBS launcher must set CurrentDirectory to install dir",
+        // No wscript/VBS wrapper: it trips Defender ASR, and AppHome.anchor()
+        // makes it redundant (the app resolves its own working directory).
+        assertFalse("Auto-start must not invoke wscript.exe", nsi.contains("wscript.exe"));
+        assertFalse("Auto-start must not build a VBS that sets CurrentDirectory",
             nsi.contains("CurrentDirectory"));
-    }
-
-    @Test
-    public void nsiAutoStartUsesWscriptWithVbs() throws Exception {
-        String nsi = readNsi();
-        assertTrue("Auto-start Run key must invoke wscript.exe with the VBS launcher",
-            nsi.contains("wscript.exe"));
     }
 
     // --- NO_DESKTOP_ICON flag for enterprise/Intune deployments ---

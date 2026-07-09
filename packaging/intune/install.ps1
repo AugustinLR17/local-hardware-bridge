@@ -128,35 +128,28 @@ if (Test-Path $configDest) {
 }
 
 # ---------------------------------------------------------------------------
-# 4. Fix auto-start WorkingDir (safety net for HKCU\...\Run key)
+# 4. Ensure auto-start points directly at the (signed) exe
 # ---------------------------------------------------------------------------
-# The NSIS installer writes a bare exe path to HKCU\...\Run without a
-# WorkingDir. At boot, Windows uses System32 as CWD, so the app can't
-# find config.json. We rewrite the Run key to use a VBS wrapper that
-# sets the working directory before launching the app.
+# The app re-anchors its working directory to the install folder on startup
+# (AppHome.anchor()), so it finds config.json even though Windows uses System32
+# as the CWD at logon. Pointing the Run key straight at the signed exe — instead
+# of a wscript/VBS wrapper — avoids Defender ASR rules that block scripts from
+# launching executables, the usual cause of "auto-start silently fails" on
+# managed (Intune) fleets. This is a safety net; the NSIS installer already
+# writes the same value.
 $runKey = "HKCU:\Software\Microsoft\Windows\CurrentVersion\Run"
 $launcherExe = Join-Path $installDir "$ProductName.exe"
-$vbsPath = Join-Path $installDir "lhb-launcher.vbs"
+$staleVbs = Join-Path $installDir "lhb-launcher.vbs"
 
-if (Test-Path $runKey) {
-    $existingRun = (Get-ItemProperty -Path $runKey -Name $ProductName -ErrorAction SilentlyContinue).$ProductName
-    if ($existingRun) {
-        Write-Log "Rewriting auto-start Run key with VBS wrapper for correct WorkingDir"
+if (Test-Path $launcherExe) {
+    Set-ItemProperty -Path $runKey -Name $ProductName -Value "`"$launcherExe`""
+    Write-Log "Auto-start Run key set to launch the exe directly: $launcherExe"
+}
 
-        # Create a VBS launcher that sets the working directory
-        $vbsContent = @"
-Set objShell = CreateObject("WScript.Shell")
-objShell.CurrentDirectory = "$installDir"
-objShell.Run """$launcherExe""", 0, False
-"@
-        Set-Content -Path $vbsPath -Value $vbsContent -Encoding ASCII -Force
-        Write-Log "Created VBS launcher at $vbsPath"
-
-        # Update the Run key to use the VBS launcher
-        $wscriptPath = "$env:SystemRoot\System32\wscript.exe"
-        Set-ItemProperty -Path $runKey -Name $ProductName -Value "`"$wscriptPath`" `"$vbsPath`""
-        Write-Log "Run key updated to use VBS launcher"
-    }
+# Remove the obsolete VBS launcher left by previous versions (no longer used).
+if (Test-Path $staleVbs) {
+    Remove-Item -Path $staleVbs -Force -ErrorAction SilentlyContinue
+    Write-Log "Removed obsolete VBS launcher: $staleVbs"
 }
 
 # ---------------------------------------------------------------------------
@@ -178,7 +171,25 @@ try {
 }
 
 # ---------------------------------------------------------------------------
-# 6. Done
+# 6. Start the app now (so the bridge is reachable without waiting for logon)
+# ---------------------------------------------------------------------------
+# The auto-start Run key only fires at the next logon. In User context we can
+# launch the (signed) exe immediately so the bridge answers on 127.0.0.1 right
+# after deployment. Best-effort — never fail the install if the launch fails.
+try {
+    $running = Get-Process -Name $ProductName -ErrorAction SilentlyContinue
+    if (-not $running -and (Test-Path $launcherExe)) {
+        Start-Process -FilePath $launcherExe -WorkingDirectory $installDir
+        Write-Log "Launched $ProductName."
+    } else {
+        Write-Log "App already running (or exe missing) — skipping immediate launch."
+    }
+} catch {
+    Write-Log "Could not launch app now (it will start at next logon): $($_.Exception.Message)"
+}
+
+# ---------------------------------------------------------------------------
+# 7. Done
 # ---------------------------------------------------------------------------
 Write-Log "Install script completed."
 exit 0

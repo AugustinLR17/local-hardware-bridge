@@ -445,6 +445,9 @@ public class Server implements WebSocketServerInterface {
         try {
             javalinServer.start(serverConfig.getBind(), serverConfig.getPort());
             log.info("{} {} running on {}", Constants.APP_NAME, Constants.VERSION, serverConfig.getUri());
+            // A successful bind means a staged auto-update (if any) booted OK —
+            // clear its boot marker so the startup check won't roll it back.
+            UpdateService.getInstance().commitStagedUpdate();
         } catch (JavalinBindException e) {
             // Do NOT kill the process here: callers (GUI.restart, the restart thread, main)
             // decide how to handle a bind failure. Rethrow so they can log/recover.

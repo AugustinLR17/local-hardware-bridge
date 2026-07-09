@@ -48,9 +48,7 @@ $cfg | ConvertTo-Json -Depth 10 | Set-Content $configPath -Encoding UTF8
 # Redemarre LHB pour appliquer
 Stop-Process -Name $ProductName -Force -ErrorAction SilentlyContinue
 Start-Sleep -Seconds 2
-$vbs = Join-Path $installDir "lhb-launcher.vbs"
-if (Test-Path $vbs) { Start-Process "$env:SystemRoot\System32\wscript.exe" -ArgumentList "`"$vbs`"" }
-else { Start-Process (Join-Path $installDir "$ProductName.exe") -WorkingDirectory $installDir }
+Start-Process (Join-Path $installDir "$ProductName.exe") -WorkingDirectory $installDir
 
 Write-Output "MIGRATED: $($legacyMappings.Count) mapping(s) imprimante copies depuis WHB (backup: config.json.bak)"
 exit 0

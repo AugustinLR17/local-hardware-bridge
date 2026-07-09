@@ -33,7 +33,7 @@
 ; --------------------------------
 !define PRODUCT_NAME "Local Hardware Bridge"
 !ifndef PRODUCT_VERSION
-  !define PRODUCT_VERSION "2.4.0-alpha.4"
+  !define PRODUCT_VERSION "2.4.0-alpha.5"
 !endif
 ; NUMERIC_VERSION is used for VIProductVersion which requires X.X.X.X format.
 ; The CI passes it via /DNUMERIC_VERSION=2.4.0.1001; fallback strips the
@@ -54,6 +54,23 @@
 
 ; The windowless native launcher created by jpackage (named after --name)
 !define LAUNCHER_EXE "${PRODUCT_NAME}.exe"
+
+; --------------------------------
+; Sign the uninstaller at compile time (CI only, needs NSIS >= 3.08)
+; --------------------------------
+; makensis builds the uninstaller EXE stub at compile time and embeds it in the
+; installer; WriteUninstaller later extracts that stub verbatim, so a signature
+; applied here survives to the client machine. Using !uninstfinalize also makes
+; NSIS emit a SEPARATE uninstaller stub, which avoids the corrupt-header side
+; effect of signing the installer without it.
+;
+; Enabled with /DSIGN_UNINSTALLER=1 (CI passes it when ESIGNER_ENABLED). jsign.jar
+; and the ES_* environment variables must be available to makensis. "= 0" fails
+; the build if signing fails — we never ship an unsigned uninstaller when signing
+; is on. Mirrors the jsign/eSigner invocation used for the installer itself.
+!ifdef SIGN_UNINSTALLER
+  !uninstfinalize 'java -jar jsign.jar --storetype ESIGNER --storepass "$%ES_USER%|$%ES_PASS%" --alias "$%ES_CRED%" --keypass "$%ES_TOTP%" "%1"' = 0
+!endif
 
 ; --------------------------------
 ; Install scope: per-user (default) or per-machine (/DPER_MACHINE=1)
@@ -144,15 +161,13 @@ Section "!Main Application" SEC_MAIN
   Delete "$SMPROGRAMS\${PRODUCT_NAME} (Server CLI).lnk"
   Delete "$SMSTARTUP\${PRODUCT_NAME}.lnk"
 
-  ; Remove old TigerWorkshop shortcuts (migration from original fork)
-  Delete "$DESKTOP\WebApp Hardware Bridge.lnk"
-  Delete "$DESKTOP\WebApp Hardware Bridge (CLI).lnk"
-  Delete "$SMPROGRAMS\WebApp Hardware Bridge.lnk"
-  Delete "$SMPROGRAMS\WebApp Hardware Bridge (CLI).lnk"
-  Delete "$SMSTARTUP\WebApp Hardware Bridge.lnk"
-  DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\WebApp Hardware Bridge"
-  DeleteRegKey HKCU "SOFTWARE\WebApp Hardware Bridge"
-  DeleteRegValue HKCU "${RUN_KEY}" "WebApp Hardware Bridge"
+  ; Remove the obsolete VBS auto-start launcher from prior LHB versions.
+  ; Auto-start now points directly at the signed exe (see SEC_AUTOSTART),
+  ; so the wscript/VBS wrapper is no longer created or used.
+  Delete "$INSTDIR\lhb-launcher.vbs"
+
+  ; NOTE: the previous fork "WebApp Hardware Bridge" (WHB) is intentionally
+  ; left untouched — LHB no longer removes its shortcuts or registry keys.
 
   ; Install the jpackage app-image (bundled JRE + windowless launcher) and icon
   File /r "${APPIMAGE_DIR}\*"
@@ -198,16 +213,14 @@ SectionEnd
 ; Section: Auto-start on boot (optional)
 ; --------------------------------
 Section "Start automatically when Windows starts" SEC_AUTOSTART
-  ; The HKCU\...\Run key does not support a separate WorkingDir value.
-  ; If we write a bare exe path, Windows uses System32 as CWD at boot,
-  ; and the app cannot find config.json. We create a VBS wrapper that
-  ; sets the working directory before launching the app.
-  FileOpen $0 "$INSTDIR\lhb-launcher.vbs" w
-  FileWrite $0 'Set objShell = CreateObject("WScript.Shell")$\r$\n'
-  FileWrite $0 'objShell.CurrentDirectory = "$INSTDIR"$\r$\n'
-  FileWrite $0 'objShell.Run """$INSTDIR\${LAUNCHER_EXE}""", 0, False$\r$\n'
-  FileClose $0
-  WriteRegStr ${REG_ROOT} "${RUN_KEY}" "${PRODUCT_NAME}" '"$SYSDIR\wscript.exe" "$INSTDIR\lhb-launcher.vbs"'
+  ; Point the Run key directly at the (signed) launcher exe. Windows uses
+  ; System32 as the working directory at logon, but the app re-anchors its
+  ; working directory to the install folder on startup (see AppHome.anchor()),
+  ; so it still finds config.json / log/ / tls/. Launching the signed exe
+  ; directly — instead of via a wscript/VBS wrapper — also sidesteps Defender
+  ; ASR rules that block scripts from starting executables, which is the
+  ; reliable auto-start path on managed (Intune) fleets.
+  WriteRegStr ${REG_ROOT} "${RUN_KEY}" "${PRODUCT_NAME}" '"$INSTDIR\${LAUNCHER_EXE}"'
 SectionEnd
 
 ; --------------------------------
@@ -261,22 +274,10 @@ Section "Uninstall"
   DeleteRegKey ${REG_ROOT} "${PRODUCT_UNINST_KEY}"
   DeleteRegKey ${REG_ROOT} "${PRODUCT_REGKEY}"
 
-  ; Clean up legacy registry keys (always per-user)
-  DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\WebApp Hardware Bridge"
-  DeleteRegKey HKCU "SOFTWARE\WebApp Hardware Bridge"
-  DeleteRegValue HKCU "${RUN_KEY}" "WebApp Hardware Bridge"
-
-  ; Delete shortcuts
+  ; Delete shortcuts (LHB only — the WHB fork is intentionally left untouched)
   Delete "$DESKTOP\${PRODUCT_NAME}.lnk"
   Delete "$SMPROGRAMS\${PRODUCT_NAME}.lnk"
   Delete "$SMSTARTUP\${PRODUCT_NAME}.lnk"
-
-  ; Delete legacy shortcuts
-  Delete "$DESKTOP\WebApp Hardware Bridge.lnk"
-  Delete "$DESKTOP\WebApp Hardware Bridge (CLI).lnk"
-  Delete "$SMPROGRAMS\WebApp Hardware Bridge.lnk"
-  Delete "$SMPROGRAMS\WebApp Hardware Bridge (CLI).lnk"
-  Delete "$SMSTARTUP\WebApp Hardware Bridge.lnk"
 
   ; Remove all files and uninstaller
   RMDir /r "$INSTDIR"

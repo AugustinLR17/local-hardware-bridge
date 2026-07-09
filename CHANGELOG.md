@@ -1,5 +1,36 @@
 # Changelogs
 
+## 2.4.0-alpha.5
+
+### Auto-start reliability (Intune fleet)
+- **Direct-exe auto-start — VBS launcher removed.** The `HKCU\...\Run` key now
+  points straight at the signed `Local Hardware Bridge.exe` instead of a
+  `wscript`/VBS wrapper. `AppHome.anchor()` already re-anchors the working
+  directory on startup, so the wrapper was redundant — and dropping it sidesteps
+  the Defender ASR rule that blocks scripts from launching executables (a cause
+  of silent auto-start failures on managed fleets). Applied across `install.nsi`,
+  `install.ps1`, `check-lhb.ps1`, `update-config.ps1`, `migrate-whb-config.ps1`.
+- **App starts immediately after deploy.** `install.ps1` now launches the app at
+  the end of a silent install, so the bridge answers on `127.0.0.1` without
+  waiting for the next logon.
+
+### Auto-update safety
+- **Startup auto-rollback.** After a staged auto-update, the first boots of the
+  new JAR are verified; if it fails to bind twice, the launcher `.cfg` is
+  repointed at the previous JAR, the bad version is quarantined
+  (`rejected-versions.txt`) so it is never re-downloaded/re-applied, and the old
+  exe is relaunched — preventing a bad release from bricking the fleet.
+
+### Code signing
+- **Signed uninstaller.** The NSIS `uninstall.exe` stub is now Authenticode-signed
+  at build time via `!uninstfinalize` (jsign + SSL.com eSigner), eliminating the
+  last unsigned binary and the "unknown publisher" prompt at uninstall. Requires
+  NSIS ≥ 3.08 (pinned in CI).
+
+### WebApp Hardware Bridge (WHB) fork
+- **Installer no longer touches WHB.** The old fork's shortcuts, auto-start entry
+  and registry keys are left intact on both install and uninstall.
+
 ## 2.4.0-alpha.3
 
 ### CI / Code Signing

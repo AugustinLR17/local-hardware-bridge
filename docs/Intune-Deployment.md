@@ -98,7 +98,7 @@ Each GitHub release includes a ready-to-upload `.intunewin` package:
 
 The package is built automatically in CI with:
 - NSIS installer built with `NO_DESKTOP_ICON` (no desktop shortcut on silent install)
-- Enterprise config template (auth enabled, auto-update enabled)
+- Enterprise config template (no auth required, auto-update enabled)
 - Install/uninstall PowerShell wrappers
 
 > If you customized `config-template.json` in Step 1, use Option B instead —
@@ -477,7 +477,8 @@ running on all machines.
    - Locate the install directory (via registry or fallback).
    - Back up the existing `config.json` to `config.json.bak`.
    - Overwrite `config.json` with the new template.
-   - Restart LHB via the VBS launcher (preserves the WorkingDir fix).
+   - Restart LHB by launching the exe directly (the app re-anchors its own
+     working directory on startup, so no VBS/wscript wrapper is needed).
 
 **Intune Scripts configuration:**
 

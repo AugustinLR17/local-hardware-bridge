@@ -116,24 +116,14 @@ Write-Log "Restarting $ProductName..."
 Stop-Process -Name "Local Hardware Bridge" -Force -ErrorAction SilentlyContinue
 Start-Sleep -Seconds 2
 
-# Restart via the VBS launcher (preserves the WorkingDir fix from install.ps1)
-$vbsPath = Join-Path $installDir "lhb-launcher.vbs"
+# Restart by launching the exe directly. The app re-anchors its working
+# directory on startup (AppHome), so no VBS/wscript wrapper is needed.
 $launcherExe = Join-Path $installDir "$ProductName.exe"
+$staleVbs = Join-Path $installDir "lhb-launcher.vbs"
+if (Test-Path $staleVbs) { Remove-Item $staleVbs -Force -ErrorAction SilentlyContinue }
 
-if (Test-Path $vbsPath) {
-    Write-Log "Starting via VBS launcher: $vbsPath"
-    Start-Process -FilePath "wscript.exe" -ArgumentList "`"$vbsPath`""
-} else {
-    # Fallback: create a VBS launcher if it doesn't exist
-    Write-Log "VBS launcher not found — creating one."
-    $vbsContent = @"
-Set objShell = CreateObject("WScript.Shell")
-objShell.CurrentDirectory = "$installDir"
-objShell.Run """$launcherExe""", 0, False
-"@
-    Set-Content -Path $vbsPath -Value $vbsContent -Encoding ASCII -Force
-    Start-Process -FilePath "wscript.exe" -ArgumentList "`"$vbsPath`""
-}
+Write-Log "Starting: $launcherExe"
+Start-Process -FilePath $launcherExe -WorkingDirectory $installDir
 
 Start-Sleep -Seconds 3
 

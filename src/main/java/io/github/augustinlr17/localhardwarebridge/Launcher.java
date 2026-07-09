@@ -35,6 +35,15 @@ public final class Launcher {
     public static void main(String[] args) throws Exception {
         AppHome.anchor();
 
+        // If we were just relaunched from a staged auto-update, verify this boot
+        // of the new JAR — or roll back to the previous JAR after repeated failed
+        // boots (and quarantine the bad version). No-op when no update is pending.
+        try {
+            UpdateService.getInstance().verifyOrRollbackStagedUpdate();
+        } catch (Exception e) {
+            System.err.println("[Launcher] Staged-update rollback check failed: " + e.getMessage());
+        }
+
         // Two-hop update, second hop (Windows): we were relaunched FROM the
         // downloaded JAR with -Dlhb.promote.target=<original jar>. The original
         // JAR is no longer locked by a JVM, so copy ourselves over it and

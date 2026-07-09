@@ -20,6 +20,8 @@ import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
+import java.util.Properties;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -69,6 +71,13 @@ public class UpdateService {
     private static final String UPDATES_DIR = "updates";
     private static final String GITHUB_API_BASE = "https://api.github.com/repos/";
     private static final String USER_AGENT = "Local-Hardware-Bridge/" + Constants.VERSION;
+
+    /** Marker file (next to the app JAR) recording a staged update pending boot verification. */
+    private static final String BOOT_MARKER = ".lhb-update-boot";
+    /** How many failed boots of a staged update to tolerate before rolling back. */
+    private static final int MAX_BOOT_ATTEMPTS = 2;
+    /** Versions that failed to boot after a staged update — never auto-applied again. */
+    private static final String REJECTED_FILE = "rejected-versions.txt";
 
     private final AtomicBoolean checking = new AtomicBoolean(false);
     private final AtomicBoolean downloading = new AtomicBoolean(false);
@@ -432,13 +441,13 @@ public class UpdateService {
                 return false;
             }
             Files.writeString(cfg, updated);
+            // Record the swap so the next boot can verify it (and roll back if the
+            // new JAR fails to start). Written BEFORE relaunching, so a crash on the
+            // very first boot still leaves a marker for the rollback logic to act on.
+            writeBootMarker(cfg, newJar.getFileName().toString(), currentJar.getFileName().toString(), exe, installDir);
             log.info("Staged update: {} installed, launcher cfg repointed, relaunching {}", newJar.getFileName(), exe);
 
-            ProcessBuilder pb = new ProcessBuilder(exe.toString());
-            pb.directory(installDir.toFile());
-            pb.inheritIO();
-            pb.start();
-            System.exit(0);
+            relaunchExe(exe, installDir); // exits the JVM
             return true; // unreachable
         } catch (Exception e) {
             log.error("Staged cfg update failed", e);
@@ -555,8 +564,8 @@ public class UpdateService {
             if (VersionComparator.isNewer(Constants.VERSION, latestVersion)) {
                 log.info("Update available: {} (current: {})", latestVersion, Constants.VERSION);
 
-                // Auto-download if configured
-                if (config.isAutoDownload() && pendingUpdate.get() == null) {
+                // Auto-download if configured (skip a version quarantined by a failed update boot)
+                if (config.isAutoDownload() && pendingUpdate.get() == null && !isRejected(latestVersion)) {
                     try {
                         downloadUpdate();
                     } catch (Exception e) {
@@ -709,6 +718,9 @@ public class UpdateService {
                 String version = name
                         .replace(JAR_NAME_PREFIX, "")
                         .replace(".jar", "");
+                if (isRejected(version)) {
+                    continue; // this version failed to boot after a staged update — never re-apply it
+                }
                 if (bestVersion == null || VersionComparator.isNewer(bestVersion, version)) {
                     bestVersion = version;
                     best = jar.toPath();
@@ -743,6 +755,202 @@ public class UpdateService {
             log.warn("Failed to determine current JAR path", e);
         }
         return null;
+    }
+
+    // --- staged-update boot verification / auto-rollback ---
+
+    /**
+     * Called at the very start of the process (before config/log init) when the
+     * app may have just been relaunched from a staged auto-update. If a boot
+     * marker is present:
+     * <ul>
+     *   <li>after {@link #MAX_BOOT_ATTEMPTS} failed boots, repoints the launcher
+     *       {@code .cfg} back to the previous (known-good) JAR, quarantines the
+     *       bad version so it is never auto-applied again, and relaunches the
+     *       native exe (exits the JVM);</li>
+     *   <li>otherwise records this boot attempt and lets startup continue. A
+     *       successful bind later calls {@link #commitStagedUpdate()} to clear
+     *       the marker.</li>
+     * </ul>
+     * No-op when running from exploded classes or when no marker exists.
+     *
+     * <p>Uses {@code System.err} (not log4j) because it runs before logging is
+     * initialised, matching the Launcher's convention.
+     */
+    public void verifyOrRollbackStagedUpdate() {
+        Path marker = bootMarkerPath();
+        if (marker == null || !Files.isRegularFile(marker)) {
+            return;
+        }
+        try {
+            Properties p = new Properties();
+            try (var in = Files.newInputStream(marker)) {
+                p.load(in);
+            }
+            int attempts = parseIntSafe(p.getProperty("attempts", "0")) + 1;
+            Path cfg = pathOrNull(p.getProperty("cfg"));
+            String newJar = p.getProperty("newJar", "");
+            String prevJar = p.getProperty("prevJar", "");
+            Path exe = pathOrNull(p.getProperty("exe"));
+            Path installDir = pathOrNull(p.getProperty("installDir"));
+
+            if (attempts > MAX_BOOT_ATTEMPTS) {
+                System.err.println("[Launcher] Staged update failed to boot " + (attempts - 1)
+                        + "x — rolling back to " + prevJar);
+                if (cfg != null && !newJar.isBlank() && !prevJar.isBlank()) {
+                    rollbackCfg(cfg, newJar, prevJar);
+                    String badVersion = versionFromJarName(newJar);
+                    reject(badVersion); // never auto-apply this version again
+                    // Remove the bad JAR from app/ and updates/ so nothing re-stages it.
+                    if (cfg.getParent() != null) {
+                        Files.deleteIfExists(cfg.getParent().resolve(newJar));
+                    }
+                    Files.deleteIfExists(Path.of(UPDATES_DIR, newJar));
+                }
+                Files.deleteIfExists(marker);
+                if (exe != null) {
+                    relaunchExe(exe, installDir); // exits the JVM on success
+                }
+                return;
+            }
+
+            // Not exhausted yet — persist the attempt count and let this boot proceed.
+            p.setProperty("attempts", Integer.toString(attempts));
+            try (var out = Files.newOutputStream(marker)) {
+                p.store(out, "LHB staged update — boot verification");
+            }
+            System.err.println("[Launcher] Verifying staged update (boot attempt "
+                    + attempts + "/" + MAX_BOOT_ATTEMPTS + ")");
+        } catch (Exception e) {
+            System.err.println("[Launcher] Staged-update boot verification failed: " + e.getMessage());
+        }
+    }
+
+    /**
+     * Clears the staged-update boot marker once the app has started successfully
+     * (e.g. the server bound its port). Safe no-op when no update is pending.
+     */
+    public void commitStagedUpdate() {
+        try {
+            Path marker = bootMarkerPath();
+            if (marker != null && Files.deleteIfExists(marker)) {
+                log.info("Staged update verified — boot marker cleared");
+            }
+        } catch (Exception e) {
+            log.debug("commitStagedUpdate failed: {}", e.getMessage());
+        }
+    }
+
+    /** Writes the boot marker next to the launcher cfg (jpackage {@code app/} dir). */
+    private void writeBootMarker(Path cfg, String newJar, String prevJar, Path exe, Path installDir) {
+        try {
+            Path appDir = cfg.toAbsolutePath().getParent();
+            if (appDir == null) {
+                return;
+            }
+            Properties p = new Properties();
+            p.setProperty("cfg", cfg.toAbsolutePath().toString());
+            p.setProperty("newJar", newJar);
+            p.setProperty("prevJar", prevJar);
+            p.setProperty("exe", exe.toAbsolutePath().toString());
+            p.setProperty("installDir", installDir.toAbsolutePath().toString());
+            p.setProperty("attempts", "0");
+            try (var out = Files.newOutputStream(appDir.resolve(BOOT_MARKER))) {
+                p.store(out, "LHB staged update — pending boot verification");
+            }
+        } catch (Exception e) {
+            log.warn("Could not write staged-update boot marker: {}", e.getMessage());
+        }
+    }
+
+    /** Resolves the boot marker from the running JAR's directory (jpackage {@code app/}). */
+    private Path bootMarkerPath() {
+        Path jar = getCurrentJarPath();
+        if (jar == null) {
+            return null;
+        }
+        Path appDir = jar.toAbsolutePath().getParent();
+        return appDir == null ? null : appDir.resolve(BOOT_MARKER);
+    }
+
+    /** Repoints the launcher cfg from the failed JAR back to the previous one. */
+    private void rollbackCfg(Path cfg, String newJar, String prevJar) throws IOException {
+        if (!Files.isRegularFile(cfg)) {
+            return;
+        }
+        String text = Files.readString(cfg);
+        String reverted = text.replace(newJar, prevJar);
+        if (!reverted.equals(text)) {
+            Files.writeString(cfg, reverted);
+        }
+    }
+
+    /** Relaunches the native jpackage exe and exits this JVM. */
+    private void relaunchExe(Path exe, Path installDir) throws IOException {
+        if (!Files.isRegularFile(exe)) {
+            return;
+        }
+        ProcessBuilder pb = new ProcessBuilder(exe.toString());
+        if (installDir != null && Files.isDirectory(installDir)) {
+            pb.directory(installDir.toFile());
+        }
+        pb.inheritIO();
+        pb.start();
+        System.exit(0);
+    }
+
+    /** True if the given version was quarantined after failing to boot. */
+    private boolean isRejected(String version) {
+        if (version == null || version.isBlank()) {
+            return false;
+        }
+        try {
+            Path f = Path.of(REJECTED_FILE);
+            if (!Files.isRegularFile(f)) {
+                return false;
+            }
+            for (String line : Files.readAllLines(f)) {
+                if (version.equals(line.trim())) {
+                    return true;
+                }
+            }
+        } catch (Exception e) {
+            log.debug("isRejected({}) failed: {}", version, e.getMessage());
+        }
+        return false;
+    }
+
+    /** Records a version as bad so it is never auto-downloaded/applied again. */
+    private void reject(String version) {
+        if (version == null || version.isBlank() || isRejected(version)) {
+            return;
+        }
+        try {
+            Files.writeString(Path.of(REJECTED_FILE), version + System.lineSeparator(),
+                    StandardOpenOption.CREATE, StandardOpenOption.APPEND);
+            log.warn("Quarantined update version {} — it will not be auto-applied again", version);
+        } catch (Exception e) {
+            log.warn("Could not quarantine version {}: {}", version, e.getMessage());
+        }
+    }
+
+    private static String versionFromJarName(String jarName) {
+        if (jarName == null || !jarName.startsWith(JAR_NAME_PREFIX) || !jarName.endsWith(".jar")) {
+            return null;
+        }
+        return jarName.substring(JAR_NAME_PREFIX.length(), jarName.length() - ".jar".length());
+    }
+
+    private static int parseIntSafe(String s) {
+        try {
+            return Integer.parseInt(s.trim());
+        } catch (Exception e) {
+            return 0;
+        }
+    }
+
+    private static Path pathOrNull(String s) {
+        return (s == null || s.isBlank()) ? null : Path.of(s);
     }
 
     private Config.Update getConfig() {
