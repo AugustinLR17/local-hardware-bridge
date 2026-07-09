@@ -1,5 +1,48 @@
 # Changelogs
 
+## 2.4.0
+
+First stable release of the 2.4.0 line (consolidates alpha.1 → alpha.5).
+
+### Auto-start reliability (Intune fleet)
+- **Direct-exe auto-start — VBS launcher removed.** The `Run` key points straight
+  at the signed `Local Hardware Bridge.exe` instead of a `wscript`/VBS wrapper,
+  sidestepping the Defender ASR rule that blocks scripts from launching
+  executables (a cause of silent auto-start failures on managed fleets).
+  `AppHome.anchor()` re-anchors the working directory on startup, so the wrapper
+  was redundant.
+- **App starts immediately after deploy.** `install.ps1` launches the app at the
+  end of a silent install, so the bridge answers on `127.0.0.1` without waiting
+  for the next logon.
+
+### Auto-update safety
+- **Startup auto-rollback.** After a staged auto-update, the first boots of the
+  new JAR are verified; if it fails to bind twice, the launcher `.cfg` is
+  repointed at the previous JAR, the bad version is quarantined
+  (`rejected-versions.txt`) so it is never re-applied, and the old exe is
+  relaunched — preventing a bad release from bricking the fleet.
+
+### Code signing
+- **Fully Authenticode-signed on Windows** via SSL.com eSigner (jsign): the
+  installer, the jpackage launcher, and the NSIS `uninstall.exe` stub are all
+  signed — no remaining unsigned binary and no "unknown publisher" prompt at
+  install or uninstall. Requires NSIS ≥ 3.08 (pinned in CI).
+
+### Performance
+- **Printer lookup/capabilities caching** — `searchPrinterForType()` results are
+  cached per type, invalidated when mappings change.
+- **Blocking serial writes** — the serial write thread uses `blockingWrite()` for
+  deterministic delivery instead of a sleep-poll loop.
+- **Static asset caching** — Web UI files are served with `Cache-Control` headers.
+
+### Security & stability
+- Critical security, concurrency, and resource-leak fixes across the request and
+  update paths.
+
+### WebApp Hardware Bridge (WHB) fork
+- **Installer no longer touches WHB.** The old fork's shortcuts, auto-start entry
+  and registry keys are left intact on both install and uninstall.
+
 ## 2.4.0-alpha.5
 
 ### Auto-start reliability (Intune fleet)
