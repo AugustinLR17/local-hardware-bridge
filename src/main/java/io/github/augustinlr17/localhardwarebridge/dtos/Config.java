@@ -22,6 +22,8 @@ public class Config {
     private Printer printer = new Printer();
     private Serial serial = new Serial();
     private Update update = new Update();
+    private PrintJobs printJobs = new PrintJobs();
+    private Webhook webhook = new Webhook();
 
     public String toJson() throws JsonProcessingException {
         return new ObjectMapper().writeValueAsString(this);
@@ -189,5 +191,109 @@ public class Config {
          * {@code includePrereleases = true} at check time.
          */
         private String channel = "stable";
+    }
+
+    /**
+     * Print-job durability, capacity, retention, and retry configuration.
+     *
+     * <p>All fields are default-initialized so that a pre-2.5 configuration
+     * file (which does not contain a {@code printJobs} section) loads with
+     * the approved defaults without manual migration.
+     */
+    @Data
+    @NoArgsConstructor
+    public static class PrintJobs {
+        /** Maximum decoded payload size per job in bytes (default 10 MiB). */
+        private int maxPayloadBytes = 10485760;
+
+        /** Maximum number of simultaneously active (queued/printing) jobs. */
+        private int maxQueuedJobs = 1000;
+
+        /** Hard aggregate cap on all new persistent data in bytes (500 MiB). */
+        private int maxPersistentBytes = 524288000;
+
+        /** Proactive cleanup starts at this threshold in bytes (400 MiB = 80%). */
+        private int cleanupThresholdBytes = 419430400;
+
+        /** Cleanup target after crossing the threshold in bytes (350 MiB = 70%). */
+        private int cleanupTargetBytes = 367001600;
+
+        /** Minimum free disk space reserve in bytes (256 MiB). */
+        private int minFreeBytes = 268435456;
+
+        /** Minimum free disk space as a percentage of filesystem capacity. */
+        private int minFreePercent = 5;
+
+        /** Days to retain terminal success metadata before pruning. */
+        private int successRetentionDays = 7;
+
+        /** Days to retain terminal failure/unknown/cancelled metadata. */
+        private int failureRetentionDays = 30;
+
+        /** Initial retry delay in seconds (exponential backoff start). */
+        private int initialRetryDelaySeconds = 30;
+
+        /** Maximum retry delay in seconds (backoff cap). */
+        private int maxRetryDelaySeconds = 3600;
+
+        /** Maximum retry attempts before a retryable job becomes a final failure. */
+        private int maxAttempts = 10;
+
+        /** Maximum age in hours after which a retryable job becomes a final failure. */
+        private int maxRetryAgeHours = 72;
+
+        /** Number of worker threads for retry scheduling. */
+        private int retryWorkers = 2;
+    }
+
+    /**
+     * Webhook result-delivery configuration.
+     *
+     * <p>Disabled by default. The {@code secret} is the HMAC-SHA256 signing
+     * key; it is masked in all config API responses and never logged. The
+     * {@code blockPrivateNetworks} field is independent of the downloader's
+     * setting but defaults to the same value ({@code false}).
+     */
+    @Data
+    @NoArgsConstructor
+    public static class Webhook {
+        /** Master switch: when false, no webhook deliveries are attempted. */
+        private boolean enabled = false;
+
+        /** Target URL (HTTP/HTTPS only, no user-info). Null when disabled. */
+        private String url = null;
+
+        /** HMAC-SHA256 signing secret. Masked in API responses, never logged. */
+        private String secret = null;
+
+        /**
+         * Independent SSRF guard for webhook delivery. Defaults to
+         * {@code false}, matching the downloader's default.
+         */
+        private boolean blockPrivateNetworks = false;
+
+        /** Connect timeout in seconds. */
+        private int connectTimeoutSeconds = 10;
+
+        /** Read timeout in seconds. */
+        private int readTimeoutSeconds = 30;
+
+        /** Maximum response body bytes to read from the receiver. */
+        private int maxResponseBytes = 65536;
+
+        /** Maximum delivery attempts before the outbox item becomes terminal. */
+        private int maxAttempts = 10;
+
+        /** Initial retry delay in seconds (exponential backoff start). */
+        private int initialRetryDelaySeconds = 30;
+
+        /** Maximum retry delay in seconds (backoff cap). */
+        private int maxRetryDelaySeconds = 3600;
+
+        /** Maximum age in hours after which an outbox item becomes terminal. */
+        private int maxRetryAgeHours = 72;
+
+        /** Number of worker threads for webhook delivery. */
+        private int deliveryWorkers = 2;
     }
 }

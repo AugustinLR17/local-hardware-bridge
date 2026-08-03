@@ -508,14 +508,17 @@ public class Server implements WebSocketServerInterface {
     }
 
     /**
-     * Mask the authentication token in a config section before returning it via API.
-     * The Web UI knows the token (it authenticated with it), but exposing it in API
-     * responses means any other client that intercepts the response gets the token.
-     * We replace it with "***" so the UI can detect "token is set" without leaking it.
+     * Mask sensitive fields (authentication token and webhook secret) in a config
+     * JSON before returning it via API. The Web UI knows these values (it authenticated
+     * with the token), but exposing them in API responses means any other client that
+     * intercepts the response gets the secrets. We replace each with "***" so the UI
+     * can detect "value is set" without leaking it.
      */
     private static String maskToken(String json) {
         if (json == null) return json;
-        return json.replaceAll("\"token\"\\s*:\\s*\"[^\"]*\"", "\"token\":\"" + MASKED_TOKEN + "\"");
+        String masked = json.replaceAll("\"token\"\\s*:\\s*\"[^\"]*\"", "\"token\":\"" + MASKED_TOKEN + "\"");
+        masked = masked.replaceAll("\"secret\"\\s*:\\s*\"[^\"]*\"", "\"secret\":\"" + MASKED_TOKEN + "\"");
+        return masked;
     }
 
     /**
